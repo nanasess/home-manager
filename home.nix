@@ -49,7 +49,6 @@
 
   programs.fzf = {
     enable = true;
-    enableZshIntegration = true;
   };
 
   home.sessionVariables = {
