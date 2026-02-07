@@ -19,5 +19,25 @@ jobs:
       - name: nix flake check
         run: nix flake check
 
-      - name: Build wsl-gentoo activation package
-        run: nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
+  build:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            config: nanasess@wsl-gentoo
+          - os: macos-13
+            config: nanasess@macbook
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build activation package
+        run: nix build '.#homeConfigurations."${{ matrix.config }}".activationPackage'
