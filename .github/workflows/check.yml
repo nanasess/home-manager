@@ -27,7 +27,7 @@ jobs:
         include:
           - os: ubuntu-latest
             config: nanasess@wsl-gentoo
-          - os: macos-13
+          - os: macos-15-intel
             config: nanasess@macbook
 
     runs-on: ${{ matrix.os }}
