@@ -79,7 +79,7 @@
         "text/x-moc" "text/x-pascal" "text/x-tcl" "text/x-tex"
         "application/x-shellscript" "text/x-c" "text/x-c++"
       ];
-      exec = "env GTK_IM_MODULE=none XMODIFIERS=@im=none /usr/bin/emacs %F";
+      exec = ''sh -c "export PATH=\\$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:\\$PATH; exec env GTK_IM_MODULE=none XMODIFIERS=@im=none /usr/bin/emacs \\$@" sh %F'';
       icon = "emacs";
       terminal = false;
       categories = [ "Utility" "Development" "TextEditor" ];
@@ -101,7 +101,7 @@
         "application/x-shellscript" "text/x-c" "text/x-c++"
         "x-scheme-handler/org-protocol"
       ];
-      exec = ''env GTK_IM_MODULE=none XMODIFIERS=@im=none sh -c "if [ -n \"\\$*\" ]; then exec /usr/bin/emacsclient --alternate-editor= --reuse-frame \"\\$@\"; else exec emacsclient --alternate-editor= --create-frame; fi" sh %F'';
+      exec = ''sh -c "export PATH=\\$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:\\$PATH; if [ -n \"\\$*\" ]; then exec env GTK_IM_MODULE=none XMODIFIERS=@im=none /usr/bin/emacsclient --alternate-editor= --reuse-frame \"\\$@\"; else exec env GTK_IM_MODULE=none XMODIFIERS=@im=none emacsclient --alternate-editor= --create-frame; fi" sh %F'';
       icon = "emacs";
       terminal = false;
       categories = [ "Development" "TextEditor" ];
@@ -113,11 +113,11 @@
       actions = {
         new-window = {
           name = "New Window";
-          exec = "env GTK_IM_MODULE=none XMODIFIERS=@im=none /usr/bin/emacsclient --alternate-editor= --create-frame %F";
+          exec = ''sh -c "export PATH=\\$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:\\$PATH; exec env GTK_IM_MODULE=none XMODIFIERS=@im=none /usr/bin/emacsclient --alternate-editor= --create-frame \\$@" sh %F'';
         };
         new-instance = {
           name = "New Instance";
-          exec = "env GTK_IM_MODULE=none XMODIFIERS=@im=none emacs %F";
+          exec = ''sh -c "export PATH=\\$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:\\$PATH; exec env GTK_IM_MODULE=none XMODIFIERS=@im=none emacs \\$@" sh %F'';
         };
       };
     };
