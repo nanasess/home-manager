@@ -51,6 +51,10 @@
     enable = true;
   };
 
+  programs.zoxide = {
+    enable = true;
+  };
+
   home.sessionVariables = {
     LANG = "ja_JP.UTF-8";
     SSH_AUTH_SOCK = "$HOME/.1password/agent.sock";
