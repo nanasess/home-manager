@@ -27,6 +27,8 @@ jobs:
         include:
           - os: ubuntu-latest
             config: nanasess@wsl-gentoo
+          - os: ubuntu-latest
+            config: nanasess@ubuntu
           - os: macos-15-intel
             config: nanasess@macbook
 

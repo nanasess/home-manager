@@ -20,10 +20,13 @@
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
           modules = [ ./home.nix ./hosts/wsl-gentoo.nix ];
         };
-
         "nanasess@macbook" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-darwin;
           modules = [ ./home.nix ./hosts/macos.nix ];
+        };
+        "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
+          pkgs = nixpkgs.legacyPackages.x86_64-linux;
+          modules = [ ./home.nix ./hosts/ubuntu.nix ];
         };
       };
 
