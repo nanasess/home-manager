@@ -15,8 +15,8 @@ js_runtime = "node"
 [keys]
 accept_typeahead = ["tab"]
 trigger_labels = "lalt"
-next = ["down"]
-prev = ["up"]
+next = ["down", "ctrl n"]
+prev = ["up", "ctrl p"]
 close = ["esc"]
 remove_from_history = ["shift backspace"]
 resume_query = ["ctrl r"]
@@ -124,7 +124,8 @@ weight = 5
 name = "calc"
 icon = "accessories-calculator"
 placeholder = "Calculator"
-min_chars = 4
+min_chars = 0
+prefix = "="
 
 [builtins.windows]
 weight = 5
