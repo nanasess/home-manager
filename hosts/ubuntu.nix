@@ -17,6 +17,8 @@
     '';
   };
 
+  xdg.configFile."walker/config.toml".source = ./walker/config.toml;
+
   home.activation.disableGnomeTerminalBell = config.lib.dag.entryAfter [ "writeBoundary" ] ''
     profile_uuid=$(${pkgs.glib}/bin/gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
     if [ -n "$profile_uuid" ]; then
