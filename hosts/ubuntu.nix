@@ -5,7 +5,17 @@
 
   home.packages = with pkgs; [
     walker
+    libqalculate
   ];
+
+  home.file.".local/bin/walker-wrapper" = {
+    executable = true;
+    text = ''
+      #!/bin/bash
+      export PATH="${config.home.homeDirectory}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      exec walker "$@"
+    '';
+  };
 
   home.activation.disableGnomeTerminalBell = config.lib.dag.entryAfter [ "writeBoundary" ] ''
     profile_uuid=$(${pkgs.glib}/bin/gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
@@ -24,7 +34,7 @@
 
     "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" = {
       name = "Walker";
-      command = "${config.home.homeDirectory}/.nix-profile/bin/walker";
+      command = "${config.home.homeDirectory}/.local/bin/walker-wrapper";
       binding = "<Control><Shift>semicolon";
     };
   };
