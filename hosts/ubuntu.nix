@@ -7,11 +7,15 @@
     walker
   ];
 
-  dconf.settings = {
-    "org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9" = {
-      audible-bell = false;
-    };
+  home.activation.disableGnomeTerminalBell = config.lib.dag.entryAfter [ "writeBoundary" ] ''
+    profile_uuid=$(${pkgs.glib}/bin/gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
+    if [ -n "$profile_uuid" ]; then
+      profile_path="/org/gnome/terminal/legacy/profiles:/:$profile_uuid"
+      ${pkgs.dconf}/bin/dconf write "$profile_path/audible-bell" false
+    fi
+  '';
 
+  dconf.settings = {
     "org/gnome/settings-daemon/plugins/media-keys" = {
       custom-keybindings = [
         "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/"
