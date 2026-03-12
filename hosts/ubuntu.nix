@@ -4,6 +4,7 @@
   home.homeDirectory = "/home/nanasess";
 
   home.packages = with pkgs; [
+    onedrive
     walker
     libqalculate
   ];
@@ -26,6 +27,22 @@
       ${pkgs.dconf}/bin/dconf write "$profile_path/audible-bell" false
     fi
   '';
+
+  systemd.user.services.onedrive = {
+    Unit = {
+      Description = "OneDrive Free Client";
+      After = [ "network-online.target" ];
+      Wants = [ "network-online.target" ];
+    };
+    Service = {
+      ExecStart = "${pkgs.onedrive}/bin/onedrive --monitor";
+      Restart = "on-failure";
+      RestartSec = 3;
+    };
+    Install = {
+      WantedBy = [ "default.target" ];
+    };
+  };
 
   dconf.settings = {
     "org/gnome/settings-daemon/plugins/media-keys" = {
