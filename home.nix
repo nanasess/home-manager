@@ -4,6 +4,11 @@
   home.username = "nanasess";
   home.stateVersion = "24.05";
 
+  nixpkgs.config.allowUnfreePredicate = pkg:
+    builtins.elem (lib.getName pkg) [
+      "terraform"
+    ];
+
   programs.home-manager.enable = true;
 
   home.packages = with pkgs; [
