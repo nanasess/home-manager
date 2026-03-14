@@ -21,6 +21,8 @@
     git-lfs
     gh
     sheldon
+    terraform
+    azure-cli
 
     # Fonts
     noto-fonts
