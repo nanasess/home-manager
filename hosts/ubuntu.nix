@@ -3,6 +3,8 @@
 {
   home.homeDirectory = "/home/nanasess";
 
+  programs.ghostty.package = config.lib.nixGL.wrap pkgs.ghostty;
+
   home.packages = with pkgs; [
     onedrive
     walker

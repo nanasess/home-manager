@@ -7,9 +7,13 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixgl = {
+      url = "github:nix-community/nixGL";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager, ... }:
+  outputs = { self, nixpkgs, home-manager, nixgl, ... }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -26,7 +30,14 @@
         };
         "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
-          modules = [ ./home.nix ./hosts/ubuntu.nix ./modules/onedrive.nix ];
+          modules = [
+            ./home.nix
+            ./hosts/ubuntu.nix
+            ./modules/onedrive.nix
+            {
+              nixGL.packages = nixgl.packages;
+            }
+          ];
         };
       };
 
