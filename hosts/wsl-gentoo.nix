@@ -3,6 +3,15 @@
 {
   home.homeDirectory = "/home/nanasess";
 
+  programs.ghostty = {
+    enable = true;
+    settings = {
+      font-family = "Ubuntu Sans Mono";
+      font-size = 13;
+      theme = "iTerm2 Solarized Light";
+    };
+  };
+
   home.sessionVariables = {
     BROWSER = "wslview";
   };

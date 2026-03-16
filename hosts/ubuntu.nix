@@ -3,6 +3,16 @@
 {
   home.homeDirectory = "/home/nanasess";
 
+  programs.ghostty = {
+    enable = true;
+    package = config.lib.nixGL.wrap pkgs.ghostty;
+    settings = {
+      font-family = "Ubuntu Sans Mono";
+      font-size = 13;
+      theme = "iTerm2 Solarized Light";
+    };
+  };
+
   home.packages = with pkgs; [
     onedrive
     walker
