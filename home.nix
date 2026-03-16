@@ -62,14 +62,6 @@
     enable = true;
   };
 
-  programs.ghostty = {
-    enable = true;
-    settings = {
-      font-family = "Ubuntu Sans Mono";
-      font-size = 13;
-    };
-  };
-
   home.sessionVariables = {
     LANG = "ja_JP.UTF-8";
     SSH_AUTH_SOCK = "$HOME/.1password/agent.sock";
