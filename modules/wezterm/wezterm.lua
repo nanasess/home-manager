@@ -33,10 +33,7 @@ config.show_close_tab_button_in_tabs = false
 wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_width)
   local title = (tab.tab_index + 1) .. ': ' .. tab.active_pane.title
   local min_width = 20
-  while #title < min_width do
-    title = title .. ' '
-  end
-  return title
+  return string.format("%-" .. min_width .. "s", title)
 end)
 
 return config
