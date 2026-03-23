@@ -28,6 +28,7 @@
     sheldon
     terraform
     azure-cli
+    hugo
 
     # Fonts
     noto-fonts
