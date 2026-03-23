@@ -19,6 +19,9 @@ jobs:
       - name: nix flake check
         run: nix flake check
 
+      - name: Lua syntax check
+        run: nix shell nixpkgs#lua -c luac -p modules/wezterm/wezterm.lua
+
   build:
     needs: check
     strategy:
