@@ -68,6 +68,8 @@ modules/
   emacs/
     default.nix        -- Emacs モジュール（el-get でパッケージ管理、Nix はネイティブ依存のみ）
     init.el, early-init.el, lisp/
+  wezterm/
+    wezterm.lua        -- WezTerm 設定（WSL Gentoo 用、activation で Windows 側にコピー）
   zsh/
     default.nix        -- Zsh モジュール（sheldon + powerlevel10k）
     .zaliases, .p10k.zsh, eterm.zsh
@@ -97,6 +99,7 @@ packages/
 | Emacs ネイティブ依存 | Nix (vterm, pdf-tools, treesit-grammars) | ビルド依存の解決 |
 | Emacs 純 Elisp パッケージ | el-get | 柔軟性、開発版追従 |
 | Zsh プラグイン | sheldon | 既存のプラグイン管理を維持 |
+| WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
 | WSL 設定 (/etc/wsl.conf 等) | 手動 or ansible | システムレベルのため home-manager 対象外 |
 
 ### 移行元リポジトリ
@@ -121,3 +124,11 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 - 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest + macos-latest）
 - フォーマットチェック (`nix fmt -- --check .`)
 - Portage の `package.use` 重複チェック（wsl-gentoo のみ）
+
+## Windows on WezTerm
+
+設定ソース: `modules/wezterm/wezterm.lua`
+デプロイ先: `/mnt/c/Users/nanasess/.wezterm.lua`
+
+`home.activation.weztermConfig` により `home-manager switch` 時に Windows 側へコピーされる。
+ホームディレクトリ外（`/mnt/c/`）のため `home.file` のシンボリックリンクは使えず、`install` コマンドでコピーしている。

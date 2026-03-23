@@ -7,6 +7,12 @@
     BROWSER = "wslview";
   };
 
+  # WezTerm 設定を Windows 側にコピー
+  home.activation.weztermConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    install -Dm644 ${../modules/wezterm/wezterm.lua} /mnt/c/Users/${config.home.username}/.wezterm.lua
+  '';
+
+
   home.file.".local/bin/op" = {
     executable = true;
     text = ''
