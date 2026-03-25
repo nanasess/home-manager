@@ -13,6 +13,7 @@ config.default_domain = "WSL:Gentoo-systemd"
 
 config.color_scheme = "Builtin Solarized Light"
 config.font = wezterm.font 'UDEV Gothic NF'
+config.font_size = 14.0
 
 local spawn_tab_in_home = wezterm.action.SpawnCommandInNewTab {
   cwd = '\\\\wsl.localhost\\Gentoo-systemd\\home\\nanasess',
@@ -25,8 +26,8 @@ config.keys = {
   { key = 't', mods = 'SUPER', action = spawn_tab_in_home },
 }
 
-config.initial_cols = 128
-config.initial_rows = 30
+config.initial_cols = 160
+config.initial_rows = 40
 config.enable_scroll_bar = true
 config.show_close_tab_button_in_tabs = false
 
