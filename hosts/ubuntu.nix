@@ -13,6 +13,21 @@
     };
   };
 
+  home.file.".local/share/applications/com.mitchellh.ghostty.desktop".text = ''
+    [Desktop Entry]
+    Version=1.0
+    Name=Ghostty
+    Type=Application
+    Comment=A terminal emulator
+    Exec=${config.home.homeDirectory}/.nix-profile/bin/ghostty --gtk-single-instance=true
+    Icon=com.mitchellh.ghostty
+    Categories=System;TerminalEmulator;
+    Keywords=terminal;tty;pty;
+    StartupNotify=true
+    StartupWMClass=com.mitchellh.ghostty
+    Terminal=false
+  '';
+
   home.packages = with pkgs; [
     onedrive
     walker
