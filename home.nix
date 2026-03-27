@@ -28,6 +28,7 @@
     sheldon
     terraform
     azure-cli
+    awscli2
     hugo
 
     # Fonts
