@@ -11,7 +11,7 @@ config.wsl_domains = {
 }
 config.default_domain = "WSL:Gentoo-systemd"
 
-config.color_scheme = "Builtin Solarized Light"
+config.color_scheme = "Solarized (light) (terminal.sexy)"
 config.font = wezterm.font 'UDEV Gothic NF'
 config.font_size = 14.0
 
