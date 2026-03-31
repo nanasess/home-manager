@@ -9,7 +9,7 @@
     settings = {
       font-family = "Ubuntu Sans Mono";
       font-size = 13;
-      theme = "iTerm2 Solarized Light";
+      theme = "Solarized Dark Patched";
     };
   };
 
