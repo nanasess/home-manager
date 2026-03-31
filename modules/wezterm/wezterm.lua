@@ -24,6 +24,8 @@ config.keys = {
   { key = 'Enter', mods = 'SHIFT', action = wezterm.action.SendString '\x1b[13;2u' },
   { key = 't', mods = 'CTRL|SHIFT', action = spawn_tab_in_home },
   { key = 't', mods = 'SUPER', action = spawn_tab_in_home },
+  { key = 'l', mods = 'CTRL', action = wezterm.action.ActivateTabRelative(1) },
+  { key = 'h', mods = 'CTRL', action = wezterm.action.ActivateTabRelative(-1) },
 }
 
 config.initial_cols = 160

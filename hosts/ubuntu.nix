@@ -10,6 +10,10 @@
       font-family = "Ubuntu Sans Mono";
       font-size = 13;
       theme = "iTerm2 Solarized Light";
+      keybind = [
+        "ctrl+l=goto_tab:next"
+        "ctrl+h=goto_tab:previous"
+      ];
     };
   };
 
