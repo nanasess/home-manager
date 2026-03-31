@@ -9,6 +9,10 @@
     settings = {
       font-family = "Ubuntu Sans Mono";
       font-size = 13;
+      keybind = [
+        "ctrl+l=next_tab"
+        "ctrl+h=previous_tab"
+      ];
       theme = "Solarized Dark Patched";
     };
   };
