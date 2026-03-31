@@ -11,8 +11,8 @@
       font-size = 13;
       theme = "iTerm2 Solarized Light";
       keybind = [
-        "ctrl+l=goto_tab:next"
-        "ctrl+h=goto_tab:previous"
+        "ctrl+l=next_tab"
+        "ctrl+h=previous_tab"
       ];
     };
   };
