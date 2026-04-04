@@ -64,6 +64,15 @@
     enable = true;
   };
 
+  programs.mise = {
+    enable = true;
+    globalConfig = {
+      tools = {
+        node = "lts";
+      };
+    };
+  };
+
   home.sessionVariables = {
     LANG = "ja_JP.UTF-8";
     SSH_AUTH_SOCK = "$HOME/.1password/agent.sock";
