@@ -8,7 +8,7 @@
     package = config.lib.nixGL.wrap pkgs.ghostty;
     settings = {
       font-family = "Ubuntu Sans Mono";
-      font-size = 13;
+      font-size = 20;
       keybind = [
         "ctrl+l=next_tab"
         "ctrl+h=previous_tab"
