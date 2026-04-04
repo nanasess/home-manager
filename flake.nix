@@ -22,11 +22,11 @@
       homeConfigurations = {
         "nanasess@wsl-gentoo" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
-          modules = [ ./home.nix ./hosts/wsl-gentoo.nix ./modules/onedrive.nix ];
+          modules = [ ./home.nix ./hosts/wsl-gentoo.nix ./modules/onedrive.nix ./modules/emacs ];
         };
         "nanasess@macbook" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-darwin;
-          modules = [ ./home.nix ./hosts/macos.nix ];
+          modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ];
         };
         "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -34,6 +34,7 @@
             ./home.nix
             ./hosts/ubuntu.nix
             ./modules/onedrive.nix
+            ./modules/emacs
             {
               nixGL.packages = nixgl.packages;
             }

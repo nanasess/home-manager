@@ -22,6 +22,21 @@ jobs:
       - name: Lua syntax check
         run: nix shell nixpkgs#lua -c luac -p modules/wezterm/wezterm.lua
 
+  emacs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: purcell/setup-emacs@master
+        with:
+          version: release-snapshot
+      - uses: actions/cache@v4
+        with:
+          path: modules/emacs/elpaca/
+          key: elpaca-${{ hashFiles('modules/emacs/init.el') }}
+          restore-keys: elpaca-
+      - name: Emacs batch load test
+        run: emacs --init-directory modules/emacs -l modules/emacs/early-init.el -l modules/emacs/init.el --batch
+
   build:
     needs: check
     strategy:
@@ -40,7 +55,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: DeterminateSystems/nix-installer-action@main
+      # Determinate Nix Installer v13+ は Intel Mac 非サポート
+      # https://github.com/DeterminateSystems/nix-src/issues/224
+      - uses: DeterminateSystems/nix-installer-action@v16
+        if: runner.os != 'macOS' || runner.arch != 'X64'
+
+      - uses: DeterminateSystems/nix-installer-action@v12
+        if: runner.os == 'macOS' && runner.arch == 'X64'
 
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
