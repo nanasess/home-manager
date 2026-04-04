@@ -4,3 +4,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # v12 は Intel Mac 向けにピン留め。v13+ は Intel Mac 非サポート
+      # https://github.com/DeterminateSystems/nix-src/issues/224
+      - dependency-name: DeterminateSystems/nix-installer-action
+        update-types: ["version-update:semver-major"]

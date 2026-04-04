@@ -55,6 +55,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Determinate Nix Installer v13+ は Intel Mac 非サポート
+      # https://github.com/DeterminateSystems/nix-src/issues/224
       - uses: DeterminateSystems/nix-installer-action@v16
         if: runner.os != 'macOS' || runner.arch != 'X64'
 
