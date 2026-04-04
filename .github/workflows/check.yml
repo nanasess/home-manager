@@ -29,7 +29,7 @@ jobs:
       - uses: purcell/setup-emacs@master
         with:
           version: release-snapshot
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: modules/emacs/elpaca/
           key: elpaca-${{ hashFiles('modules/emacs/init.el') }}
