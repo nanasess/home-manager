@@ -55,7 +55,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/nix-installer-action@v16
+        if: runner.os != 'macOS' || runner.arch != 'X64'
+
+      - uses: DeterminateSystems/nix-installer-action@v12
+        if: runner.os == 'macOS' && runner.arch == 'X64'
 
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
