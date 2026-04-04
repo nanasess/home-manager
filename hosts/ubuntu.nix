@@ -33,6 +33,7 @@
   '';
 
   home.packages = with pkgs; [
+    emacs30
     onedrive
     walker
     libqalculate

@@ -93,7 +93,7 @@
       export PATH="${config.home.homeDirectory}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
       export GTK_IM_MODULE=none
       export XMODIFIERS=@im=none
-      exec /usr/bin/emacs "$@"
+      exec emacs "$@"
     '';
   };
 
@@ -105,9 +105,9 @@
       export GTK_IM_MODULE=none
       export XMODIFIERS=@im=none
       if [ -n "$*" ]; then
-        exec /usr/bin/emacsclient --alternate-editor= --reuse-frame "$@"
+        exec emacsclient --alternate-editor= --reuse-frame "$@"
       else
-        exec /usr/bin/emacsclient --alternate-editor= --create-frame
+        exec emacsclient --alternate-editor= --create-frame
       fi
     '';
   };
@@ -127,7 +127,7 @@
       StartupNotify=true
       StartupWMClass=Emacs
       Keywords=Text;Editor;
-      TryExec=/usr/bin/emacs
+      TryExec=${config.home.homeDirectory}/.nix-profile/bin/emacs
     '';
   };
 
