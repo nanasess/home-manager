@@ -80,14 +80,18 @@ nix flake update home-manager
 
 ### Emacs パッケージの更新 (elpaca)
 
+`elpaca-lock-file` は `~/.config/home-manager/modules/emacs/elpaca.lock` を直接指しているため、
+`M-x elpaca-write-lock-file` で home-manager ソースに直接書き出される（手動コピー不要）。
+
 ```bash
 # 1. Emacs 内で全パッケージを更新
 M-x elpaca-pull-all
 
-# 2. 動作確認後、ロックファイルを書き出し
+# 2. 動作確認後、ロックファイルを書き出し（home-manager ソースに直接反映）
 M-x elpaca-write-lock-file
 
 # 3. 変更をコミット
+cd ~/.config/home-manager
 git add modules/emacs/elpaca.lock
 git commit -m "chore(emacs): elpaca パッケージ更新"
 
@@ -99,6 +103,18 @@ home-manager switch --flake '.#nanasess@wsl-gentoo'
 
 ```bash
 M-x elpaca-pull    # パッケージ名を指定
+M-x elpaca-write-lock-file
+```
+
+ロックファイルでピン留めされたパッケージが detached HEAD で更新に失敗する場合:
+
+```bash
+# ソースディレクトリで手動でブランチに戻す
+cd ~/.emacs.d/elpaca/sources/<package>
+git checkout main
+git pull
+
+# Emacs でロックファイルを更新
 M-x elpaca-write-lock-file
 ```
 

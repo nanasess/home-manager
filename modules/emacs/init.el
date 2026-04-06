@@ -64,7 +64,11 @@
 
 ;; Lock file for version pinning (replaces el-get-lock)
 ;; Generate: M-x elpaca-write-lock-file
-(setopt elpaca-lock-file (expand-file-name "elpaca.lock" user-emacs-directory))
+;; home-manager のソースに直接書き出すことで手動コピー不要にする
+(setopt elpaca-lock-file
+        (let ((hm-lock "~/.config/home-manager/modules/emacs/elpaca.lock"))
+          (if (file-writable-p hm-lock) hm-lock
+            (expand-file-name "elpaca.lock" user-emacs-directory))))
 
 ;;;; ============================================================
 ;;;; Base libraries (wait for completion before dependents)
