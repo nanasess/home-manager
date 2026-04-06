@@ -13,6 +13,27 @@
   '';
 
 
+  # WSL 固有の zsh 設定
+  programs.zsh.initContent = lib.mkAfter ''
+    # VS Code PATH (WSL)
+    export PATH="/mnt/c/Users/''${USER}/AppData/Local/Programs/Microsoft VS Code/bin":$PATH
+
+    # X11/Wayland symlinks for WSLg
+    if [ ! -L /tmp/.X11-unix ]; then
+      rm -rf /tmp/.X11-unix
+      ln -s /mnt/wslg/.X11-unix /tmp/.X11-unix
+    fi
+    if [ ! -L "''${XDG_RUNTIME_DIR}/wayland-0" ]; then
+      rm -rf "''${XDG_RUNTIME_DIR}/wayland-0*"
+      ln -s /mnt/wslg/runtime-dir/wayland-0* "$XDG_RUNTIME_DIR"
+    fi
+
+    # keyboard layout
+    if [ -z "$WAYLAND_DISPLAY" ]; then
+      if which setxkbmap > /dev/null; then setxkbmap -layout us; fi
+    fi
+  '';
+
   home.file.".local/bin/op" = {
     executable = true;
     text = ''

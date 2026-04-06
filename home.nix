@@ -25,7 +25,6 @@
     # Development
     git-lfs
     gh
-    sheldon
     terraform
     azure-cli
     awscli2

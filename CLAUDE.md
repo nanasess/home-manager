@@ -65,10 +65,13 @@ home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
 flake.nix              -- エントリポイント（inputs と homeConfigurations）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
-  wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm コピー、1Password CLI）
+  wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm コピー、1Password CLI、WSLg X11/Wayland）
   ubuntu.nix           -- Ubuntu 固有設定（Ghostty、Walker、OneDrive）
   macos.nix            -- macOS 固有設定
 modules/
+  zsh/
+    default.nix        -- Zsh モジュール（プラグイン、エイリアス、補完、1Password 連携）
+    .p10k.zsh          -- Powerlevel10k テーマ設定
   emacs/
     default.nix        -- Emacs モジュール（elpaca でパッケージ管理）
     init.el             -- Emacs 設定
@@ -86,7 +89,7 @@ modules/
 ### ホスト設定の追加パターン
 
 1. `hosts/<hostname>.nix` を作成（ホスト固有の設定）
-2. `flake.nix` の `homeConfigurations` にエントリを追加（`modules = [ ./home.nix ./hosts/<hostname>.nix ]`）
+2. `flake.nix` の `homeConfigurations` にエントリを追加（`modules = [ ./home.nix ./hosts/<hostname>.nix ./modules/emacs ./modules/zsh ]`）
 3. macOS ホストの場合は `pkgs` を `aarch64-darwin` の `legacyPackages` に変更
 
 ### 管理方針
@@ -95,18 +98,19 @@ modules/
 |---------|--------|------|
 | ユーザー環境・dotfiles | home-manager | 宣言的管理、CI 検証 |
 | 開発ツール (CLI) | Nix | 環境再現性 |
+| Zsh プラグイン | Nix (programs.zsh.plugins) | sheldon から移行、Nix による再現性 |
 | Emacs Elisp パッケージ | elpaca + use-package | 柔軟性、ロックファイルによるバージョン固定 |
 | Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
 
 ### 移行元リポジトリ (TODO)
 
-以下のリポジトリからの移行は未完了。段階的にこのリポジトリへ統合する。
+以下のリポジトリからの移行状況。段階的にこのリポジトリへ統合する。
 
-| リポジトリ | 移行対象 |
-|-----------|---------|
-| `~/.config/dotfiles` | Zsh 設定、エイリアス、1Password SSH 連携 |
-| `~/git-repos/gentoo-ansible` | Portage 設定 (make.conf, package.use 等)、パッケージ一覧 |
+| リポジトリ | 移行対象 | 状態 |
+|-----------|---------|------|
+| `~/.config/dotfiles` | Zsh 設定、エイリアス、1Password SSH 連携 | 移行済み |
+| `~/git-repos/gentoo-ansible` | Portage 設定 (make.conf, package.use 等)、パッケージ一覧 | 未着手 |
 
 ### フォーマッター
 
