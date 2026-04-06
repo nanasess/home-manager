@@ -83,6 +83,19 @@
     JQ_COLORS = "1;36:0;33:0;33:0;36:0;32:1;39:1;39";
   };
 
+  programs.ssh = {
+    enable = true;
+    enableDefaultConfig = false;
+    includes = [
+      "~/.ssh/conf.d/*.conf"
+    ];
+    matchBlocks."*" = {
+      extraOptions = {
+        "IdentityAgent" = "~/.1password/agent.sock";
+      };
+    };
+  };
+
   home.file.".signature".text = ''
     Kentaro Ohkouchi
   '';
