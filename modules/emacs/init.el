@@ -471,7 +471,7 @@
   :bind ("C-," . embark-act))
 
 (use-package embark-consult
-  :ensure nil
+  :ensure (:host github :repo "oantolin/embark" :files ("embark-consult.el"))
   :after (embark consult)
   :bind (:map embark-file-map
          ("s" . sudo-edit)))
