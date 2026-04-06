@@ -442,7 +442,8 @@
   (completion-category-overrides nil))
 
 (use-package marginalia
-  :ensure (:host github :repo "minad/marginalia" :branch "main"))
+  :ensure (:host github :repo "minad/marginalia" :branch "main")
+  :hook (after-init . marginalia-mode))
 
 (use-package consult
   :ensure (:host github :repo "minad/consult" :branch "main")
@@ -487,7 +488,6 @@
   :ensure (:host github :repo "minad/vertico" :branch "main"
            :files ("*.el" "extensions/*.el"))
   :hook ((after-init . vertico-mode)
-         (after-init . marginalia-mode)
          (minibuffer-setup . vertico-repeat-save))
   :bind (("C-z C-r" . vertico-repeat)
          :map vertico-map
