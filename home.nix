@@ -32,6 +32,7 @@
     # Fonts
     noto-fonts
     noto-fonts-color-emoji
+    udev-gothic-nf
   ]
   ++ lib.optionals stdenv.isLinux [
     wakatime-cli
