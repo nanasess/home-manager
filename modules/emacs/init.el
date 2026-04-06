@@ -524,6 +524,7 @@
 
 (use-package consult-tramp
   :ensure (:host github :repo "Ladicle/consult-tramp" :branch "main")
+  :defer t
   :custom
   (consult-tramp-method "sshx"))
 
@@ -622,16 +623,6 @@
       (message "Copy menu not available. Run M-x magit-status to load transient first."))))
 
 (bind-key "M-w" #'my/copy-or-menu)
-
-(use-package yasnippet
-  :ensure t
-  :hook (emacs-startup . yas-global-mode)
-  :bind (:map yas-minor-mode-map
-         ([(tab)] . nil)
-         ("TAB" . nil)))
-
-(use-package yasnippet-snippets
-  :ensure t)
 
 (use-package expand-region
   :ensure t
@@ -779,10 +770,12 @@
          ("<S-tab>" . markdown-shifttab)))
 
 (use-package polymode
-  :ensure (:host github :repo "polymode/polymode"))
+  :ensure (:host github :repo "polymode/polymode")
+  :defer t)
 
 (use-package poly-markdown
-  :ensure (:host github :repo "polymode/poly-markdown"))
+  :ensure (:host github :repo "polymode/poly-markdown")
+  :defer t)
 
 ;;;; ============================================================
 ;;;; Flycheck
@@ -900,7 +893,8 @@
 ;;;; Email (oauth2)
 ;;;; ============================================================
 (use-package oauth2
-  :ensure (:host github :repo "emacsmirror/oauth2"))
+  :ensure (:host github :repo "emacsmirror/oauth2")
+  :defer t)
 
 ;;;; ============================================================
 ;;;; Misc tools
