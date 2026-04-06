@@ -17,6 +17,10 @@
 (setq load-prefer-newer t)
 (push '(tool-bar-lines . 0) default-frame-alist)
 
+;; doom-solarized-light のフラッシュ防止
+(push '(background-color . "#FDF6E3") default-frame-alist)
+(push '(foreground-color . "#657B83") default-frame-alist)
+
 ;; elpaca takes over package management
 (setq package-enable-at-startup nil)
 
