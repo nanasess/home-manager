@@ -190,38 +190,27 @@
 ;;;; ============================================================
 (use-package ultra-scroll
   :ensure (:host github :repo "jdtsmith/ultra-scroll" :branch "main")
+  :init
+  (setq scroll-conservatively 3
+        scroll-margin 0)
   :hook (emacs-startup
          . (lambda ()
-             (pixel-scroll-precision-mode t)
-             (setopt scroll-conservatively 101
-                    scroll-margin 0
-                    scroll-step 1
-                    pixel-scroll-precision-use-momentum t
-                    pixel-scroll-precision-interpolate-mice t
-                    pixel-scroll-precision-large-scroll-height 10.0
-                    pixel-scroll-precision-interpolation-factor 1.0
-                    pixel-scroll-precision-interpolate-page t
-                    pixel-scroll-precision-interpolation-total-time 0.25)
+             (setopt pixel-scroll-precision-interpolation-total-time 0.15)
              (ultra-scroll-mode 1)
 
-             ;; https://www.reddit.com/r/emacs/comments/13accue/emacs_29_pixelscrollprecisionmode_seems_to_break/
-             (defun +pixel-scroll-interpolate-down ()
-               "Interpolate a scroll downwards by one page."
+             ;; emacs-inertial-scroll 風: ウィンドウの1/3をスムーススクロール
+             (defun my/scroll-down-smoothly ()
+               "Scroll down smoothly by 1/3 of window height."
                (interactive)
-               (if pixel-scroll-precision-interpolate-page
-                   (pixel-scroll-precision-interpolate
-                    (- (/ (window-text-height nil t) 2)) nil 1)
-                 (cua-scroll-up)))
-
-             (defun +pixel-scroll-interpolate-up ()
-               "Interpolate a scroll upwards by one page."
+               (pixel-scroll-precision-interpolate
+                (- (/ (window-text-height nil t) 3)) nil 1))
+             (defun my/scroll-up-smoothly ()
+               "Scroll up smoothly by 1/3 of window height."
                (interactive)
-               (if pixel-scroll-precision-interpolate-page
-                   (pixel-scroll-precision-interpolate
-                    (/ (window-text-height nil t) 2) nil 1)
-                 (cua-scroll-down)))
-             (global-set-key (kbd "C-v") '+pixel-scroll-interpolate-down)
-             (global-set-key (kbd "M-v") '+pixel-scroll-interpolate-up))))
+               (pixel-scroll-precision-interpolate
+                (/ (window-text-height nil t) 3) nil 1))
+             (global-set-key (kbd "C-v") 'my/scroll-down-smoothly)
+             (global-set-key (kbd "M-v") 'my/scroll-up-smoothly))))
 
 ;;;; ============================================================
 ;;;; Clipboard (pgtk / wl-clipboard)
