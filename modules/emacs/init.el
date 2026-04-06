@@ -353,9 +353,8 @@
 ;;;; ============================================================
 (use-package doom-themes
   :ensure t
-  :hook (emacs-startup
-         . (lambda ()
-             (load-theme 'doom-solarized-light t))))
+  :config
+  (load-theme 'doom-solarized-light t))
 
 (use-package nerd-icons
   :ensure (:host github :repo "rainstormstudio/nerd-icons.el" :branch "main")
@@ -372,7 +371,7 @@
 
 (use-package doom-modeline
   :ensure t
-  :hook (emacs-startup . doom-modeline-mode)
+  :hook (after-init . doom-modeline-mode)
   :custom
   (doom-modeline-vcs-max-length 999)
   (doom-modeline-buffer-file-name-style 'buffer-name))
@@ -479,7 +478,7 @@
 
 (use-package savehist
   :ensure nil
-  :hook (emacs-startup . savehist-mode)
+  :hook (after-init . savehist-mode)
   :custom
   (savehist-additional-variables
    '(kill-ring log-edit-comment-ring search-ring regexp-search-ring)))
@@ -487,8 +486,8 @@
 (use-package vertico
   :ensure (:host github :repo "minad/vertico" :branch "main"
            :files ("*.el" "extensions/*.el"))
-  :hook ((emacs-startup . vertico-mode)
-         (emacs-startup . marginalia-mode)
+  :hook ((after-init . vertico-mode)
+         (after-init . marginalia-mode)
          (minibuffer-setup . vertico-repeat-save))
   :bind (("C-z C-r" . vertico-repeat)
          :map vertico-map
@@ -559,7 +558,7 @@
 
 (use-package undo-tree
   :ensure (:host github :repo "emacsmirror/undo-tree")
-  :hook (emacs-startup . global-undo-tree-mode)
+  :hook (after-init . global-undo-tree-mode)
   :custom
   (undo-tree-visualizer-timestamps t)
   (undo-tree-visualizer-diff t)
@@ -924,10 +923,9 @@
 
 (use-package recentf-ext
   :ensure t
-  :hook (emacs-startup
-         . (lambda ()
-             (setopt recentf-max-saved-items 50000)
-             (recentf-mode 1))))
+  :custom
+  (recentf-max-saved-items 50000)
+  :hook (after-init . recentf-mode))
 
 (use-package auto-save-buffers-enhanced
   :ensure (:host github :repo "kentaro/auto-save-buffers-enhanced")
