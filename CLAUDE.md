@@ -4,15 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 概要
 
-Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。WSL2 Gentoo Linux と macOS の環境を1リポジトリで宣言的に管理する。
+Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。WSL2 Gentoo Linux, Ubuntu, macOS の環境を1リポジトリで宣言的に管理する。
 
 ### 目標
 
-- 1リポジトリで WSL2 Gentoo + macOS の設定を管理
+- 1リポジトリで WSL2 Gentoo + Ubuntu + macOS の設定を管理
 - Nix Flakes による宣言的な構成管理
 - GitHub Actions CI で設定の乖離を防止
-- Portage との併用（Gentoo 固有）
-- Emacs + el-get 環境の管理
+- Emacs + elpaca 環境の管理
 
 ### 環境情報
 
@@ -37,9 +36,13 @@ nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
 # macOS の設定をビルド
 nix build '.#homeConfigurations."nanasess@macbook".activationPackage'
 
+# Ubuntu の設定をビルド
+nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage'
+
 # 設定を適用
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 home-manager switch --flake '.#nanasess@macbook'
+home-manager switch --flake '.#nanasess@ubuntu'
 
 # Nix ファイルのフォーマット
 nix fmt
@@ -56,28 +59,26 @@ home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
 
 ## アーキテクチャ
 
-### 目標構成
+### ディレクトリ構成
 
 ```
-flake.nix              -- エントリポイント。inputs と homeConfigurations を定義
-home.nix               -- 全ホスト共通設定（ユーザー名、共通パッケージ、git、direnv、環境変数）
+flake.nix              -- エントリポイント（inputs と homeConfigurations）
+home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
-  wsl-gentoo.nix       -- WSL Gentoo 固有設定（Portage、WSL 環境変数）
+  wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm コピー、1Password CLI）
+  ubuntu.nix           -- Ubuntu 固有設定（Ghostty、Walker、OneDrive）
   macos.nix            -- macOS 固有設定
 modules/
   emacs/
-    default.nix        -- Emacs モジュール（el-get でパッケージ管理、Nix はネイティブ依存のみ）
-    init.el, early-init.el, lisp/
+    default.nix        -- Emacs モジュール（elpaca でパッケージ管理）
+    init.el             -- Emacs 設定
+    early-init.el       -- Emacs 早期初期化設定
+    elpaca.lock         -- elpaca パッケージロックファイル
+    init.d/             -- OS/環境別の追加設定
+    site-lisp/          -- 自作 Elisp
   wezterm/
-    wezterm.lua        -- WezTerm 設定（WSL Gentoo 用、activation で Windows 側にコピー）
-  zsh/
-    default.nix        -- Zsh モジュール（sheldon + powerlevel10k）
-    .zaliases, .p10k.zsh, eterm.zsh
-  git.nix
-  portage.nix          -- Portage 設定管理モジュール（Gentoo 用カスタムモジュール）
-packages/
-  common.nix           -- 共通 Nix パッケージ
-  gentoo-portage.nix   -- Portage パッケージ宣言
+    wezterm.lua        -- WezTerm 設定（WSL → Windows 側にコピー）
+  onedrive.nix         -- OneDrive 設定（WSL Gentoo 用）
 .github/workflows/
   check.yml            -- CI 設定
 ```
@@ -94,24 +95,18 @@ packages/
 |---------|--------|------|
 | ユーザー環境・dotfiles | home-manager | 宣言的管理、CI 検証 |
 | 開発ツール (CLI) | Nix | 環境再現性 |
-| Gentoo システム基盤 | Portage | カーネル、ドライバ、USE flags |
-| Portage 設定ファイル | home-manager → symlink | 宣言的に記述、手動同期 |
-| Emacs ネイティブ依存 | Nix (vterm, pdf-tools, treesit-grammars) | ビルド依存の解決 |
-| Emacs 純 Elisp パッケージ | el-get | 柔軟性、開発版追従 |
-| Zsh プラグイン | sheldon | 既存のプラグイン管理を維持 |
+| Emacs Elisp パッケージ | elpaca + use-package | 柔軟性、ロックファイルによるバージョン固定 |
+| Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
-| WSL 設定 (/etc/wsl.conf 等) | 手動 or ansible | システムレベルのため home-manager 対象外 |
 
-### 移行元リポジトリ
+### 移行元リポジトリ (TODO)
+
+以下のリポジトリからの移行は未完了。段階的にこのリポジトリへ統合する。
 
 | リポジトリ | 移行対象 |
 |-----------|---------|
-| `~/.config/dotfiles` | Zsh 設定、Emacs 設定、エイリアス、1Password SSH 連携 |
+| `~/.config/dotfiles` | Zsh 設定、エイリアス、1Password SSH 連携 |
 | `~/git-repos/gentoo-ansible` | Portage 設定 (make.conf, package.use 等)、パッケージ一覧 |
-
-### Portage モジュール (`modules/portage.nix`)
-
-home-manager のカスタムモジュールとして `/etc/portage` 配下の設定を宣言的に管理する。`services.portage` オプションで `makeConf`, `packageUse`, `packageAcceptKeywords`, `packageMask`, `packageUnmask`, `packageLicense` 等を定義し、`~/.config/portage/` に出力後、同期スクリプトで `/etc/portage` にシンボリックリンクを張る。
 
 ### フォーマッター
 
@@ -120,10 +115,9 @@ home-manager のカスタムモジュールとして `/etc/portage` 配下の設
 ## CI
 
 GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行:
-- `nix flake check` — flake の構文・評価検証
-- 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest + macos-latest）
-- フォーマットチェック (`nix fmt -- --check .`)
-- Portage の `package.use` 重複チェック（wsl-gentoo のみ）
+- **check** — `nix flake check` + WezTerm Lua 構文チェック
+- **emacs** — `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
+- **build** — 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest, macos-15-intel）
 
 ## Windows on WezTerm
 
