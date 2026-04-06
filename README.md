@@ -83,15 +83,47 @@ nix flake update home-manager
 `elpaca-lock-file` は `~/.config/home-manager/modules/emacs/elpaca.lock` を直接指しているため、
 `M-x elpaca-write-lock-file` で home-manager ソースに直接書き出される（手動コピー不要）。
 
+ロックファイルから復元された環境では全パッケージが detached HEAD になるため、
+`elpaca-pull-all` がそのままでは失敗する（[progfolio/elpaca#447](https://github.com/progfolio/elpaca/issues/447)）。
+以下のいずれかの方法で更新する。
+
+#### 方法 1: ロックファイルを一時無効化して更新（メンテナー推奨）
+
+```elisp
+;; init.el の elpaca-lock-file 設定を一時的にコメントアウト
+;; (setopt elpaca-lock-file ...)
+```
+
 ```bash
-# 1. ロックファイルから復元した環境では全パッケージが detached HEAD のため、
-#    まずブランチに戻す
+# 1. Emacs を再起動（ロックファイルなしで起動するため detached HEAD にならない）
+
+# 2. 全パッケージを更新
+M-x elpaca-pull-all
+
+# 3. 動作確認後、ロックファイルを書き出し
+M-x elpaca-write-lock-file
+
+# 4. init.el の elpaca-lock-file 設定を元に戻し、Emacs を再起動
+
+# 5. 変更をコミット
+cd ~/.config/home-manager
+git add modules/emacs/elpaca.lock
+git commit -m "chore(emacs): elpaca パッケージ更新"
+
+# 6. home-manager に反映
+home-manager switch --flake '.#nanasess@wsl-gentoo'
+```
+
+#### 方法 2: elpaca-checkout-branches で detached HEAD を解消して更新
+
+```bash
+# 1. 全パッケージのブランチを復元
 M-x elpaca-checkout-branches
 
 # 2. 全パッケージを更新
 M-x elpaca-pull-all
 
-# 3. 動作確認後、ロックファイルを書き出し（home-manager ソースに直接反映）
+# 3. 動作確認後、ロックファイルを書き出し
 M-x elpaca-write-lock-file
 
 # 4. 変更をコミット
@@ -99,16 +131,8 @@ cd ~/.config/home-manager
 git add modules/emacs/elpaca.lock
 git commit -m "chore(emacs): elpaca パッケージ更新"
 
-# 5. home-manager に反映（elpaca.lock を ~/.emacs.d/ にコピー）
+# 5. home-manager に反映
 home-manager switch --flake '.#nanasess@wsl-gentoo'
-```
-
-特定のパッケージのみ更新する場合:
-
-```bash
-M-x elpaca-checkout-branches   # 必要に応じて
-M-x elpaca-pull                # パッケージ名を指定
-M-x elpaca-write-lock-file
 ```
 
 ### Nix + Emacs を一括更新
