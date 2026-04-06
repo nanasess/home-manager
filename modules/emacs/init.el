@@ -64,7 +64,32 @@
 
 ;; Lock file for version pinning (replaces el-get-lock)
 ;; Generate: M-x elpaca-write-lock-file
-(setopt elpaca-lock-file (expand-file-name "elpaca.lock" user-emacs-directory))
+;; home-manager のソースに直接書き出すことで手動コピー不要にする
+(setopt elpaca-lock-file
+        (let ((hm-lock "~/.config/home-manager/modules/emacs/elpaca.lock"))
+          (if (file-writable-p hm-lock) hm-lock
+            (expand-file-name "elpaca.lock" user-emacs-directory))))
+
+;; elpaca-pull 前に detached HEAD を解消するコマンド
+;; ロックファイル復元後は全パッケージが detached HEAD になるため、
+;; pull 前にブランチに戻す必要がある
+(defun elpaca-checkout-branches ()
+  "Checkout the default branch for all elpaca source repos."
+  (interactive)
+  (let ((sources-dir (expand-file-name "sources" (expand-file-name "elpaca" user-emacs-directory)))
+        (count 0))
+    (dolist (dir (directory-files sources-dir t "^[^.]"))
+      (when (file-directory-p (expand-file-name ".git" dir))
+        (let* ((default-directory dir)
+               (branch (string-trim
+                        (shell-command-to-string
+                         "git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'")))
+               (branch (if (string-empty-p branch) "main" branch)))
+          (when (not (string-empty-p
+                      (shell-command-to-string "git symbolic-ref HEAD 2>&1 | grep -q fatal && echo detached")))
+            (shell-command-to-string (format "git checkout %s 2>/dev/null" branch))
+            (setq count (1+ count))))))
+    (message "Checked out branches for %d packages" count)))
 
 ;;;; ============================================================
 ;;;; Base libraries (wait for completion before dependents)
