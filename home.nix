@@ -7,6 +7,8 @@
   nixpkgs.config.allowUnfreePredicate = pkg:
     builtins.elem (lib.getName pkg) [
       "terraform"
+      "1password-cli"
+      "1password"
     ];
 
   programs.home-manager.enable = true;
@@ -36,6 +38,8 @@
   ]
   ++ lib.optionals stdenv.isLinux [
     wakatime-cli
+    _1password-cli
+    _1password-gui
   ]
   ++ lib.optionals stdenv.isDarwin [
     coreutils
