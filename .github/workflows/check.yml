@@ -47,21 +47,15 @@ jobs:
             config: nanasess@wsl-gentoo
           - os: ubuntu-latest
             config: nanasess@ubuntu
-          - os: macos-15-intel
-            config: nanasess@macbook
+          - os: macos-15
+            config: nanasess@macbook-aarch64
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v6
 
-      # Determinate Nix Installer v13+ は Intel Mac 非サポート
-      # https://github.com/DeterminateSystems/nix-src/issues/224
       - uses: DeterminateSystems/nix-installer-action@v16
-        if: runner.os != 'macOS' || runner.arch != 'X64'
-
-      - uses: DeterminateSystems/nix-installer-action@v12
-        if: runner.os == 'macOS' && runner.arch == 'X64'
 
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
