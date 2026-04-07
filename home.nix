@@ -23,7 +23,6 @@
     tree
     htop
     # Development
-    git-lfs
     gh
     terraform
     azure-cli
@@ -44,10 +43,22 @@
 
   programs.git = {
     enable = true;
-    userName = "Kentaro Ohkouchi";
-    extraConfig = {
+    signing = {
+      key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF0gg8ApM4YFGtY3k6gn/qjvdPE2Vr0MdbSHNa4traq+";
+      signByDefault = true;
+      format = "ssh";
+    };
+    lfs.enable = true;
+    settings = {
+      user = {
+        name = "Kentaro Ohkouchi";
+        email = "nanasess@fsm.ne.jp";
+      };
       init.defaultBranch = "main";
       pull.rebase = true;
+      commit.verbose = true;
+      "credential \"https://github.com\"".helper = "!${config.home.homeDirectory}/.nix-profile/bin/gh auth git-credential";
+      "credential \"https://gist.github.com\"".helper = "!${config.home.homeDirectory}/.nix-profile/bin/gh auth git-credential";
     };
   };
 
@@ -98,5 +109,25 @@
   home.file.".signature".text = ''
     Kentaro Ohkouchi
   '';
+
+  home.file.".myclirc".source = ./dotfiles/myclirc;
+
+  home.file.".npmrc".text = ''
+    prefix=${config.home.homeDirectory}/.npm-global
+  '';
+
+  xdg.configFile."phpactor/phpactor.yml".source = ./dotfiles/phpactor.yml;
+
+  xdg.mimeApps = lib.mkIf pkgs.stdenv.isLinux {
+    enable = true;
+    defaultApplications = {
+      "text/html" = "google-chrome.desktop";
+      "x-scheme-handler/http" = "google-chrome.desktop";
+      "x-scheme-handler/https" = "google-chrome.desktop";
+      "x-scheme-handler/about" = "google-chrome.desktop";
+      "x-scheme-handler/unknown" = "google-chrome.desktop";
+      "x-scheme-handler/claude-cli" = "claude-code-url-handler.desktop";
+    };
+  };
 
 }

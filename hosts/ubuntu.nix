@@ -3,6 +3,8 @@
 {
   home.homeDirectory = "/home/nanasess";
 
+  programs.git.signing.signer = "/opt/1Password/op-ssh-sign";
+
   programs.ghostty = {
     enable = true;
     package = config.lib.nixGL.wrap pkgs.ghostty;

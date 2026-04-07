@@ -3,6 +3,8 @@
 {
   home.homeDirectory = "/home/nanasess";
 
+  programs.git.signing.signer = "/mnt/c/Users/${config.home.username}/AppData/Local/Microsoft/WindowsApps/op-ssh-sign.exe";
+
   home.sessionVariables = {
     BROWSER = "wslview";
   };

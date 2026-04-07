@@ -28,6 +28,10 @@
           pkgs = nixpkgs.legacyPackages.x86_64-darwin;
           modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ./modules/zsh ];
         };
+        "nanasess@macbook-aarch64" = home-manager.lib.homeManagerConfiguration {
+          pkgs = nixpkgs.legacyPackages.aarch64-darwin;
+          modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ./modules/zsh ];
+        };
         "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
           modules = [
