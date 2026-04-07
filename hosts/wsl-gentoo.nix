@@ -41,7 +41,7 @@
     text = ''
       #!/bin/bash
       OP_EXE="/mnt/c/Users/${config.home.username}/AppData/Local/Microsoft/WinGet/Links/op.exe"
-      OP_LINUX="/usr/bin/op"
+      OP_LINUX="${config.home.homeDirectory}/.nix-profile/bin/op"
 
       # op run は Linux のバイナリを実行するため、Windows の op.exe では動作しない
       if [ "$1" = "run" ] && [ -x "$OP_LINUX" ]; then
