@@ -5,6 +5,10 @@
 
   programs.git.signing.signer = "/mnt/c/Users/${config.home.username}/AppData/Local/Microsoft/WindowsApps/op-ssh-sign.exe";
 
+  home.packages = with pkgs; [
+    emacs30-gtk3
+  ];
+
   home.sessionVariables = {
     BROWSER = "wslview";
   };
