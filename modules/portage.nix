@@ -149,4 +149,9 @@
     net-misc/onedrive libnotify dmd-2_105
     sys-devel/gcc d
   '';
+
+  # pg_config とヘッダのみ必要（mise PHP ビルド用）、サーバ不要
+  xdg.configFile."portage/package.use/postgresql".text = ''
+    dev-db/postgresql -systemd -xml
+  '';
 }

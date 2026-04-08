@@ -57,6 +57,24 @@ sudo getuto
 ~/.local/bin/check-system-packages
 ```
 
+### mise PHP のセットアップ
+
+```bash
+# PHP インストール
+mise install php@8.3
+
+# カスタム設定（memory_limit 等）
+echo "memory_limit=1G" > ~/.local/share/mise/installs/php/8.3.30/conf.d/custom.ini
+
+# PECL 拡張の追加
+pecl install redis
+echo "extension=redis.so" > ~/.local/share/mise/installs/php/8.3.30/conf.d/redis.ini
+
+# 確認
+php -m | grep redis
+php -r 'echo ini_get("memory_limit")."\n";'
+```
+
 ## ディレクトリ構成
 
 ```

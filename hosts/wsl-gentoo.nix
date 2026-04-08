@@ -17,8 +17,10 @@ let
     "x11-apps/xeyes"
     "app-shells/zsh"
     "app-editors/emacs" # #49 検証中
+    "sys-apps/plocate"
 
     # mise PHP ビルド依存（asdf-php workflow.yml 参照）
+    "dev-db/postgresql"
     "media-libs/gd"
     "net-misc/curl"
     "dev-libs/libedit"
