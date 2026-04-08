@@ -45,6 +45,7 @@
 
     # Development
     gh
+    uv
     terraform
     azure-cli
     awscli2
