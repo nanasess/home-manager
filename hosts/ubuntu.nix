@@ -1,5 +1,12 @@
 { config, pkgs, lib, ... }:
 
+let
+  # apt で管理するパッケージ一覧
+  # dpkg --get-selections | grep -v deinstall で確認
+  aptPackages = [
+    # TODO: 実環境から精査して追加
+  ];
+in
 {
   home.homeDirectory = "/home/nanasess";
 
@@ -33,6 +40,28 @@
     StartupWMClass=com.mitchellh.ghostty
     Terminal=false
   '';
+
+  home.file.".local/bin/check-system-packages" = {
+    executable = true;
+    text = ''
+      #!/usr/bin/env bash
+      echo "=== apt パッケージ差分チェック ==="
+      missing=0
+      for pkg in ${lib.concatStringsSep " " aptPackages}; do
+        if ! dpkg -s "$pkg" 2>/dev/null | grep -q 'Status: install ok installed'; then
+          echo "MISSING: $pkg"
+          missing=$((missing + 1))
+        fi
+      done
+      if [ "$missing" -eq 0 ]; then
+        echo "OK: すべてのパッケージがインストールされています"
+      else
+        echo "---"
+        echo "$missing 個のパッケージが未インストールです"
+        exit 1
+      fi
+    '';
+  };
 
   home.packages = with pkgs; [
     emacs30

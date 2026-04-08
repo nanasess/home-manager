@@ -81,6 +81,7 @@ modules/
     site-lisp/          -- 自作 Elisp
   wezterm/
     wezterm.lua        -- WezTerm 設定（WSL → Windows 側にコピー）
+  portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
   onedrive.nix         -- OneDrive 設定（WSL Gentoo 用）
 .github/workflows/
   check.yml            -- CI 設定
@@ -102,6 +103,8 @@ modules/
 | Emacs Elisp パッケージ | elpaca + use-package | 柔軟性、ロックファイルによるバージョン固定 |
 | Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
+| Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` → `/etc/portage` シンボリックリンク |
+| システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
 
 ### 移行元リポジトリ (TODO)
 
@@ -110,7 +113,7 @@ modules/
 | リポジトリ | 移行対象 | 状態 |
 |-----------|---------|------|
 | `~/.config/dotfiles` | Zsh 設定、エイリアス、1Password SSH 連携 | 移行済み |
-| `~/git-repos/gentoo-ansible` | Portage 設定 (make.conf, package.use 等)、パッケージ一覧 | 未着手 |
+| `~/git-repos/gentoo-ansible` | Portage 設定 (make.conf, package.use 等) | 移行済み (`modules/portage.nix`) |
 
 ### フォーマッター
 
