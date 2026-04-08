@@ -30,18 +30,23 @@ home-manager switch --flake '.#nanasess@wsl-gentoo'
 
 ### Portage 設定のセットアップ（WSL Gentoo のみ）
 
-Portage 設定は `~/.config/portage/` に書き出されます。初回のみ `/etc/portage` をシンボリックリンクに置換する必要があります。
+Portage 設定は `~/.config/portage/` に書き出され、`/etc/portage/` 内の各ファイルから個別にシンボリックリンクします。
+`gnupg/`, `make.profile`, `profile/` は root 管理のまま `/etc/portage/` に残します。
 
 ```bash
-# 既存の /etc/portage をバックアップ
-sudo cp -a /etc/portage /etc/portage.bak
-
-# home-manager switch で ~/.config/portage/ を生成
+# 1. home-manager switch で ~/.config/portage/ を生成
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 
-# /etc/portage をシンボリックリンクに置換
-sudo rm -rf /etc/portage
-sudo ln -sfn /home/nanasess/.config/portage /etc/portage
+# 2. 管理対象ファイルのシンボリックリンクを作成（初回のみ）
+for f in make.conf binrepos.conf package.accept_keywords package.mask package.unmask package.license; do
+  sudo ln -sfn ~/.config/portage/$f /etc/portage/$f
+done
+sudo rm -rf /etc/portage/package.use /etc/portage/repos.conf
+sudo ln -sfn ~/.config/portage/package.use /etc/portage/package.use
+sudo ln -sfn ~/.config/portage/repos.conf /etc/portage/repos.conf
+
+# 3. GnuPG 鍵の取得（未取得の場合）
+sudo getuto
 ```
 
 ### システムパッケージの確認

@@ -1,21 +1,12 @@
-{ config, lib, ... }:
+{ ... }:
 {
   # Portage 設定を ~/.config/portage/ 以下に書き出す
-  # 初回セットアップ: sudo ln -sfn ~/.config/portage /etc/portage
+  # /etc/portage/ の各ファイルから個別にシンボリックリンクする（初回セットアップは Issue #40 参照）
   #
-  # 以下は xdg.configFile では管理できないため、手動で維持する:
-  # - make.profile (シンボリックリンク → /var/db/repos/gentoo/profiles/...)
-  # - gnupg/ (秘密鍵を含むため)
+  # /etc/portage/ 内で root 管理のまま残すもの:
+  # - gnupg/ (GnuPG 鍵。root 所有・600 が必要)
+  # - make.profile (プロファイルシンボリックリンク。eselect profile で管理)
   # - profile/ (package.use.force 等)
-  #
-  # make.profile が存在しない場合に自動作成
-  home.activation.portageProfile = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    PORTAGE_DIR="${config.xdg.configHome}/portage"
-    PROFILE_TARGET="/var/db/repos/gentoo/profiles/default/linux/amd64/23.0/desktop/systemd"
-    if [ ! -e "$PORTAGE_DIR/make.profile" ] || [ "$(readlink "$PORTAGE_DIR/make.profile")" != "$PROFILE_TARGET" ]; then
-      ln -sfn "$PROFILE_TARGET" "$PORTAGE_DIR/make.profile"
-    fi
-  '';
 
   # binrepos.conf: --getbinpkg 用（空でも存在が必要）
   xdg.configFile."portage/binrepos.conf".text = ''

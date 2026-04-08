@@ -103,7 +103,7 @@ modules/
 | Emacs Elisp パッケージ | elpaca + use-package | 柔軟性、ロックファイルによるバージョン固定 |
 | Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
-| Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` → `/etc/portage` シンボリックリンク |
+| Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` に書き出し、`/etc/portage/` から個別にシンボリックリンク |
 | システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
 
 ### 移行元リポジトリ (TODO)

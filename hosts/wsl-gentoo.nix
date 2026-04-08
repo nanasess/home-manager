@@ -17,6 +17,24 @@ let
     "x11-apps/xeyes"
     "app-shells/zsh"
     "app-editors/emacs" # #49 検証中
+
+    # mise PHP ビルド依存（asdf-php workflow.yml 参照）
+    "media-libs/gd"
+    "net-misc/curl"
+    "dev-libs/libedit"
+    "dev-libs/icu"
+    "media-libs/libjpeg-turbo"
+    "dev-libs/oniguruma"
+    "media-libs/libpng"
+    "sys-libs/readline"
+    "dev-db/sqlite"
+    "dev-libs/openssl"
+    "dev-libs/libxml2"
+    "dev-libs/libzip"
+    "dev-util/re2c"
+    "sys-devel/bison"
+    "dev-build/autoconf"
+    "sys-libs/zlib"
   ];
 in
 {
