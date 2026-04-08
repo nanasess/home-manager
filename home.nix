@@ -113,6 +113,7 @@
     globalConfig = {
       tools = {
         node = "lts";
+        php = "8.5";
       };
     };
   };
