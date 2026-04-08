@@ -38,6 +38,8 @@
     inetutils
 
     # DB CLI
+    postgresql_18
+    mariadb.client
     pgcli
     litecli
 
@@ -111,6 +113,7 @@
     globalConfig = {
       tools = {
         node = "lts";
+        php = "8.5";
       };
     };
   };

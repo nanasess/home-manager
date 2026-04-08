@@ -1,5 +1,44 @@
 { config, pkgs, lib, ... }:
 
+let
+  # Gentoo (portage) で管理するパッケージ一覧
+  # Issue #48 の「3. Gentoo に残す」参照
+  gentooPackages = [
+    "app-admin/sudo"
+    "app-eselect/eselect-repository"
+    "app-portage/gentoolkit"
+    "app-portage/mirrorselect"
+    "dev-util/pkgdev"
+    "dev-util/pkgcheck"
+    "net-misc/onedrive"
+    "www-client/google-chrome"
+    "x11-misc/xvfb-run"
+    "x11-apps/mesa-progs"
+    "x11-apps/xeyes"
+    "app-shells/zsh"
+    "app-editors/emacs" # #49 検証中
+    "sys-apps/plocate"
+
+    # mise PHP ビルド依存（asdf-php workflow.yml 参照）
+    "dev-db/postgresql"
+    "media-libs/gd"
+    "net-misc/curl"
+    "dev-libs/libedit"
+    "dev-libs/icu"
+    "media-libs/libjpeg-turbo"
+    "dev-libs/oniguruma"
+    "media-libs/libpng"
+    "sys-libs/readline"
+    "dev-db/sqlite"
+    "dev-libs/openssl"
+    "dev-libs/libxml2"
+    "dev-libs/libzip"
+    "dev-util/re2c"
+    "sys-devel/bison"
+    "dev-build/autoconf"
+    "sys-libs/zlib"
+  ];
+in
 {
   home.homeDirectory = "/home/nanasess";
 
@@ -39,6 +78,28 @@
       if which setxkbmap > /dev/null; then setxkbmap -layout us; fi
     fi
   '';
+
+  home.file.".local/bin/check-system-packages" = {
+    executable = true;
+    text = ''
+      #!/usr/bin/env bash
+      echo "=== Gentoo パッケージ差分チェック ==="
+      missing=0
+      for pkg in ${lib.concatStringsSep " " gentooPackages}; do
+        if ! equery list "$pkg" &>/dev/null; then
+          echo "MISSING: $pkg"
+          missing=$((missing + 1))
+        fi
+      done
+      if [ "$missing" -eq 0 ]; then
+        echo "OK: すべてのパッケージがインストールされています"
+      else
+        echo "---"
+        echo "$missing 個のパッケージが未インストールです"
+        exit 1
+      fi
+    '';
+  };
 
   home.file.".local/bin/op" = {
     executable = true;
