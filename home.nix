@@ -24,12 +24,33 @@
     jq
     tree
     htop
+    vim
+    ffmpeg
+    whois
+    pandoc
+    lftp
+    pigz
+    zip
+    socat
+    stunnel
+    sharutils
+    dnsutils
+    inetutils
+
+    # DB CLI
+    pgcli
+    litecli
+
     # Development
     gh
     terraform
     azure-cli
     awscli2
     hugo
+    apacheHttpd
+
+    # Japanese input
+    skktools
 
     # Fonts
     noto-fonts
@@ -40,6 +61,12 @@
     wakatime-cli
     _1password-cli
     _1password-gui
+    wl-clipboard
+    xrandr
+    libnotify
+    json-glib
+    google-cloud-sdk
+    mycli
   ]
   ++ lib.optionals stdenv.isDarwin [
     coreutils
