@@ -38,6 +38,8 @@
     inetutils
 
     # DB CLI
+    postgresql_18
+    mariadb.client
     pgcli
     litecli
 
