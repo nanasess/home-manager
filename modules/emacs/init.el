@@ -451,17 +451,12 @@
          ([remap goto-line] . consult-goto-line)
          ("C-M-s" . consult-line)
          ("C-x C-d" . consult-dir)
-         ("C-z l" . consult-ls-git)
-         ("C-z s" . consult-howm-do-ag))
+         ("C-z l" . consult-ls-git))
   :custom
   (consult-narrow-key ">")
   (consult-widen-key "<")
   (consult-preview-key "M-.")
   :config
-  (defun consult-howm-do-ag ()
-    (interactive)
-    (require 'howm)
-    (consult-ripgrep howm-directory))
   (consult-customize
    consult-ripgrep
    consult-grep
@@ -743,7 +738,16 @@
   (howm-view-use-grep t)
   (howm-process-coding-system 'utf-8-unix)
   (howm-todo-menu-types "[-+~!]")
-  :bind ("C-z c" . howm-create)
+  (howm-view-grep-command "rg")
+  (howm-view-grep-option "-nH --no-heading --color never")
+  (howm-view-grep-extended-option nil)
+  (howm-view-grep-fixed-option "-F")
+  (howm-view-grep-expr-option nil)
+  (howm-view-grep-file-stdin-option nil)
+  :bind (("C-z c" . howm-create)
+         ("C-z s" . consult-howm-do-ag)
+         :map howm-mode-map
+         ("C-c C-q" . howm-save-and-kill-buffer))
   :config
   (setq howm-template
         (concat howm-view-title-header
@@ -770,16 +774,9 @@
             (delete-file file-name)
             (message "(Deleted %s)" (file-name-nondirectory file-name))))
         (kill-buffer nil))))
-  (add-hook 'howm-mode-hook
-            (lambda ()
-              (define-key howm-mode-map (kbd "C-c C-q") #'howm-save-and-kill-buffer)))
-  (when (executable-find "rg")
-    (setq howm-view-grep-command "rg")
-    (setq howm-view-grep-option "-nH --no-heading --color never")
-    (setq howm-view-grep-extended-option nil)
-    (setq howm-view-grep-fixed-option "-F")
-    (setq howm-view-grep-expr-option nil)
-    (setq howm-view-grep-file-stdin-option nil)))
+  (defun consult-howm-do-ag ()
+    (interactive)
+    (consult-ripgrep howm-directory)))
 
 ;; see https://stackoverflow.com/a/384346
 (defun rename-file-and-buffer (new-name)
