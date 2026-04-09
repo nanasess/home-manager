@@ -59,7 +59,6 @@
     ## default USE flags
     ## emerge --info | grep ^USE
     USE="keyring wayland gnome"
-    PHP_TARGETS="php8-2"
 
     COMMON_FLAGS="-march=znver3 -O2 -pipe"
     CHOST="x86_64-pc-linux-gnu"
@@ -97,7 +96,6 @@
     net-misc/onedrive
     sys-devel/gcc:15
     app-admin/cf-terraforming
-    dev-python/pipx
     dev-python/userpath
     dev-php/symfony-cli
     dev-python/pyfzf
