@@ -764,7 +764,7 @@
     "Kill buffer when exiting from howm-mode, deleting empty files."
     (interactive)
     (let ((file-name (buffer-file-name)))
-      (when (and file-name (string-match "\\.md" file-name))
+      (when (and file-name (string-suffix-p ".md" file-name))
         (if (save-excursion
               (goto-char (point-min))
               (re-search-forward "[^ \t\r\n]" nil t))
