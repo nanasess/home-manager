@@ -910,6 +910,11 @@
   :custom
   (terraform-format-on-save t))
 
+;;; Nix
+(use-package nix-mode
+  :ensure t
+  :mode "\\.nix\\'")
+
 ;;; Nginx
 (use-package nginx-mode
   :ensure t)
