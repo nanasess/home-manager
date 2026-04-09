@@ -451,15 +451,17 @@
          ([remap goto-line] . consult-goto-line)
          ("C-M-s" . consult-line)
          ("C-x C-d" . consult-dir)
-         ("C-z l" . consult-ls-git))
+         ("C-z l" . consult-ls-git)
+         ("C-z s" . consult-howm-do-ag))
   :custom
   (consult-narrow-key ">")
   (consult-widen-key "<")
   (consult-preview-key "M-.")
   :config
-  ;; (defun consult-howm-do-ag ()
-  ;;   (interactive)
-  ;;   (consult-ripgrep howm-directory))
+  (defun consult-howm-do-ag ()
+    (interactive)
+    (require 'howm)
+    (consult-ripgrep howm-directory))
   (consult-customize
    consult-ripgrep
    consult-grep
@@ -719,11 +721,65 @@
          ("M-p" . smerge-prev)))
 
 ;;;; ============================================================
-;;;; howm (commented out — preserved for future use)
+;;;; howm
 ;;;; ============================================================
-;; howm is not installed — these are preserved for reference
-;; (setopt howm-directory (concat external-directory "howm/"))
-;; (setopt howm-file-name-format "%Y/%m/%Y-%m-%d-%H%M%S.md")
+(use-package howm
+  :ensure t
+  :init
+  (defvar howm-menu-lang 'ja)
+  (defvar howm-view-title-header "Title:")
+  :custom
+  (howm-directory (concat external-directory "howm/"))
+  (howm-file-name-format "%Y/%m/%Y-%m-%d-%H%M%S.md")
+  (howm-keyword-file (locate-user-emacs-file ".howm-keys"))
+  (howm-history-file (locate-user-emacs-file ".howm-history"))
+  (howm-menu-schedule-days-before 30)
+  (howm-menu-schedule-days 30)
+  (howm-menu-expiry-hours 2)
+  (howm-menu-refresh-after-save nil)
+  (howm-refresh-after-save nil)
+  (howm-list-all-title t)
+  (howm-schedule-menu-types "[!@\+]")
+  (howm-view-use-grep t)
+  (howm-process-coding-system 'utf-8-unix)
+  (howm-todo-menu-types "[-+~!]")
+  :bind ("C-z c" . howm-create)
+  :config
+  (setq howm-template
+        (concat howm-view-title-header
+                " %title%cursor\n"
+                "Date: %date\n\n"
+                "%file\n\n"
+                "<!--\n"
+                "  Local Variables:\n"
+                "  mode: gfm\n"
+                "  coding: utf-8-unix\n"
+                "  End:\n"
+                "-->\n"))
+  (defun howm-save-and-kill-buffer ()
+    "Kill buffer when exiting from howm-mode, deleting empty files."
+    (interactive)
+    (let ((file-name (buffer-file-name)))
+      (when (and file-name (string-match "\\.md" file-name))
+        (if (save-excursion
+              (goto-char (point-min))
+              (re-search-forward "[^ \t\r\n]" nil t))
+            (howm-save-buffer)
+          (set-buffer-modified-p nil)
+          (when (file-exists-p file-name)
+            (delete-file file-name)
+            (message "(Deleted %s)" (file-name-nondirectory file-name))))
+        (kill-buffer nil))))
+  (add-hook 'howm-mode-hook
+            (lambda ()
+              (define-key howm-mode-map (kbd "C-c C-q") #'howm-save-and-kill-buffer)))
+  (when (executable-find "rg")
+    (setq howm-view-grep-command "rg")
+    (setq howm-view-grep-option "-nH --no-heading --color never")
+    (setq howm-view-grep-extended-option nil)
+    (setq howm-view-grep-fixed-option "-F")
+    (setq howm-view-grep-expr-option nil)
+    (setq howm-view-grep-file-stdin-option nil)))
 
 ;; see https://stackoverflow.com/a/384346
 (defun rename-file-and-buffer (new-name)
@@ -741,8 +797,6 @@
           (set-visited-file-name new-name)
           (set-buffer-modified-p nil))))))
 
-;; (bind-keys ("C-z c" . howm-create)
-;;            ("C-c ,c" . howm-create))
 
 ;;;; ============================================================
 ;;;; Markdown
