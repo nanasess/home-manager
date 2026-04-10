@@ -50,6 +50,7 @@
     azure-cli
     awscli2
     hugo
+    symfony-cli
     apacheHttpd
 
     # Japanese input
