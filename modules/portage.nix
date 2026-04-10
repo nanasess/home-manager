@@ -97,7 +97,7 @@
     sys-devel/gcc:15
     app-admin/cf-terraforming
     dev-python/userpath
-    dev-php/symfony-cli
+
     dev-python/pyfzf
     app-emacs/emacs-common
     dev-python/click
