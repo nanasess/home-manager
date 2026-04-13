@@ -28,6 +28,7 @@
     ffmpeg
     whois
     pandoc
+    poppler-utils
     lftp
     pigz
     zip
