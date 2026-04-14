@@ -11,7 +11,6 @@
 (when load-file-name
   (setq user-emacs-directory (file-name-directory load-file-name)))
 
-(defvar user-initial-directory (locate-user-emacs-file "init.d/"))
 (defvar external-directory (expand-file-name "~/OneDrive - Skirnir Inc/emacs/"))
 (setopt debug-on-error t)
 (setopt warning-minimum-level :error)
@@ -142,7 +141,6 @@
   (unless (server-running-p)
     (server-start)))
 
-(add-to-list 'load-path (expand-file-name user-initial-directory))
 (add-to-list 'load-path (expand-file-name (locate-user-emacs-file "secret.d/")))
 
 ;;; exec-path settings
