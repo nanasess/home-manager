@@ -3,8 +3,6 @@
 {
   home.file.".emacs.d/init.el".source = ./init.el;
   home.file.".emacs.d/early-init.el".source = ./early-init.el;
-  home.file.".emacs.d/init.d".source = ./init.d;
-  home.file.".emacs.d/site-lisp".source = ./site-lisp;
 
   home.activation.elpacaLockFile = config.lib.dag.entryAfter [ "writeBoundary" ] ''
     install -Dm644 ${./elpaca.lock} ${config.home.homeDirectory}/.emacs.d/elpaca.lock

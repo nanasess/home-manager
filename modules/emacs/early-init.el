@@ -13,8 +13,7 @@
                               (time-subtract after-init-time before-init-time)))
                      gcs-done)))
 
-(setq byte-compile-warnings '(cl-functions))
-(setq load-prefer-newer t)
+(setopt load-prefer-newer t)
 (push '(tool-bar-lines . 0) default-frame-alist)
 
 ;; doom-solarized-light のフラッシュ防止
@@ -22,16 +21,10 @@
 (push '(foreground-color . "#657B83") default-frame-alist)
 
 ;; elpaca takes over package management
-(setq package-enable-at-startup nil)
+(setopt package-enable-at-startup nil)
 
 (with-eval-after-load 'comp
-  (setq native-comp-async-jobs-number 16)
+  (setopt native-comp-async-jobs-number (num-processors))
   (setq native-comp-speed 3))
-
-;; see https://zenn.dev/takeokunn/articles/56010618502ccc#el-get%E3%81%AEpackage%E3%82%82nativecomp%E3%81%99%E3%82%8B
-(defun my/native-comp-packages ()
-  (interactive)
-  (native-compile-async "~/.emacs.d/init.d" 'recursively)
-  (native-compile-async "~/.emacs.d/elpaca/builds" 'recursively))
 
 (provide 'early-init)

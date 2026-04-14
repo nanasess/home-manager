@@ -11,8 +11,6 @@
 (when load-file-name
   (setq user-emacs-directory (file-name-directory load-file-name)))
 
-(defvar user-initial-directory (locate-user-emacs-file "init.d/"))
-(defvar user-site-lisp-directory (locate-user-emacs-file "site-lisp/"))
 (defvar external-directory (expand-file-name "~/OneDrive - Skirnir Inc/emacs/"))
 (setopt debug-on-error t)
 (setopt warning-minimum-level :error)
@@ -65,8 +63,10 @@
 ;; Lock file for version pinning (replaces el-get-lock)
 ;; Generate: M-x elpaca-write-lock-file
 ;; home-manager のソースに直接書き出すことで手動コピー不要にする
+(require 'xdg)
 (setopt elpaca-lock-file
-        (let ((hm-lock "~/.config/home-manager/modules/emacs/elpaca.lock"))
+        (let ((hm-lock (expand-file-name "home-manager/modules/emacs/elpaca.lock"
+                                         (xdg-config-home))))
           (if (file-writable-p hm-lock) hm-lock
             (expand-file-name "elpaca.lock" user-emacs-directory))))
 
@@ -108,15 +108,41 @@
 ;;;; Load path & initial settings
 ;;;; ============================================================
 
-;;; initial load files
-(dolist (sys-type (list (symbol-name system-type)
-                        (symbol-name window-system)))
-  (add-to-list 'load-path
-               (expand-file-name
-                (concat user-initial-directory "arch/" sys-type)))
-  (load "init" t))
-(add-to-list 'load-path (expand-file-name user-initial-directory))
-(add-to-list 'load-path (expand-file-name user-site-lisp-directory))
+;;; Platform-specific settings
+
+;; macOS NS GUI
+(when (featurep 'ns)
+  (setopt ns-alternate-modifier 'super)
+  (setopt ns-command-modifier 'meta)
+  (setopt ns-pop-up-frames nil)
+  (setopt mac-allow-anti-aliasing t)
+  (setopt mac-frame-tabbing t)
+  (keymap-set global-map "<ns-drag-file>" #'ns-find-file)
+  ;; font: Menlo + Hiragino Kaku Gothic ProN
+  (set-face-attribute 'default nil :family "Menlo" :height 120)
+  (set-fontset-font t 'japanese-jisx0208
+                    (font-spec :family "Hiragino Kaku Gothic ProN"))
+  (set-fontset-font t 'japanese-jisx0212
+                    (font-spec :family "Hiragino Kaku Gothic ProN"))
+  (setq face-font-rescale-alist '((".*Hiragino.*" . 1.2))))
+
+;; GNU/Linux (WSL2, Ubuntu)
+(when (eq system-type 'gnu/linux)
+  (defun my/set-font-linux (frame)
+    "Set font for FRAME when it is a graphic display."
+    (when (display-graphic-p frame)
+      (set-face-attribute 'default frame :family "UDEV Gothic NF" :height 120)))
+  (if (daemonp)
+      (add-hook 'after-make-frame-functions #'my/set-font-linux)
+    (when (display-graphic-p)
+      (set-face-attribute 'default nil :family "UDEV Gothic NF" :height 120))))
+
+;; server
+(when (display-graphic-p)
+  (require 'server)
+  (unless (server-running-p)
+    (server-start)))
+
 (add-to-list 'load-path (expand-file-name (locate-user-emacs-file "secret.d/")))
 
 ;;; exec-path settings
@@ -142,13 +168,12 @@
   (define-coding-system-alias 'iso-2022-jp 'cp50220)
   (define-coding-system-alias 'euc-jp 'cp51932))
 
-(unless (require 'japanese-init nil 'noerror)
-  (set-language-environment "Japanese")
-  (set-default-coding-systems 'utf-8-unix)
-  (set-keyboard-coding-system 'utf-8)
-  (set-terminal-coding-system 'utf-8)
-  (setq default-process-coding-system '(utf-8 . utf-8))
-  (setenv "LANG" "ja_JP.UTF-8"))
+(set-language-environment "Japanese")
+(set-default-coding-systems 'utf-8-unix)
+(set-keyboard-coding-system 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(setq default-process-coding-system '(utf-8 . utf-8))
+(setenv "LANG" "ja_JP.UTF-8")
 
 (use-package nskk
   :ensure (:host github :repo "takeokunn/nskk.el" :branch "main"
@@ -245,9 +270,6 @@
 (use-package emacs
   :ensure nil
   :config
-  (setopt dired-bind-jump nil)
-  (setopt dired-dwim-target t)
-  (setopt ediff-window-setup-function 'ediff-setup-windows-plain)
   (setopt enable-recursive-minibuffers t)
   (setopt cua-enable-cua-keys nil)
 
@@ -264,7 +286,6 @@
   (setopt visible-bell t)
 
   ;; whitespace
-  (require 'whitespace)
   (setopt whitespace-style '(face trailing tabs spaces space-mark tab-mark))
   (setopt whitespace-display-mappings nil)
   (setopt whitespace-trailing-regexp  "\\([ \u00A0]+\\)$")
@@ -290,12 +311,9 @@
   (global-display-line-numbers-mode t)
 
   ;; uniquify
-  (require 'uniquify)
   (setopt uniquify-buffer-name-style 'post-forward-angle-brackets)
   (setopt uniquify-ignore-buffers-re "*[^*]+*")
 
-  ;; dired
-  (add-hook 'dired-load-hook (lambda () (load "dired-x")))
 
   ;; indent
   (setq-default indent-tabs-mode nil)
@@ -314,14 +332,6 @@
   (defun risky-local-variable-p (sym &optional _ignored) nil)
   (defun safe-local-variable-p (sym val) t)
 
-  ;; view-mode
-  (add-hook 'view-mode-hook
-            (lambda ()
-                (setopt view-read-only t)
-                (auto-revert-mode 1)
-                (setopt line-move-visual nil)))
-  (add-to-list 'auto-mode-alist '("\\.log$" . view-mode))
-
   ;; treesit
   (setopt treesit-font-lock-level 4)
   (setopt treesit-language-source-alist
@@ -330,16 +340,14 @@
   ;; editor
   (setenv "EDITOR" "emacsclient"))
 
-(use-package dired
-  :ensure nil
-  :defer t
-  :bind (:map dired-mode-map
-         ("C-t" . other-window)
-         ("r" . wdired-change-to-wdired-mode)))
-
 (use-package view
   :ensure nil
-  :defer t
+  :custom
+  (view-read-only t)
+  :hook (view-mode . (lambda ()
+                       (auto-revert-mode 1)
+                       (setq-local line-move-visual nil)))
+  :mode ("\\.log\\'" . view-mode)
   :bind (:map view-mode-map
          ("h" . backward-word)
          ("l" . forward-word)
@@ -347,6 +355,24 @@
          ("k" . previous-line)
          (" " . scroll-up)
          ("b" . scroll-down)))
+
+(use-package dired
+  :ensure nil
+  :defer t
+  :custom
+  (dired-bind-jump nil)
+  (dired-dwim-target t)
+  :config
+  (require 'dired-x)
+  :bind (:map dired-mode-map
+         ("C-t" . other-window)
+         ("r" . wdired-change-to-wdired-mode)))
+
+(use-package ediff
+  :ensure nil
+  :defer t
+  :custom
+  (ediff-window-setup-function 'ediff-setup-windows-plain))
 
 ;;;; ============================================================
 ;;;; Theme & UI
@@ -531,23 +557,18 @@
 
 (use-package migemo
   :ensure t
-  :defer t
-  :init
-  (defvar migemo-dictionary
-    (concat external-directory "migemo/dict/utf-8/migemo-dict"))
-  (when (file-exists-p migemo-dictionary)
-    (setopt migemo-command "cmigemo"
-            migemo-options '("-q" "--emacs" "-i" "\a")
-            migemo-user-dictionary nil
-            migemo-regex-dictionary nil
-            migemo-use-pattern-alist t
-            migemo-use-frequent-pattern-alist t
-            migemo-pattern-alist-length 10000
-            migemo-coding-system 'utf-8-unix))
-  (add-hook 'isearch-mode-hook (lambda ()
-                                   (unless (featurep 'migemo)
-                                     (require 'migemo))
-                                   (migemo-init))))
+  :if (file-exists-p (concat external-directory "migemo/dict/utf-8/migemo-dict"))
+  :hook (isearch-mode . migemo-init)
+  :custom
+  (migemo-dictionary (concat external-directory "migemo/dict/utf-8/migemo-dict"))
+  (migemo-command "cmigemo")
+  (migemo-options '("-q" "--emacs" "-i" "\a"))
+  (migemo-user-dictionary nil)
+  (migemo-regex-dictionary nil)
+  (migemo-use-pattern-alist t)
+  (migemo-use-frequent-pattern-alist t)
+  (migemo-pattern-alist-length 10000)
+  (migemo-coding-system 'utf-8-unix))
 
 (use-package visual-regexp
   :ensure t
@@ -612,8 +633,8 @@
 (use-package expand-region
   :ensure t
   :bind ("C-=" . er/expand-region)
-  :init
-  (setopt shift-select-mode nil))
+  :custom
+  (shift-select-mode nil))
 
 (use-package multiple-cursors
   :ensure t
@@ -829,11 +850,11 @@
 ;;; TypeScript
 (use-package typescript-ts-mode
   :ensure nil
-  :mode "\\.ts$")
+  :mode "\\.ts\\'")
 
 (use-package tsx-ts-mode
   :ensure nil
-  :mode "\\.tsx$")
+  :mode "\\.tsx\\'")
 
 ;;; jq
 (use-package jq-mode
@@ -857,12 +878,12 @@
 ;;; YAML
 (use-package yaml-mode
   :ensure t
-  :mode "\\.ya?ml$")
+  :mode "\\.ya?ml\\'")
 
 ;;; PHP
 (use-package php-ts-mode
   :ensure nil
-  :mode "\\.\\(inc\\|php[s34]?\\)$"
+  :mode "\\.\\(inc\\|php[s34]?\\)\\'"
   :hook (php-ts-mode . (lambda ()
                          (electric-indent-local-mode t)
                          (electric-layout-mode t)
@@ -951,13 +972,9 @@
 
 (use-package sqlite-dump
   :ensure (:host github :repo "nanasess/sqlite-dump")
+  :mode "\\.\\(db\\|sqlite\\)\\'"
   :init
-  (modify-coding-system-alist 'file "\\.\\(db\\|sqlite\\)\\'" 'raw-text-unix)
-  (add-to-list 'auto-mode-alist '("\\.\\(db\\|sqlite\\)\\'" . sqlite-dump)))
-
-(defvar mkpasswd-command
-  "head -c 10 < /dev/random | uuencode -m - | tail -n 2 |head -n 1 | head -c10")
-(autoload 'mkpasswd "mkpasswd" nil t)
+  (modify-coding-system-alist 'file "\\.\\(db\\|sqlite\\)\\'" 'raw-text-unix))
 
 (use-package fosi
   :ensure (:host github :repo "hotoku/fosi" :branch "main"
@@ -985,20 +1002,22 @@
 
 (use-package auto-save-buffers-enhanced
   :ensure (:host github :repo "kentaro/auto-save-buffers-enhanced")
+  :custom
+  (auto-save-buffers-enhanced-interval 30)
+  (auto-save-buffers-enhanced-save-scratch-buffer-to-file-p t)
+  (auto-save-buffers-enhanced-file-related-with-scratch-buffer
+   (concat external-directory "howm/scratch.txt"))
   :config
-  (setopt auto-save-buffers-enhanced-interval 30)
-  (setopt auto-save-buffers-enhanced-save-scratch-buffer-to-file-p t)
-  (setopt auto-save-buffers-enhanced-file-related-with-scratch-buffer
-        (concat external-directory "howm/scratch.txt"))
   (auto-save-buffers-enhanced t)
   :bind ("C-x a s" . auto-save-buffers-enhanced-toggle-activity))
 
 (use-package gcmh
   :ensure t
   :demand t
+  :custom
+  (gcmh-verbose t)
   :config
-  (gcmh-mode 1)
-  (setopt gcmh-verbose t))
+  (gcmh-mode 1))
 
 ;;;; ============================================================
 ;;;; Minibuffer extras
