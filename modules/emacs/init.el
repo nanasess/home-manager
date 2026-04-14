@@ -320,11 +320,19 @@
 
 (use-package view
   :ensure nil
+  :custom
+  (view-read-only t)
   :hook (view-mode . (lambda ()
-                       (setopt view-read-only t)
                        (auto-revert-mode 1)
-                       (setopt line-move-visual nil)))
-  :mode ("\\.log\\'" . view-mode))
+                       (setq-local line-move-visual nil)))
+  :mode ("\\.log\\'" . view-mode)
+  :bind (:map view-mode-map
+         ("h" . backward-word)
+         ("l" . forward-word)
+         ("j" . next-line)
+         ("k" . previous-line)
+         (" " . scroll-up)
+         ("b" . scroll-down)))
 
 (use-package dired
   :ensure nil
@@ -334,17 +342,6 @@
   :bind (:map dired-mode-map
          ("C-t" . other-window)
          ("r" . wdired-change-to-wdired-mode)))
-
-(use-package view
-  :ensure nil
-  :defer t
-  :bind (:map view-mode-map
-         ("h" . backward-word)
-         ("l" . forward-word)
-         ("j" . next-line)
-         ("k" . previous-line)
-         (" " . scroll-up)
-         ("b" . scroll-down)))
 
 ;;;; ============================================================
 ;;;; Theme & UI
