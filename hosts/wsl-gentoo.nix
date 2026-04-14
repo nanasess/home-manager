@@ -10,13 +10,11 @@ let
     "app-portage/mirrorselect"
     "dev-util/pkgdev"
     "dev-util/pkgcheck"
-    "net-misc/onedrive"
     "www-client/google-chrome"
     "x11-misc/xvfb-run"
     "x11-apps/mesa-progs"
     "x11-apps/xeyes"
     "app-shells/zsh"
-    "app-editors/emacs" # #49 検証中
     "sys-apps/plocate"
 
     # mise PHP ビルド依存（asdf-php workflow.yml 参照）
