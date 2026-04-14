@@ -142,13 +142,12 @@
   (define-coding-system-alias 'iso-2022-jp 'cp50220)
   (define-coding-system-alias 'euc-jp 'cp51932))
 
-(unless (require 'japanese-init nil 'noerror)
-  (set-language-environment "Japanese")
-  (set-default-coding-systems 'utf-8-unix)
-  (set-keyboard-coding-system 'utf-8)
-  (set-terminal-coding-system 'utf-8)
-  (setq default-process-coding-system '(utf-8 . utf-8))
-  (setenv "LANG" "ja_JP.UTF-8"))
+(set-language-environment "Japanese")
+(set-default-coding-systems 'utf-8-unix)
+(set-keyboard-coding-system 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(setq default-process-coding-system '(utf-8 . utf-8))
+(setenv "LANG" "ja_JP.UTF-8")
 
 (use-package nskk
   :ensure (:host github :repo "takeokunn/nskk.el" :branch "main"
