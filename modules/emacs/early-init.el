@@ -21,7 +21,7 @@
 (push '(foreground-color . "#657B83") default-frame-alist)
 
 ;; elpaca takes over package management
-(setopt package-enable-at-startup nil)
+(setq package-enable-at-startup nil)
 
 (with-eval-after-load 'comp
   (setopt native-comp-async-jobs-number (num-processors))
