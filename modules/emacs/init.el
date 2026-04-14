@@ -245,9 +245,6 @@
 (use-package emacs
   :ensure nil
   :config
-  (setopt dired-bind-jump nil)
-  (setopt dired-dwim-target t)
-  (setopt ediff-window-setup-function 'ediff-setup-windows-plain)
   (setopt enable-recursive-minibuffers t)
   (setopt cua-enable-cua-keys nil)
 
@@ -337,11 +334,20 @@
 (use-package dired
   :ensure nil
   :defer t
+  :custom
+  (dired-bind-jump nil)
+  (dired-dwim-target t)
   :config
   (require 'dired-x)
   :bind (:map dired-mode-map
          ("C-t" . other-window)
          ("r" . wdired-change-to-wdired-mode)))
+
+(use-package ediff
+  :ensure nil
+  :defer t
+  :custom
+  (ediff-window-setup-function 'ediff-setup-windows-plain))
 
 ;;;; ============================================================
 ;;;; Theme & UI
@@ -602,8 +608,8 @@
 (use-package expand-region
   :ensure t
   :bind ("C-=" . er/expand-region)
-  :init
-  (setopt shift-select-mode nil))
+  :custom
+  (shift-select-mode nil))
 
 (use-package multiple-cursors
   :ensure t
@@ -819,11 +825,11 @@
 ;;; TypeScript
 (use-package typescript-ts-mode
   :ensure nil
-  :mode "\\.ts$")
+  :mode "\\.ts\\'")
 
 (use-package tsx-ts-mode
   :ensure nil
-  :mode "\\.tsx$")
+  :mode "\\.tsx\\'")
 
 ;;; jq
 (use-package jq-mode
@@ -847,12 +853,12 @@
 ;;; YAML
 (use-package yaml-mode
   :ensure t
-  :mode "\\.ya?ml$")
+  :mode "\\.ya?ml\\'")
 
 ;;; PHP
 (use-package php-ts-mode
   :ensure nil
-  :mode "\\.\\(inc\\|php[s34]?\\)$"
+  :mode "\\.\\(inc\\|php[s34]?\\)\\'"
   :hook (php-ts-mode . (lambda ()
                          (electric-indent-local-mode t)
                          (electric-layout-mode t)
@@ -975,20 +981,22 @@
 
 (use-package auto-save-buffers-enhanced
   :ensure (:host github :repo "kentaro/auto-save-buffers-enhanced")
+  :custom
+  (auto-save-buffers-enhanced-interval 30)
+  (auto-save-buffers-enhanced-save-scratch-buffer-to-file-p t)
+  (auto-save-buffers-enhanced-file-related-with-scratch-buffer
+   (concat external-directory "howm/scratch.txt"))
   :config
-  (setopt auto-save-buffers-enhanced-interval 30)
-  (setopt auto-save-buffers-enhanced-save-scratch-buffer-to-file-p t)
-  (setopt auto-save-buffers-enhanced-file-related-with-scratch-buffer
-        (concat external-directory "howm/scratch.txt"))
   (auto-save-buffers-enhanced t)
   :bind ("C-x a s" . auto-save-buffers-enhanced-toggle-activity))
 
 (use-package gcmh
   :ensure t
   :demand t
+  :custom
+  (gcmh-verbose t)
   :config
-  (gcmh-mode 1)
-  (setopt gcmh-verbose t))
+  (gcmh-mode 1))
 
 ;;;; ============================================================
 ;;;; Minibuffer extras
