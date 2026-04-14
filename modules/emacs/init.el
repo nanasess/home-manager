@@ -264,7 +264,6 @@
   (setopt visible-bell t)
 
   ;; whitespace
-  (require 'whitespace)
   (setopt whitespace-style '(face trailing tabs spaces space-mark tab-mark))
   (setopt whitespace-display-mappings nil)
   (setopt whitespace-trailing-regexp  "\\([ \u00A0]+\\)$")
@@ -290,12 +289,9 @@
   (global-display-line-numbers-mode t)
 
   ;; uniquify
-  (require 'uniquify)
   (setopt uniquify-buffer-name-style 'post-forward-angle-brackets)
   (setopt uniquify-ignore-buffers-re "*[^*]+*")
 
-  ;; dired
-  (add-hook 'dired-load-hook (lambda () (load "dired-x")))
 
   ;; indent
   (setq-default indent-tabs-mode nil)
@@ -314,14 +310,6 @@
   (defun risky-local-variable-p (sym &optional _ignored) nil)
   (defun safe-local-variable-p (sym val) t)
 
-  ;; view-mode
-  (add-hook 'view-mode-hook
-            (lambda ()
-                (setopt view-read-only t)
-                (auto-revert-mode 1)
-                (setopt line-move-visual nil)))
-  (add-to-list 'auto-mode-alist '("\\.log$" . view-mode))
-
   ;; treesit
   (setopt treesit-font-lock-level 4)
   (setopt treesit-language-source-alist
@@ -330,9 +318,19 @@
   ;; editor
   (setenv "EDITOR" "emacsclient"))
 
+(use-package view
+  :ensure nil
+  :hook (view-mode . (lambda ()
+                       (setopt view-read-only t)
+                       (auto-revert-mode 1)
+                       (setopt line-move-visual nil)))
+  :mode ("\\.log\\'" . view-mode))
+
 (use-package dired
   :ensure nil
   :defer t
+  :config
+  (require 'dired-x)
   :bind (:map dired-mode-map
          ("C-t" . other-window)
          ("r" . wdired-change-to-wdired-mode)))
@@ -531,23 +529,18 @@
 
 (use-package migemo
   :ensure t
-  :defer t
-  :init
-  (defvar migemo-dictionary
-    (concat external-directory "migemo/dict/utf-8/migemo-dict"))
-  (when (file-exists-p migemo-dictionary)
-    (setopt migemo-command "cmigemo"
-            migemo-options '("-q" "--emacs" "-i" "\a")
-            migemo-user-dictionary nil
-            migemo-regex-dictionary nil
-            migemo-use-pattern-alist t
-            migemo-use-frequent-pattern-alist t
-            migemo-pattern-alist-length 10000
-            migemo-coding-system 'utf-8-unix))
-  (add-hook 'isearch-mode-hook (lambda ()
-                                   (unless (featurep 'migemo)
-                                     (require 'migemo))
-                                   (migemo-init))))
+  :if (file-exists-p (concat external-directory "migemo/dict/utf-8/migemo-dict"))
+  :hook (isearch-mode . migemo-init)
+  :custom
+  (migemo-dictionary (concat external-directory "migemo/dict/utf-8/migemo-dict"))
+  (migemo-command "cmigemo")
+  (migemo-options '("-q" "--emacs" "-i" "\a"))
+  (migemo-user-dictionary nil)
+  (migemo-regex-dictionary nil)
+  (migemo-use-pattern-alist t)
+  (migemo-use-frequent-pattern-alist t)
+  (migemo-pattern-alist-length 10000)
+  (migemo-coding-system 'utf-8-unix))
 
 (use-package visual-regexp
   :ensure t
@@ -951,9 +944,9 @@
 
 (use-package sqlite-dump
   :ensure (:host github :repo "nanasess/sqlite-dump")
+  :mode "\\.\\(db\\|sqlite\\)\\'"
   :init
-  (modify-coding-system-alist 'file "\\.\\(db\\|sqlite\\)\\'" 'raw-text-unix)
-  (add-to-list 'auto-mode-alist '("\\.\\(db\\|sqlite\\)\\'" . sqlite-dump)))
+  (modify-coding-system-alist 'file "\\.\\(db\\|sqlite\\)\\'" 'raw-text-unix))
 
 (defvar mkpasswd-command
   "head -c 10 < /dev/random | uuencode -m - | tail -n 2 |head -n 1 | head -c10")
