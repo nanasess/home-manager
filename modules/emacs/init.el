@@ -64,7 +64,8 @@
 ;; Generate: M-x elpaca-write-lock-file
 ;; home-manager のソースに直接書き出すことで手動コピー不要にする
 (setopt elpaca-lock-file
-        (let ((hm-lock "~/.config/home-manager/modules/emacs/elpaca.lock"))
+        (let ((hm-lock (expand-file-name "home-manager/modules/emacs/elpaca.lock"
+                                               (xdg-config-home))))
           (if (file-writable-p hm-lock) hm-lock
             (expand-file-name "elpaca.lock" user-emacs-directory))))
 
