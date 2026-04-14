@@ -12,7 +12,6 @@
   (setq user-emacs-directory (file-name-directory load-file-name)))
 
 (defvar user-initial-directory (locate-user-emacs-file "init.d/"))
-(defvar user-site-lisp-directory (locate-user-emacs-file "site-lisp/"))
 (defvar external-directory (expand-file-name "~/OneDrive - Skirnir Inc/emacs/"))
 (setopt debug-on-error t)
 (setopt warning-minimum-level :error)
@@ -108,15 +107,42 @@
 ;;;; Load path & initial settings
 ;;;; ============================================================
 
-;;; initial load files
-(dolist (sys-type (list (symbol-name system-type)
-                        (symbol-name window-system)))
-  (add-to-list 'load-path
-               (expand-file-name
-                (concat user-initial-directory "arch/" sys-type)))
-  (load "init" t))
+;;; Platform-specific settings
+
+;; macOS NS GUI
+(when (featurep 'ns)
+  (setopt ns-alternate-modifier 'super)
+  (setopt ns-command-modifier 'meta)
+  (setopt ns-pop-up-frames nil)
+  (setopt mac-allow-anti-aliasing t)
+  (setopt mac-frame-tabbing t)
+  (keymap-set global-map "<ns-drag-file>" #'ns-find-file)
+  ;; font: Menlo + Hiragino Kaku Gothic ProN
+  (set-face-attribute 'default nil :family "Menlo" :height 120)
+  (set-fontset-font t 'japanese-jisx0208
+                    (font-spec :family "Hiragino Kaku Gothic ProN"))
+  (set-fontset-font t 'japanese-jisx0212
+                    (font-spec :family "Hiragino Kaku Gothic ProN"))
+  (setq face-font-rescale-alist '((".*Hiragino.*" . 1.2))))
+
+;; GNU/Linux (WSL2, Ubuntu)
+(when (eq system-type 'gnu/linux)
+  (defun my/set-font-linux (frame)
+    "Set font for FRAME when it is a graphic display."
+    (when (display-graphic-p frame)
+      (set-face-attribute 'default frame :family "UDEV Gothic NF" :height 120)))
+  (if (daemonp)
+      (add-hook 'after-make-frame-functions #'my/set-font-linux)
+    (when (display-graphic-p)
+      (set-face-attribute 'default nil :family "UDEV Gothic NF" :height 120))))
+
+;; server
+(when (display-graphic-p)
+  (require 'server)
+  (unless (server-running-p)
+    (server-start)))
+
 (add-to-list 'load-path (expand-file-name user-initial-directory))
-(add-to-list 'load-path (expand-file-name user-site-lisp-directory))
 (add-to-list 'load-path (expand-file-name (locate-user-emacs-file "secret.d/")))
 
 ;;; exec-path settings
@@ -949,10 +975,6 @@
   :mode "\\.\\(db\\|sqlite\\)\\'"
   :init
   (modify-coding-system-alist 'file "\\.\\(db\\|sqlite\\)\\'" 'raw-text-unix))
-
-(defvar mkpasswd-command
-  "head -c 10 < /dev/random | uuencode -m - | tail -n 2 |head -n 1 | head -c10")
-(autoload 'mkpasswd "mkpasswd" nil t)
 
 (use-package fosi
   :ensure (:host github :repo "hotoku/fosi" :branch "main"
