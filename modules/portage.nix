@@ -82,7 +82,6 @@
     # Please keep this setting intact when reporting bugs.
     LC_MESSAGES=C.utf8
 
-    EGIT_OVERRIDE_REPO_EMACS="https://github.com/emacs-mirror/emacs.git"
     GENTOO_MIRRORS="http://ftp.iij.ad.jp/pub/linux/gentoo/ \
         https://ftp.jaist.ac.jp/pub/Linux/Gentoo/ \
         https://repo.jing.rocks/gentoo \
@@ -92,20 +91,13 @@
   # #48 移行済みパッケージを除外
   xdg.configFile."portage/package.accept_keywords".text = ''
     dev-python/sqlglot
-    app-editors/emacs **
-    net-misc/onedrive
     sys-devel/gcc:15
     app-admin/cf-terraforming
     dev-python/userpath
 
     dev-python/pyfzf
-    app-emacs/emacs-common
     dev-python/click
     media-libs/mesa
-  '';
-
-  xdg.configFile."portage/package.mask".text = ''
-    >app-editors/emacs-31
   '';
 
   xdg.configFile."portage/package.unmask".text = ''
@@ -120,15 +112,6 @@
     www-client/google-chrome google-chrome
   '';
 
-  # package.use: #49 検証中
-  xdg.configFile."portage/package.use/emacs".text = ''
-    app-editors/emacs xft -gsettings gconf gtk -athena -Xaw3d dynamic-loading gif gui gzip-el harfbuzz imagemagick jpeg json libxml2 livecd m17n-lib mailutils png svg tiff toolkit-scroll-bars wide-int xwidgets cairo jit tree-sitter X webp sqlite ssl tools -pgtk
-    # required by app-editors/emacs-29.3-r2::gentoo[jit]
-    # required by @selected
-    # required by @world (argument)
-    >=sys-devel/gcc-13.2.1_p20240210 jit
-  '';
-
   xdg.configFile."portage/package.use/ffmpeg".text = ''
     media-video/ffmpeg libass lzma opus pulseaudio theora vpx
     media-libs/libsdl2 gles2 pipewire pulseaudio
@@ -141,11 +124,6 @@
   xdg.configFile."portage/package.use/gnupg".text = ''
     app-crypt/gpgme -qt5 -qt6
     app-crypt/gnupg -usb
-  '';
-
-  xdg.configFile."portage/package.use/onedrive".text = ''
-    net-misc/onedrive libnotify dmd-2_105
-    sys-devel/gcc d
   '';
 
   # pg_config とヘッダのみ必要（mise PHP ビルド用）、サーバ不要
