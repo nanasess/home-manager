@@ -13,7 +13,7 @@
                               (time-subtract after-init-time before-init-time)))
                      gcs-done)))
 
-(setq load-prefer-newer t)
+(setopt load-prefer-newer t)
 (push '(tool-bar-lines . 0) default-frame-alist)
 
 ;; doom-solarized-light のフラッシュ防止
@@ -21,10 +21,10 @@
 (push '(foreground-color . "#657B83") default-frame-alist)
 
 ;; elpaca takes over package management
-(setq package-enable-at-startup nil)
+(setopt package-enable-at-startup nil)
 
 (with-eval-after-load 'comp
-  (setq native-comp-async-jobs-number (num-processors))
+  (setopt native-comp-async-jobs-number (num-processors))
   (setq native-comp-speed 3))
 
 (provide 'early-init)
