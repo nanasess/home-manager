@@ -79,6 +79,11 @@ modules/
     elpaca.lock         -- elpaca パッケージロックファイル
     init.d/             -- OS/環境別の追加設定
     site-lisp/          -- 自作 Elisp
+  locale-eaw/
+    default.nix        -- locale-eaw モジュール（localedef + LOCPATH 設定）
+    UTF-8-EAW-CONSOLE.gz -- East Asian Ambiguous 文字幅修正済み charmap
+    eaw-console-wezterm.lua -- WezTerm cell_widths 設定
+    eaw-console.el     -- Emacs char-width-table 設定
   wezterm/
     wezterm.lua        -- WezTerm 設定（WSL → Windows 側にコピー）
   portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
@@ -103,6 +108,7 @@ modules/
 | Emacs Elisp パッケージ | elpaca + use-package | 柔軟性、ロックファイルによるバージョン固定 |
 | Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
+| East Asian Ambiguous 文字幅 | locale-eaw EAW-CONSOLE | glibc wcwidth + WezTerm cell_widths + Emacs char-width-table を統一 |
 | Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` に書き出し、`/etc/portage/` から個別にシンボリックリンク |
 | システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
 
@@ -125,6 +131,30 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 - **check** — `nix flake check` + WezTerm Lua 構文チェック
 - **emacs** — `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
 - **build** — 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest, macos-15-intel）
+
+## East Asian Ambiguous 文字幅 (locale-eaw)
+
+glibc 2.39+ で `wcwidth()` が East Asian Ambiguous 文字 (△→○●■□▲ 等) に 1 を返すようになり、日本語環境で半角表示される問題に対処。[locale-eaw](https://github.com/hamano/locale-eaw) EAW-CONSOLE を使い、全レイヤーで文字幅を統一する。
+
+### メカニズム
+
+```
+locale-eaw EAW-CONSOLE
+├── glibc wcwidth()     -- LOCPATH でカスタムロケール適用 (△→=2, ─│=1)
+├── WezTerm cell_widths -- eaw-console-wezterm.lua で同じ幅テーブルを適用
+└── Emacs char-width-table -- eaw-console.el で同じ幅テーブルを適用
+
+UDEV Gothic JPDOC (全角グリフ提供)
+├── WezTerm -- プライマリフォント (NF は Nerd Font 用 fallback)
+└── Emacs   -- プライマリフォント (set-fontset-font はフォールバック機構のため不可)
+```
+
+### 設計上の注意点
+
+- **ロケール生成**: `localedef` でユーザー空間 (`~/.local/share/locale/ja_JP.utf8`) にコンパイル。ロケール名は `ja_JP.utf8` のまま、charmap だけ `UTF-8-EAW-CONSOLE` を使用。`LOCPATH` で既存システムロケールより優先。
+- **WezTerm**: Windows 側で動作するため、Linux のフォントや LOCPATH は参照不可。`font_dirs` で JPDOC フォントを、`dofile` で cell_widths 設定を Windows 側からロード。
+- **Emacs フォント**: `set-fontset-font` はフォールバック機構であり、プライマリフォントにグリフがある場合は無視される。そのため JPDOC をプライマリフォントとして設定する必要がある。
+- **Emacs char-width-table**: `set-language-environment "Japanese"` が `char-width-table` をリセットするため、`eaw-console.el` はその後に読み込む。
 
 ## Windows on WezTerm
 
