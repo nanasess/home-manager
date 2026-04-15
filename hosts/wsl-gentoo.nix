@@ -60,7 +60,7 @@ in
   home.activation.weztermFonts = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     fontdir="/mnt/c/Users/${config.home.username}/.local/share/fonts"
     mkdir -p "$fontdir"
-    install -Dm644 ${pkgs.udev-gothic}/share/fonts/udev-gothic/UDEVGothicJPDOC-*.ttf "$fontdir/"
+    install -m644 ${pkgs.udev-gothic}/share/fonts/udev-gothic/UDEVGothicJPDOC-*.ttf "$fontdir/"
   '';
 
 
