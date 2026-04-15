@@ -60,6 +60,7 @@
     # Fonts
     noto-fonts
     noto-fonts-color-emoji
+    udev-gothic
     udev-gothic-nf
   ]
   ++ lib.optionals stdenv.isLinux [

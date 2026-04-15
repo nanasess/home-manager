@@ -53,6 +53,14 @@ in
   # WezTerm 設定を Windows 側にコピー
   home.activation.weztermConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     install -Dm644 ${../modules/wezterm/wezterm.lua} /mnt/c/Users/${config.home.username}/.wezterm.lua
+    install -Dm644 ${../modules/locale-eaw/eaw-console-wezterm.lua} /mnt/c/Users/${config.home.username}/.eaw-console-wezterm.lua
+  '';
+
+  # UDEV Gothic JPDOC フォントを Windows 側にコピー (WezTerm font_dirs 用)
+  home.activation.weztermFonts = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    fontdir="/mnt/c/Users/${config.home.username}/.local/share/fonts"
+    mkdir -p "$fontdir"
+    install -m644 ${pkgs.udev-gothic}/share/fonts/udev-gothic/UDEVGothicJPDOC-*.ttf "$fontdir/"
   '';
 
 
