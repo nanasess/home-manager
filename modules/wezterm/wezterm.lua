@@ -12,8 +12,17 @@ config.wsl_domains = {
 config.default_domain = "WSL:Gentoo-systemd"
 
 config.color_scheme = "Solarized Light (Gogh)"
-config.font = wezterm.font 'UDEV Gothic NF'
+config.font_dirs = { 'C:\\Users\\nanasess\\.local\\share\\fonts' }
+config.font = wezterm.font_with_fallback {
+  'UDEV Gothic JPDOC',
+  'UDEV Gothic NF',
+}
 config.font_size = 14.0
+
+-- locale-eaw EAW-CONSOLE に合わせた文字幅設定
+-- https://github.com/hamano/locale-eaw
+local eaw = dofile(wezterm.config_dir .. '/.eaw-console-wezterm.lua')
+config.cell_widths = eaw
 
 local spawn_tab_in_home = wezterm.action.SpawnCommandInNewTab {
   cwd = '\\\\wsl.localhost\\Gentoo-systemd\\home\\nanasess',

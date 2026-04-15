@@ -127,15 +127,16 @@
   (setq face-font-rescale-alist '((".*Hiragino.*" . 1.2))))
 
 ;; GNU/Linux (WSL2, Ubuntu)
+;; JPDOC をプライマリフォントに使用 (East Asian Ambiguous 文字が全角グリフ)
 (when (eq system-type 'gnu/linux)
   (defun my/set-font-linux (frame)
     "Set font for FRAME when it is a graphic display."
     (when (display-graphic-p frame)
-      (set-face-attribute 'default frame :family "UDEV Gothic NF" :height 120)))
+      (set-face-attribute 'default frame :family "UDEV Gothic JPDOC" :height 120)))
   (if (daemonp)
       (add-hook 'after-make-frame-functions #'my/set-font-linux)
     (when (display-graphic-p)
-      (set-face-attribute 'default nil :family "UDEV Gothic NF" :height 120))))
+      (set-face-attribute 'default nil :family "UDEV Gothic JPDOC" :height 120))))
 
 ;; server
 (when (display-graphic-p)
@@ -174,6 +175,11 @@
 (set-terminal-coding-system 'utf-8)
 (setq default-process-coding-system '(utf-8 . utf-8))
 (setenv "LANG" "ja_JP.UTF-8")
+
+;; locale-eaw EAW-CONSOLE: East Asian Ambiguous 文字の幅を適切に設定
+;; set-language-environment が char-width-table をリセットするため、その後に読み込む
+;; https://github.com/hamano/locale-eaw
+(load (expand-file-name (locate-user-emacs-file "site-lisp/eaw-console")) t t)
 
 (use-package nskk
   :ensure (:host github :repo "takeokunn/nskk.el" :branch "main"
