@@ -22,6 +22,9 @@ config.font_size = 14.0
 -- locale-eaw EAW-CONSOLE に合わせた文字幅設定
 -- https://github.com/hamano/locale-eaw
 local eaw = dofile(wezterm.config_dir .. '/.eaw-console-wezterm.lua')
+-- Claude Code TUI との互換性のため特定の記号を半角に戻す
+table.insert(eaw, {first = 0x23bf, last = 0x23bf, width = 1})  -- ⎿
+table.insert(eaw, {first = 0x25cf, last = 0x25cf, width = 1})  -- ●
 config.cell_widths = eaw
 
 local spawn_tab_in_home = wezterm.action.SpawnCommandInNewTab {
