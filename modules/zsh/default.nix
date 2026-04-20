@@ -108,7 +108,6 @@
         # PATH
         export PATH=$HOME/bin:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/bin:$PATH
         export PATH=$HOME/.composer/vendor/bin:~/.npm-global/bin:$PATH
-        export PATH=$HOME/.dotnet/tools:$PATH
         export PATH=$HOME/.rbenv/bin:$PATH
         export PATH=$HOME/.symfony/bin:$HOME/.symfony5/bin:$PATH
         export PATH=$HOME/google-cloud-sdk/bin:$PATH
