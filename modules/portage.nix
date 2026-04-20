@@ -102,7 +102,6 @@
 
   xdg.configFile."portage/package.unmask".text = ''
     >=www-client/google-chrome-126.0.6478.55
-    >=virtual/dotnet-sdk-9.0
     # mycli-1.41.2の依存関係
     dev-python/click
   '';
