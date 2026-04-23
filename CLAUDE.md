@@ -65,7 +65,7 @@ home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
 flake.nix              -- エントリポイント（inputs と homeConfigurations）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
-  wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm コピー、1Password CLI、WSLg X11/Wayland）
+  wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm / Ghostty コピー、1Password CLI、WSLg X11/Wayland）
   ubuntu.nix           -- Ubuntu 固有設定（Ghostty、Walker、OneDrive）
   macos.nix            -- macOS 固有設定
 modules/
@@ -86,6 +86,8 @@ modules/
     eaw-console.el     -- Emacs char-width-table 設定
   wezterm/
     wezterm.lua        -- WezTerm 設定（WSL → Windows 側にコピー）
+  ghostty/
+    default.nix        -- Ghostty 共有設定（Linux native / Windows port (PR #12167) 両対応、_module.args で公開）
   portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
   onedrive.nix         -- OneDrive 設定（WSL Gentoo 用）
 .github/workflows/
@@ -108,6 +110,7 @@ modules/
 | Emacs Elisp パッケージ | elpaca + use-package | 柔軟性、ロックファイルによるバージョン固定 |
 | Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
+| Ghostty 設定 | 共有 Nix attrset + renderer | `programs.ghostty.settings` (Linux native) と `%LOCALAPPDATA%\ghostty\config.ghostty` (Windows port) を同一 attrset から生成 |
 | East Asian Ambiguous 文字幅 | locale-eaw EAW-CONSOLE | glibc wcwidth + WezTerm cell_widths + Emacs char-width-table を統一 |
 | Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` に書き出し、`/etc/portage/` から個別にシンボリックリンク |
 | システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |

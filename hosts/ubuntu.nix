@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, ghostty, ... }:
 
 let
   # apt で管理するパッケージ一覧
@@ -15,15 +15,7 @@ in
   programs.ghostty = {
     enable = true;
     package = config.lib.nixGL.wrap pkgs.ghostty;
-    settings = {
-      font-family = "Ubuntu Sans Mono";
-      font-size = 13;
-      keybind = [
-        "ctrl+l=next_tab"
-        "ctrl+h=previous_tab"
-      ];
-      theme = "Solarized Dark Patched";
-    };
+    settings = ghostty.settings;
   };
 
   home.file.".local/share/applications/com.mitchellh.ghostty.desktop".text = ''
