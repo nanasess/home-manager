@@ -73,7 +73,7 @@ in
     ghostty_dir="/mnt/c/Users/${config.home.username}/AppData/Local/ghostty"
     install -Dm644 ${ghostty.configFile} "$ghostty_dir/config.ghostty"
     mkdir -p "$ghostty_dir/themes"
-    ${pkgs.rsync}/bin/rsync -a --delete \
+    ${pkgs.rsync}/bin/rsync -rt --delete \
       ${pkgs.ghostty}/share/ghostty/themes/ "$ghostty_dir/themes/"
   '';
 
