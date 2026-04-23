@@ -126,8 +126,9 @@ in
   # ユーザーフォント (~/.local/share/fonts) からシステムフォントに
   # ワンショットでコピーするヘルパー (UAC 昇格が発生する)
   #
-  # .ps1 を一時ファイルに書き出してから Start-Process -Verb RunAs で実行することで、
-  # 多段クォートのトラブル・静かな失敗・ウィンドウ即閉じによる情報欠落を回避する
+  # PowerShell スクリプトは UTF-16LE + base64 化して -EncodedCommand で
+  # 直接引数として渡す。中間 .ps1 ファイルを作らないので、ユーザー書込可能な
+  # 場所のファイルを昇格実行する際の TOCTOU リスクを回避できる
   home.file.".local/bin/install-ghostty-windows-fonts" = {
     executable = true;
     text = ''
@@ -135,8 +136,6 @@ in
       set -e
       user='${config.home.username}'
       src_dir="/mnt/c/Users/$user/.local/share/fonts"
-      ps1_wsl="$src_dir/.install-ghostty-fonts.ps1"
-      ps1_win="C:\\Users\\$user\\.local\\share\\fonts\\.install-ghostty-fonts.ps1"
       PSH='/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
 
       if [ ! -x "$PSH" ]; then
@@ -150,7 +149,7 @@ in
         exit 1
       fi
 
-      cat > "$ps1_wsl" <<'EOF'
+      read -r -d "" ps_script <<'EOF' || true
       $ErrorActionPreference = 'Stop'
       $src = Join-Path $env:USERPROFILE '.local\share\fonts'
       $dst = Join-Path $env:WINDIR 'Fonts'
@@ -169,11 +168,13 @@ in
       Start-Sleep -Seconds 2
       EOF
 
+      # PowerShell -EncodedCommand は UTF-16LE base64 を要求する
+      encoded=$(printf '%s' "$ps_script" | iconv -t UTF-16LE | base64 -w 0)
+
       echo "UAC 昇格プロンプトが出ます。[はい] で許可してください。"
       "$PSH" -NoProfile -Command \
-        "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','$ps1_win'"
+        "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile','-EncodedCommand','$encoded'"
 
-      rm -f "$ps1_wsl"
       echo ""
       echo "--- コピー結果の確認 ---"
       ls /mnt/c/Windows/Fonts/UDEVGothic*.ttf 2>/dev/null || echo "(まだ見つかりません — UAC を拒否したか、別の理由で失敗しています)"
