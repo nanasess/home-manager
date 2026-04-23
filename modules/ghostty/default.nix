@@ -17,6 +17,10 @@ let
       "ctrl+h=previous_tab"
     ];
     theme = "iTerm2 Solarized Light";
+    # マウス選択で通常クリップボードにコピー (Ctrl+V で貼付可能)
+    # Linux では selection clipboard にも入るので中クリックペーストも維持される
+    # Windows のデフォルトは false, Linux のデフォルトは true (selection のみ)
+    copy-on-select = "clipboard";
   };
 
   # Windows 版固有の追加設定
