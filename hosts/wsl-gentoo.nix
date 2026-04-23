@@ -36,6 +36,77 @@ let
     "dev-build/autoconf"
     "sys-libs/zlib"
   ];
+
+  # Playwright 用 FHS 環境
+  # プロジェクトごとに異なる @playwright/test バージョンに対応するため、
+  # browser バイナリは npm 側で `npx playwright install` させ、
+  # それが要求するシステムライブラリをこの FHS 環境で提供する
+  # 使い方: `playwright-fhs` で対話シェル / `playwright-fhs -c '<cmd>'` で単発実行
+  playwright-fhs = pkgs.buildFHSEnv {
+    name = "playwright-fhs";
+    targetPkgs = p: with p; [
+      # 共通
+      glib
+      nss
+      nspr
+      at-spi2-atk
+      at-spi2-core
+      cups
+      dbus
+      expat
+      libdrm
+      libxkbcommon
+      mesa
+      alsa-lib
+      pango
+      cairo
+      libgcc
+      libGL
+      fontconfig
+      freetype
+      cacert
+      nghttp2
+
+      # Chromium
+      xorg.libxshmfence
+
+      # GStreamer (WebKit 再生)
+      gst_all_1.gstreamer
+      gst_all_1.gst-plugins-base
+      gst_all_1.gst-plugins-bad
+      gst_all_1.gst-libav
+
+      # WebKit / Firefox
+      icu
+      libxml2
+      libevent
+      libopus
+      flite
+      libjpeg_turbo
+      libmanette
+      enchant2
+      hyphen
+      woff2
+
+      # X11
+      xorg.libX11
+      xorg.libXcomposite
+      xorg.libXdamage
+      xorg.libXext
+      xorg.libXfixes
+      xorg.libXrandr
+      xorg.libxcb
+      xorg.libXtst
+      xorg.libXScrnSaver
+      xorg.libXi
+      xorg.libXrender
+      xorg.libXcursor
+    ];
+    runScript = "bash";
+    profile = ''
+      export PATH="$HOME/.nix-profile/bin:$HOME/.local/bin:$PATH"
+    '';
+  };
 in
 {
   home.homeDirectory = "/home/nanasess";
@@ -44,6 +115,7 @@ in
 
   home.packages = with pkgs; [
     emacs30-gtk3
+    playwright-fhs
   ];
 
   home.sessionVariables = {
