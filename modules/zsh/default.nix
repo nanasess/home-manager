@@ -26,6 +26,15 @@
         set +a
       fi
 
+      # WakaTime API キーを tmpfs にキャッシュ
+      # (wakatime-cli の api_key_vault_cmd は 2 秒タイムアウトハードコードなので
+      #  op read を直接呼ぶと WSL では起動コストで失敗する。
+      #  ここで一度 env var をキャッシュし、cfg 側は cat するだけにする)
+      if [[ -n "$WAKATIME_API_KEY" ]]; then
+        umask 077
+        printf '%s' "$WAKATIME_API_KEY" > "/run/user/$(id -u)/wakatime-api-key"
+      fi
+
       export ENHANCD_HYPHEN_NUM=50
     '';
 

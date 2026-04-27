@@ -993,12 +993,11 @@
 (use-package mcp
   :ensure (:host github :repo "lizqwerscott/mcp.el"))
 
-;; (el-get-bundle wakatime-mode)
-;; (add-to-list 'load-path (concat user-emacs-directory ".wakatime.d"))
-;; (load "wakatime-config" t t)
-;; (add-hook 'emacs-startup-hook 'global-wakatime-mode)
-;; (with-eval-after-load 'wakatime-mode
-;;   (setopt wakatime-cli-path "/usr/bin/wakatime"))
+(use-package wakatime-mode
+  :ensure t
+  :hook (after-init . global-wakatime-mode)
+  :custom
+  (wakatime-cli-path (executable-find "wakatime-cli")))
 
 (use-package recentf-ext
   :ensure t

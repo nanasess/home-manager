@@ -22,15 +22,15 @@
       homeConfigurations = {
         "nanasess@wsl-gentoo" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
-          modules = [ ./home.nix ./hosts/wsl-gentoo.nix ./modules/onedrive.nix ./modules/portage.nix ./modules/locale-eaw ./modules/emacs ./modules/zsh ./modules/ghostty ];
+          modules = [ ./home.nix ./hosts/wsl-gentoo.nix ./modules/onedrive.nix ./modules/portage.nix ./modules/locale-eaw ./modules/emacs ./modules/zsh ./modules/ghostty ./modules/wakatime ];
         };
         "nanasess@macbook" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-darwin;
-          modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ./modules/zsh ];
+          modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ./modules/zsh ./modules/wakatime ];
         };
         "nanasess@macbook-aarch64" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.aarch64-darwin;
-          modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ./modules/zsh ];
+          modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ./modules/zsh ./modules/wakatime ];
         };
         "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -41,6 +41,7 @@
             ./modules/emacs
             ./modules/zsh
             ./modules/ghostty
+            ./modules/wakatime
             {
               nixGL.packages = nixgl.packages;
             }
