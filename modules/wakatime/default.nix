@@ -50,7 +50,7 @@ in
   home.file.".local/bin/wakatime-vault-read" = {
     executable = true;
     text = ''
-      #!/usr/bin/env bash
+      #!${pkgs.bash}/bin/bash
       ${resolveCachePath}
       if [ -r "$_wakatime_cache" ]; then
         cat "$_wakatime_cache"
