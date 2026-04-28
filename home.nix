@@ -64,7 +64,6 @@
     udev-gothic-nf
   ]
   ++ lib.optionals stdenv.isLinux [
-    wakatime-cli
     _1password-cli
     _1password-gui
     wl-clipboard
