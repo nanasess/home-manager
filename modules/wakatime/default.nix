@@ -24,6 +24,7 @@ let
   # nixpkgs-unstable の wakatime-cli は 2.3.1 で止まっており、
   # claude-code-wakatime プラグインが要求する `--sync-ai-activity` フラグ
   # (v2.7.0 以降で追加) を持たない。upstream の最新版へオーバーライド。
+  # 将来 nixpkgs が v2.7.0 以降に追従したら本オーバーライドは外せる。
   wakatimeCli = pkgs.wakatime-cli.overrideAttrs (old: rec {
     version = "2.9.0";
     src = pkgs.fetchFromGitHub {
