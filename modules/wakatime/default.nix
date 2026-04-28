@@ -20,9 +20,28 @@ let
       _wakatime_cache="''${TMPDIR:-/tmp}/wakatime-api-key.$(id -u)"
     fi
   '';
+
+  # nixpkgs-unstable の wakatime-cli は 2.3.1 で止まっており、
+  # claude-code-wakatime プラグインが要求する `--sync-ai-activity` フラグ
+  # (v2.7.0 以降で追加) を持たない。upstream の最新版へオーバーライド。
+  wakatimeCli = pkgs.wakatime-cli.overrideAttrs (old: rec {
+    version = "2.9.0";
+    src = pkgs.fetchFromGitHub {
+      owner = "wakatime";
+      repo = "wakatime-cli";
+      tag = "v${version}";
+      hash = "sha256-9HJb2ByOcQSyg7sABavYkKfwZ199gvuf77+tRig8adE=";
+    };
+    vendorHash = "sha256-OfnXj6X2JIN/lLCvB8LLYeqNj1aW3GuA1hCiw+219QQ=";
+    ldflags = [
+      "-s"
+      "-w"
+      "-X github.com/wakatime/wakatime-cli/pkg/version.Version=${version}"
+    ];
+  });
 in
 {
-  home.packages = [ pkgs.wakatime-cli ];
+  home.packages = [ wakatimeCli ];
 
   # Zsh 起動時に $WAKATIME_API_KEY をキャッシュへ書き出す。
   # umask 077 はサブシェルで囲んでセッション全体への副作用を防ぐ。
