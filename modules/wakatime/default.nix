@@ -39,6 +39,11 @@ let
       "-w"
       "-X github.com/wakatime/wakatime-cli/pkg/version.Version=${version}"
     ];
+    # pkg/api のテストは httptest.Server を立ててループバック通信を行うが、
+    # Nix の strict sandbox (GitHub Actions のデフォルト) ではネットワークが
+    # 遮断され Accept() が永久ブロック → 600s タイムアウトで CI が失敗する。
+    # テストは upstream の責務とし、ビルド側ではスキップ。
+    doCheck = false;
   });
 in
 {
