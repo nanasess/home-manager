@@ -139,41 +139,15 @@ nix flake update home-manager
 `elpaca-lock-file` は `~/.config/home-manager/modules/emacs/elpaca.lock` を直接指しているため、
 `M-x elpaca-write-lock-file` で home-manager ソースに直接書き出される（手動コピー不要）。
 
-ロックファイルから復元された環境では全パッケージが detached HEAD になるため、
-`elpaca-pull-all` がそのままでは失敗する（[progfolio/elpaca#447](https://github.com/progfolio/elpaca/issues/447)）。
-以下のいずれかの方法で更新する。
+elpaca はロックファイルの `:ref` で各パッケージを特定コミットに固定するため、
+`~/.emacs.d/elpaca/sources/<pkg>/` は通常 detached HEAD 状態になっている。
+そのまま `elpaca-pull-all` を実行すると pull 先ブランチが特定できず失敗するので、
+事前にブランチを復元する必要がある（init.el で定義されている `elpaca-checkout-branches` を使う）。
 
-#### 方法 1: ロックファイルを一時無効化して更新（メンテナー推奨）
-
-```elisp
-;; init.el の elpaca-lock-file 設定を一時的にコメントアウト
-;; (setopt elpaca-lock-file ...)
-```
+#### 標準手順
 
 ```bash
-# 1. Emacs を再起動（ロックファイルなしで起動するため detached HEAD にならない）
-
-# 2. 全パッケージを更新
-M-x elpaca-pull-all
-
-# 3. 動作確認後、ロックファイルを書き出し
-M-x elpaca-write-lock-file
-
-# 4. init.el の elpaca-lock-file 設定を元に戻し、Emacs を再起動
-
-# 5. 変更をコミット
-cd ~/.config/home-manager
-git add modules/emacs/elpaca.lock
-git commit -m "chore(emacs): elpaca パッケージ更新"
-
-# 6. home-manager に反映
-home-manager switch --flake '.#nanasess@wsl-gentoo'
-```
-
-#### 方法 2: elpaca-checkout-branches で detached HEAD を解消して更新
-
-```bash
-# 1. 全パッケージのブランチを復元
+# 1. 全パッケージを default branch に戻す（detached HEAD 解消）
 M-x elpaca-checkout-branches
 
 # 2. 全パッケージを更新
@@ -191,11 +165,29 @@ git commit -m "chore(emacs): elpaca パッケージ更新"
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 ```
 
+#### 既知の制約: 一部パッケージは手動 checkout が必要
+
+`elpaca-checkout-branches` は `git symbolic-ref refs/remotes/origin/HEAD` で default branch を判定するため、
+以下のような GNU ELPA mirror 由来でリモートに `origin/HEAD` シンボリックリンクがなく、
+かつ default が `main` / `master` でないパッケージでは復帰できない:
+
+- `csv-mode` (default branch: `externals/csv-mode`)
+- `queue` (default branch: `externals/queue`)
+
+これらは `elpaca-pull-all` のログでエラーになっていれば手動で checkout する:
+
+```bash
+cd ~/.emacs.d/elpaca/sources/csv-mode && git checkout externals/csv-mode
+cd ~/.emacs.d/elpaca/sources/queue    && git checkout externals/queue
+```
+
+その後あらためて `M-x elpaca-pull-all` を実行する。
+
 ### Nix + Emacs を一括更新
 
 ```bash
 nix flake update
-# Emacs で M-x elpaca-pull-all → M-x elpaca-write-lock-file
+# Emacs で M-x elpaca-checkout-branches → M-x elpaca-pull-all → M-x elpaca-write-lock-file
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 git add flake.lock modules/emacs/elpaca.lock
 git commit -m "chore: nix flake update + elpaca パッケージ更新"
