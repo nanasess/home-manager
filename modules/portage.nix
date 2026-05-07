@@ -129,4 +129,9 @@
   xdg.configFile."portage/package.use/postgresql".text = ''
     dev-db/postgresql -systemd -xml
   '';
+
+  # Gentoo 公式 binhost のバイナリと USE を一致させ、gcc をソースビルドせずに済ませる
+  xdg.configFile."portage/package.use/gcc".text = ''
+    sys-devel/gcc lto pgo
+  '';
 }
