@@ -44,6 +44,9 @@ in
 
   home.packages = with pkgs; [
     emacs30-gtk3
+    # Windows 側の op.exe ではなく Linux 側で動かす必要がある
+    # `op run` 用 (~/.local/bin/op シム参照)
+    _1password-cli
   ];
 
   home.sessionVariables = {
