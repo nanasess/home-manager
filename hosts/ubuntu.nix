@@ -97,6 +97,10 @@ in
     };
     Service = {
       Type = "simple";
+      # walker は起動時に `which("elephant")` で elephant を検出する。
+      # systemd ユーザーサービスの PATH には ~/.nix-profile/bin が含まれない
+      # ため、elephant の bin を明示的に PATH に追加する。
+      Environment = [ "PATH=${pkgs.elephant}/bin:/usr/local/bin:/usr/bin:/bin" ];
       ExecStart = "${pkgs.walker}/bin/walker --gapplication-service";
       Restart = "on-failure";
       RestartSec = 5;
