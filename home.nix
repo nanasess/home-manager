@@ -8,7 +8,6 @@
     builtins.elem (lib.getName pkg) [
       "terraform"
       "1password-cli"
-      "1password"
     ];
 
   programs.home-manager.enable = true;
@@ -64,8 +63,6 @@
     udev-gothic-nf
   ]
   ++ lib.optionals stdenv.isLinux [
-    _1password-cli
-    _1password-gui
     wl-clipboard
     xrandr
     libnotify
