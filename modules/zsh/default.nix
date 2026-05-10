@@ -47,9 +47,8 @@
     };
 
     completionInit = ''
-      autoload -U compinit promptinit
+      autoload -U compinit
       compinit
-      promptinit; prompt gentoo
 
       eval "$(op completion zsh)"; compdef _op op
 
