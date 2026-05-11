@@ -47,6 +47,9 @@ in
     # Windows 側の op.exe ではなく Linux 側で動かす必要がある
     # `op run` 用 (~/.local/bin/op シム参照)
     _1password-cli
+    # ~/.config/zsh/.env.local (FIFO) への secrets 注入用
+    # Windows 側 1Password は Linux 側 FIFO に書き込めないため WSLg で Linux 版 GUI を起動する
+    _1password-gui
   ];
 
   home.sessionVariables = {
