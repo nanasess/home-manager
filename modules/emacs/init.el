@@ -341,7 +341,7 @@
   ;; treesit
   (setopt treesit-font-lock-level 4)
   (setopt treesit-language-source-alist
-          '((csharp . ("https://github.com/tree-sitter/tree-sitter-c-sharp.git"))))
+          '((c-sharp . ("https://github.com/tree-sitter/tree-sitter-c-sharp.git"))))
 
   ;; editor
   (setenv "EDITOR" "emacsclient"))
@@ -830,7 +830,6 @@
   :mode (("\\.\\(markdown\\|md\\)\\'" . gfm-mode))
   :custom
   (markdown-fontify-code-blocks-natively t)
-  (markdown-header-scaling t)
   (markdown-indent-on-enter 'indent-and-new-item)
   :bind (:map markdown-mode-map
          ("<S-tab>" . markdown-shifttab)))
@@ -881,19 +880,63 @@
                       (when (string-equal "tpl" (file-name-extension buffer-file-name))
                         (web-mode-set-engine "eccube")))))
 
+;;; JSON
+(use-package json-ts-mode
+  :ensure nil
+  :mode "\\.json\\'")
+
+;;; Shell scripts
+;; sh-mode に決まったあと bash-ts-mode へリマップする。bash-ts-mode 自体が
+;; shebang などから bash/sh でないと判断した場合は sh--redirect-bash-ts-mode
+;; advice で sh-mode に戻るため、zsh/csh 等は安全にフォールバックする。
+(use-package sh-script
+  :ensure nil
+  :init
+  (add-to-list 'major-mode-remap-alist '(sh-mode . bash-ts-mode)))
+
+;;; CSS
+(use-package css-mode
+  :ensure nil
+  :init
+  (add-to-list 'major-mode-remap-alist '(css-mode . css-ts-mode)))
+
+;;; JavaScript
+;; auto-mode-alist のデフォルトは `\.js[mx]?\' . javascript-mode' で、
+;; javascript-mode は js-mode の defalias。major-mode-remap はエイリアスを
+;; 解決しないため両方の名前でリマップする。
+(use-package js
+  :ensure nil
+  :init
+  (add-to-list 'major-mode-remap-alist '(javascript-mode . js-ts-mode))
+  (add-to-list 'major-mode-remap-alist '(js-mode . js-ts-mode)))
+
+;;; C#
+;; csharp-ts-mode は内部で言語シンボル 'c-sharp を使うため、grammar は
+;; libtree-sitter-c-sharp.so の名前で配置する必要がある (default.nix 参照)。
+(use-package csharp-mode
+  :ensure nil
+  :init
+  (add-to-list 'major-mode-remap-alist '(csharp-mode . csharp-ts-mode)))
+
 ;;; YAML
+;; ビルトインの yaml-ts-mode は treesit-simple-indent-rules が未実装で
+;; インデントが効かないため、手書きの indent ルールを持つ yaml-mode を優先する。
 (use-package yaml-mode
   :ensure t
-  :mode "\\.ya?ml\\'")
+  :mode "\\.ya?ml\\'"
+  :init
+  (setq auto-mode-alist
+        (rassq-delete-all 'yaml-ts-mode auto-mode-alist)))
 
 ;;; PHP
-(use-package php-ts-mode
-  :ensure nil
-  :mode "\\.\\(inc\\|php[s34]?\\)\\'"
-  :hook (php-ts-mode . (lambda ()
-                         (electric-indent-local-mode t)
-                         (electric-layout-mode t)
-                         (electric-pair-local-mode t))))
+(use-package php-mode
+  :ensure (:host github :repo "emacs-php/php-mode"
+                 :files ("lisp/*.el"))
+  :mode ("\\.\\(inc\\|php[s34]?\\|phtml\\)\\'" . php-mode)
+  :hook (php-mode . (lambda ()
+                      (electric-indent-local-mode t)
+                      (electric-layout-mode t)
+                      (electric-pair-local-mode t))))
 
 (use-package php-runtime
   :ensure (:host github :repo "emacs-php/php-runtime.el"))
