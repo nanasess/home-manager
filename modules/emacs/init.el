@@ -340,8 +340,6 @@
 
   ;; treesit
   (setopt treesit-font-lock-level 4)
-  (setopt treesit-language-source-alist
-          '((c-sharp . ("https://github.com/tree-sitter/tree-sitter-c-sharp.git"))))
 
   ;; editor
   (setenv "EDITOR" "emacsclient"))
@@ -556,11 +554,6 @@
 ;;;; ============================================================
 ;;;; Editing support
 ;;;; ============================================================
-(use-package terminal-here
-  :ensure (:host github :repo "davidshepherd7/terminal-here")
-  :custom
-  (terminal-here-mac-terminal-command 'iterm2))
-
 (use-package migemo
   :ensure t
   :if (file-exists-p (concat external-directory "migemo/dict/utf-8/migemo-dict"))
@@ -971,8 +964,13 @@
          (haskell-mode . turn-on-haskell-indentation)))
 
 ;;; Dockerfile
-(use-package dockerfile-mode
-  :ensure t)
+;; Emacs 29+ ビルトインの dockerfile-ts-mode を使う。grammar は Nix 側
+;; (default.nix) で libtree-sitter-dockerfile.so として配置済み。
+(use-package dockerfile-ts-mode
+  :ensure nil
+  :mode (("/Dockerfile\\(?:\\..*\\)?\\'" . dockerfile-ts-mode)
+         ("\\.[Dd]ockerfile\\'" . dockerfile-ts-mode)
+         ("/Containerfile\\(?:\\..*\\)?\\'" . dockerfile-ts-mode)))
 
 ;;; Terraform
 (use-package terraform-mode
