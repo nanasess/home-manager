@@ -14,6 +14,7 @@ let
     yaml       = tree-sitter-yaml;
     bash       = tree-sitter-bash;
     c-sharp    = tree-sitter-c-sharp;
+    dockerfile = tree-sitter-dockerfile;
   };
 
   treesitGrammars = pkgs.runCommandLocal "treesit-grammars" { } ''
