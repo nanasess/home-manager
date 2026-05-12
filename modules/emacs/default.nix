@@ -1,9 +1,33 @@
 { config, pkgs, lib, ... }:
 
+let
+  # Emacs treesit が探すファイル名 (拡張子なし) → nixpkgs の grammar 派生物。
+  # キー名は各 major mode が `treesit-ready-p` などに渡す言語シンボルに合わせる
+  # (例: csharp-ts-mode は 'c-sharp を使うため、ファイル名も libtree-sitter-c-sharp.so にする)。
+  treesitGrammarMap = with pkgs.tree-sitter-grammars; {
+    typescript = tree-sitter-typescript;
+    tsx        = tree-sitter-tsx;
+    javascript = tree-sitter-javascript;
+    json       = tree-sitter-json;
+    css        = tree-sitter-css;
+    html       = tree-sitter-html;
+    yaml       = tree-sitter-yaml;
+    bash       = tree-sitter-bash;
+    c-sharp    = tree-sitter-c-sharp;
+  };
+
+  treesitGrammars = pkgs.runCommandLocal "treesit-grammars" { } ''
+    mkdir -p $out
+    ${lib.concatStrings (lib.mapAttrsToList (lang: grammar: ''
+      ln -s ${grammar}/parser $out/libtree-sitter-${lang}${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}
+    '') treesitGrammarMap)}
+  '';
+in
 {
   home.file.".emacs.d/init.el".source = ./init.el;
   home.file.".emacs.d/early-init.el".source = ./early-init.el;
   home.file.".emacs.d/site-lisp/eaw-console.el".source = ../locale-eaw/eaw-console.el;
+  home.file.".emacs.d/tree-sitter".source = treesitGrammars;
 
   home.activation.elpacaLockFile = config.lib.dag.entryAfter [ "writeBoundary" ] ''
     install -Dm644 ${./elpaca.lock} ${config.home.homeDirectory}/.emacs.d/elpaca.lock
