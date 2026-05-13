@@ -181,8 +181,12 @@
 ;; https://github.com/hamano/locale-eaw
 (load (expand-file-name (locate-user-emacs-file "site-lisp/eaw-console")) t t)
 
+;; nskk は upstream で *.el を src/ サブディレクトリに移動したため、
+;; elpaca のデフォルト :files では nskk.el が見つからずビルドが失敗する。
+;; src/*.el を明示的にビルド対象に加える。
 (use-package nskk
   :ensure (:host github :repo "takeokunn/nskk.el" :branch "main"
+           :files ("src/*.el")
            :build (:not elpaca-build-autoloads))
   :demand t
   :bind (("C-j" . nskk-toggle-mode)
