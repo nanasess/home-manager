@@ -885,7 +885,11 @@
           bash-ts-mode-hook
           yaml-mode-hook yaml-ts-mode-hook
           json-ts-mode-hook
-          html-mode-hook mhtml-mode-hook
+          ;; .html / .tpl / .vue / .twig は web-mode に割り当てているため
+          ;; (web-mode セクション参照)、HTML 系は web-mode-hook で起動する。
+          ;; lsp-bridge も html-mode 系のサーバー解決を持たず web-mode-hook を
+          ;; デフォルト対象としている (lsp-bridge.el)。
+          web-mode-hook
           css-ts-mode-hook
           dockerfile-ts-mode-hook
           nix-mode-hook
