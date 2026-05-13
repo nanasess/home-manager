@@ -54,6 +54,15 @@
     symfony-cli
     apacheHttpd
 
+    # LSP servers (lsp-bridge から利用)
+    phpactor
+    bash-language-server
+    typescript-language-server
+    yaml-language-server
+    vscode-langservers-extracted
+    dockerfile-language-server
+    nil
+
     # Japanese input
     skktools
 

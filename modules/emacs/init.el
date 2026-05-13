@@ -846,6 +846,56 @@
   :ensure t)
 
 ;;;; ============================================================
+;;;; LSP (lsp-bridge)
+;;;; ============================================================
+;; lsp-bridge は外部 Python サーバー (epc 経由) で動作する補完/LSP クライアント。
+;; Python 依存は uv で ~/.local/share/lsp-bridge/.venv に隔離管理する
+;; (modules/emacs/lsp-bridge/pyproject.toml と default.nix の
+;; home.activation.lspBridgeUvSync を参照)。
+;; PHP は phpactor、その他は lsp-bridge 同梱の langserver/*.json で解決する。
+
+(use-package yasnippet
+  :ensure t
+  :config
+  (yas-global-mode 1))
+
+(use-package posframe
+  :ensure t)
+
+(use-package lsp-bridge
+  :ensure (:host github :repo "manateelazycat/lsp-bridge"
+                 :files (:defaults "*.py" "core" "acm" "icons" "langserver" "resources"))
+  :after (yasnippet posframe)
+  :demand t
+  :bind (("M-." . lsp-bridge-find-def)
+         ("M-," . lsp-bridge-find-def-return)
+         ([remap xref-find-definitions] . lsp-bridge-find-def)
+         ([remap xref-go-back]          . lsp-bridge-find-def-return)
+         ([remap xref-pop-marker-stack] . lsp-bridge-find-def-return))
+  :init
+  (setq lsp-bridge-python-command
+        (expand-file-name "~/.local/share/lsp-bridge/.venv/bin/python"))
+  ;; PHP は phpactor を使用 (langserver/phpactor.json が同梱されている)
+  (setq lsp-bridge-php-lsp-server "phpactor")
+  ;; 対象モードを明示。csharp-ts-mode 等は LSP を入れていないので除外する。
+  (setq lsp-bridge-default-mode-hooks
+        '(php-ts-mode-hook
+          typescript-ts-mode-hook tsx-ts-mode-hook
+          js-ts-mode-hook
+          bash-ts-mode-hook
+          yaml-mode-hook yaml-ts-mode-hook
+          json-ts-mode-hook
+          html-mode-hook mhtml-mode-hook
+          css-ts-mode-hook
+          dockerfile-ts-mode-hook
+          nix-mode-hook
+          ;; emacs-lisp は外部 LSP サーバーを使わず lsp-bridge 内蔵の
+          ;; elisp symbol 同期 (lsp-bridge-elisp-symbols-update) で補完する。
+          emacs-lisp-mode-hook))
+  :config
+  (global-lsp-bridge-mode))
+
+;;;; ============================================================
 ;;;; Programming languages
 ;;;; ============================================================
 
@@ -926,26 +976,15 @@
         (rassq-delete-all 'yaml-ts-mode auto-mode-alist)))
 
 ;;; PHP
-(use-package php-mode
-  :ensure (:host github :repo "emacs-php/php-mode"
-                 :files ("lisp/*.el"))
-  :mode ("\\.\\(inc\\|php[s34]?\\|phtml\\)\\'" . php-mode)
-  :hook (php-mode . (lambda ()
-                      (electric-indent-local-mode t)
-                      (electric-layout-mode t)
-                      (electric-pair-local-mode t))))
-
-(use-package php-runtime
-  :ensure (:host github :repo "emacs-php/php-runtime.el"))
-
-(use-package php-skeleton
-  :ensure (:host github :repo "emacs-php/php-skeleton"))
-
-(use-package composer
-  :ensure (:host github :repo "emacs-php/composer.el"))
-
-(use-package phpstan
-  :ensure (:host github :repo "emacs-php/phpstan.el"))
+;; Emacs 30 内蔵 php-ts-mode を使用。grammar (php / phpdoc / html / css /
+;; javascript / jsdoc) は default.nix の treesitGrammarMap で配置済み。
+;; HTML/CSS/JavaScript の混在ブロックも treesit-language-at で正しくハイライトされる。
+(use-package php-ts-mode
+  :ensure nil
+  :mode ("\\.\\(inc\\|php[s34]?\\|phtml\\)\\'" . php-ts-mode)
+  :hook (php-ts-mode . (lambda ()
+                         (electric-indent-local-mode t)
+                         (electric-pair-local-mode t))))
 
 ;;; Groovy
 (use-package groovy-mode
