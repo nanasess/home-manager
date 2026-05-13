@@ -563,7 +563,7 @@
                 github :repo "takeokunn/nskk.el" :branch "main" :build
                 (:not elpaca-build-autoloads) :type git :protocol
                 https :inherit t :depth treeless :ref
-                "784edc6c05b4c3f0659d5a6d73d918f2e21b3492"))
+                "2b8078a65e990ee8e774edbadd9df120c95bb100"))
  (oauth2 :source "elpaca-menu-lock-file" :recipe
          (:package "oauth2" :repo "emacsmirror/oauth2" :tar "0.18.4"
                    :host github :files ("*" (:exclude ".git")) :source
