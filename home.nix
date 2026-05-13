@@ -61,7 +61,7 @@
     yaml-language-server
     vscode-langservers-extracted
     dockerfile-language-server
-    nil
+    nixd
 
     # Japanese input
     skktools
