@@ -98,6 +98,12 @@
     dev-python/pyfzf
     dev-python/click
     media-libs/mesa
+
+    # 1Password (GURU overlay)
+    app-misc/1password-cli ~amd64
+    gui-apps/1password ~amd64
+    acct-group/onepassword-cli ~amd64
+    acct-group/1password ~amd64
   '';
 
   xdg.configFile."portage/package.unmask".text = ''
@@ -106,9 +112,12 @@
     dev-python/click
   '';
 
-  # #48 移行済みパッケージを除外（terraform, 1password, op-cli-bin）
+  # #48 移行済みパッケージを除外（terraform, op-cli-bin）
+  # 1password 系は PR #85 で portage 管理に戻したためライセンス受諾を復活
   xdg.configFile."portage/package.license".text = ''
     www-client/google-chrome google-chrome
+    app-misc/1password-cli all-rights-reserved
+    gui-apps/1password all-rights-reserved
   '';
 
   xdg.configFile."portage/package.use/ffmpeg".text = ''
