@@ -7,8 +7,6 @@
   nixpkgs.config.allowUnfreePredicate = pkg:
     builtins.elem (lib.getName pkg) [
       "terraform"
-      "1password-cli"
-      "1password"
     ];
 
   programs.home-manager.enable = true;
