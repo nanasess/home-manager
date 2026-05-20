@@ -58,7 +58,10 @@
 
     ## default USE flags
     ## emerge --info | grep ^USE
-    USE="keyring wayland gnome"
+    ## NOTE: keyring USE は app-crypt/pinentry と dev-vcs/git の 2 つにしか効かず、
+    ##       gnome-keyring-daemon 依存と git-credential-libsecret を引き込む。
+    ##       WSL は 1Password 中心の運用で gnome-keyring が不要なため除去。
+    USE="wayland gnome"
 
     COMMON_FLAGS="-march=znver3 -O2 -pipe"
     CHOST="x86_64-pc-linux-gnu"
@@ -142,5 +145,11 @@
   # Gentoo 公式 binhost のバイナリと USE を一致させ、gcc をソースビルドせずに済ませる
   xdg.configFile."portage/package.use/gcc".text = ''
     sys-devel/gcc lto pgo
+  '';
+
+  # WSL は pinentry-tty を使うため GUI 版は不要。
+  # gtk USE が gnome-base/gnome-keyring を静的依存で引くため除外する。
+  xdg.configFile."portage/package.use/pinentry".text = ''
+    app-crypt/pinentry -gtk -qt6 -wayland
   '';
 }
