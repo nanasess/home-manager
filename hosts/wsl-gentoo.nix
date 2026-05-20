@@ -17,6 +17,14 @@ let
     "app-shells/zsh"
     "sys-apps/plocate"
 
+    # 1Password (GURU overlay)
+    # Nix /nix/store では setgid を付与できず Linux GUI と通信できないため、
+    # portage 経由で /usr/bin/op (setgid onepassword-cli) を導入する。
+    # GUI は ~/.config/zsh/.env.local (FIFO) への secrets 注入と
+    # SSH agent (~/.1password/agent.sock) を提供する。
+    "app-misc/1password-cli"
+    "gui-apps/1password"
+
     # mise PHP ビルド依存（asdf-php workflow.yml 参照）
     "dev-db/postgresql"
     "media-libs/gd"
@@ -44,12 +52,6 @@ in
 
   home.packages = with pkgs; [
     emacs30-gtk3
-    # Windows 側の op.exe ではなく Linux 側で動かす必要がある
-    # `op run` 用 (~/.local/bin/op シム参照)
-    _1password-cli
-    # ~/.config/zsh/.env.local (FIFO) への secrets 注入用
-    # Windows 側 1Password は Linux 側 FIFO に書き込めないため WSLg で Linux 版 GUI を起動する
-    _1password-gui
   ];
 
   home.sessionVariables = {
@@ -192,7 +194,11 @@ in
     text = ''
       #!/bin/bash
       OP_EXE="/mnt/c/Users/${config.home.username}/AppData/Local/Microsoft/WinGet/Links/op.exe"
-      OP_LINUX="${config.home.homeDirectory}/.nix-profile/bin/op"
+      # Gentoo portage の app-misc/1password-cli (GURU overlay) が
+      # setgid onepassword-cli 付きで /usr/bin/op を提供する。
+      # Nix /nix/store では setgid が付与できず Linux GUI と通信できないため、
+      # システム側 setgid バイナリを参照する。
+      OP_LINUX="/usr/bin/op"
 
       # op run は Linux のバイナリを実行するため、Windows の op.exe では動作しない
       if [ "$1" = "run" ] && [ -x "$OP_LINUX" ]; then
