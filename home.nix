@@ -133,7 +133,6 @@
     LESSCHARSET = "utf-8";
     LESS = "-R";
     LESSCOLORIZER = "pygmentize -O style=solarized-light";
-    JQ_COLORS = "1;36:0;33:0;33:0;36:0;32:1;39:1;39";
   };
 
   programs.ssh = {
