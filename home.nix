@@ -132,7 +132,7 @@
     PAGER = "less";
     LESSCHARSET = "utf-8";
     LESS = "-R";
-    JQ_COLORS = "1;36:0;33:0;33:0;36:0;32:1;39:1;39";
+    LESSCOLORIZER = "pygmentize -O style=solarized-light";
   };
 
   programs.ssh = {
