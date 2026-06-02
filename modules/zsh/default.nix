@@ -90,7 +90,7 @@
         cdpath=($HOME)
 
         # TERM
-        if [ ! -n "''${TERM}" ]; then
+        if [[ -z "''${TERM}" ]]; then
           TERM=xterm-256color
         fi
 
@@ -98,7 +98,7 @@
         # Ghostty / WezTerm はネイティブに COLORTERM=truecolor をセットするが、
         # WSL (wsl.exe 経由) で伝播が落ちるため未設定時のみ補完する。
         # Claude Code の light テーマ等、24bit RGB を使う TUI の量子化を防ぐ。
-        if [ ! -n "''${COLORTERM}" ]; then
+        if [[ -z "''${COLORTERM}" ]]; then
           export COLORTERM=truecolor
         fi
 
