@@ -94,6 +94,14 @@
           TERM=xterm-256color
         fi
 
+        # COLORTERM
+        # Ghostty / WezTerm はネイティブに COLORTERM=truecolor をセットするが、
+        # WSL (wsl.exe 経由) で伝播が落ちるため未設定時のみ補完する。
+        # Claude Code の light テーマ等、24bit RGB を使う TUI の量子化を防ぐ。
+        if [ ! -n "''${COLORTERM}" ]; then
+          export COLORTERM=truecolor
+        fi
+
         # GPG
         if [ -t 0 ]; then
           export GPG_TTY=$(tty)
