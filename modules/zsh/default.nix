@@ -134,6 +134,10 @@
         # rbenv
         if which rbenv > /dev/null; then eval "$(rbenv init -)"; fi
 
+        # git-worktree-manager シェル統合 (switch/create/checkout 後の自動 cd)
+        # https://github.com/nanasess/git-worktree-manager/pull/24
+        if command -v worktree > /dev/null; then eval "$(worktree shell-init)"; fi
+
         # misc
         export BAT_THEME=ansi-light
         export WEBKIT_FORCE_SANDBOX=0
