@@ -13,6 +13,12 @@ in
 {
   home.homeDirectory = "/Users/nanasess";
 
+  # 字形本体の Noto。home.nix 共通から移動 (Ubuntu のみ OS 静的 Noto に委譲する方針)。
+  # macOS の Emacs は CoreText (ns) バックエンドのため可変フォントでも問題ない。
+  home.packages = with pkgs; [
+    noto-fonts
+  ];
+
   programs.git.signing.signer = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign";
 
   home.file.".local/bin/check-system-packages" = {

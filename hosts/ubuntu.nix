@@ -56,10 +56,16 @@ in
   };
 
   home.packages = with pkgs; [
-    emacs30
+    # Wayland セッションでは pgtk ビルドを使う。XWayland (X11) 経由を避けることで
+    # GTK の長年のバグ (X11 接続喪失時に daemon ごとクラッシュ / GNOME #85715) を
+    # 回避し、HiDPI スケーリングと IME 連携も Wayland ネイティブになる。
+    emacs30-pgtk
     walker
     elephant
     libqalculate
+    # GNOME のUIフォント設定 (gsettings: Adwaita Sans) の実体。未導入だと
+    # pgtk Emacs の GTK メニュー/ツールバー/タイトルバーが豆腐になる。
+    adwaita-fonts
   ];
 
   home.file.".local/bin/walker-wrapper" = {

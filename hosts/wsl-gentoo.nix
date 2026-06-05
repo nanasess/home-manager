@@ -52,6 +52,8 @@ in
 
   home.packages = with pkgs; [
     emacs30-gtk3
+    # 字形本体の Noto。home.nix 共通から移動 (Ubuntu のみ OS 静的 Noto に委譲する方針)。
+    noto-fonts
   ];
 
   home.sessionVariables = {

@@ -65,10 +65,16 @@
     skktools
 
     # Fonts
-    noto-fonts
+    # noto-fonts (字形本体) はホスト側で管理する。Nix の noto-fonts は可変フォント版
+    # (NotoSans[wdth,wght].ttf) で、Linux の Emacs ftcrhb バックエンドが realize できず
+    # 各スクリプトが豆腐になるため。Ubuntu は OS の静的 Noto (272本) に委譲し、
+    # noto-fonts を入れない。WSL Gentoo / macOS は各ホストで追加する。
     noto-fonts-color-emoji
     udev-gothic
     udev-gothic-nf
+    # nerd-icons が参照する "Symbols Nerd Font Mono" を提供する。
+    # 未導入だと doom-modeline 等のアイコン (U+F0000 台) が豆腐になる。
+    nerd-fonts.symbols-only
   ]
   ++ lib.optionals stdenv.isLinux [
     wl-clipboard
