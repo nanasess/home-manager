@@ -129,14 +129,22 @@
 ;; GNU/Linux (WSL2, Ubuntu)
 ;; JPDOC をプライマリフォントに使用 (East Asian Ambiguous 文字が全角グリフ)
 (when (eq system-type 'gnu/linux)
+  ;; variable-pitch / fixed-pitch も静的フォントに固定する。
+  ;; generic "Sans Serif" は可変フォント NotoSans[wdth,wght].ttf に解決されるが、
+  ;; Emacs の ftcrhb バックエンドは可変フォントを realize できず豆腐になるため
+  ;; (about-emacs 等の variable-pitch 表示が崩れる)、静的フォントを明示する。
   (defun my/set-font-linux (frame)
     "Set font for FRAME when it is a graphic display."
     (when (display-graphic-p frame)
-      (set-face-attribute 'default frame :family "UDEV Gothic JPDOC" :height 120)))
+      (set-face-attribute 'default frame :family "UDEV Gothic JPDOC" :height 120)
+      (set-face-attribute 'variable-pitch frame :family "Noto Sans CJK JP")
+      (set-face-attribute 'fixed-pitch frame :family "UDEV Gothic JPDOC")))
   (if (daemonp)
       (add-hook 'after-make-frame-functions #'my/set-font-linux)
     (when (display-graphic-p)
-      (set-face-attribute 'default nil :family "UDEV Gothic JPDOC" :height 120))))
+      (set-face-attribute 'default nil :family "UDEV Gothic JPDOC" :height 120)
+      (set-face-attribute 'variable-pitch nil :family "Noto Sans CJK JP")
+      (set-face-attribute 'fixed-pitch nil :family "UDEV Gothic JPDOC"))))
 
 ;; server
 (when (display-graphic-p)
