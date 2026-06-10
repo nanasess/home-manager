@@ -19,7 +19,8 @@ let
 
     # SKK 辞書サーバ (skkserv)。Emacs nskk の辞書本体をこのサーバへ逃がし、
     # nskk のトライ索引 (~650MiB) が full GC を 20-50 秒占有する問題を解消する。
-    # RDEPEND の app-i18n/skk-jisyo で SKK-JISYO.L も入る。OpenRC で常駐。
+    # RDEPEND の app-i18n/skk-jisyo で SKK-JISYO.L も入る。
+    # 常駐は systemd ユーザーサービス (modules/yaskkserv2.nix) で管理。
     "app-i18n/yaskkserv2"
 
     # 1Password (GURU overlay)

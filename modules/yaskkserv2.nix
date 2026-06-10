@@ -25,7 +25,9 @@
   xdg.configFile."yaskkserv2/yaskkserv2.conf".text = ''
     dictionary = /usr/lib/yaskkserv2/all
     port = 1178
-    listen-address = 0.0.0.0
+    # 127.0.0.1 に限定 (LAN へ露出しない)。WSL2 の localhostForwarding により
+    # Windows 側からも localhost:1178 で到達できる。
+    listen-address = 127.0.0.1
     max-connections = 16
     google-japanese-input = notfound
     google-suggest = enable
@@ -41,7 +43,7 @@
     Service = {
       # --midashi-utf8: SKK-JISYO.all.utf8 は EUC-JP 不可文字を含むため UTF-8 で
       # 統一し、nskk 側 nskk-server-coding-system 'utf-8 (init.el) と整合させる。
-      ExecStart = "/usr/bin/yaskkserv2 --no-daemonize --midashi-utf8 --config-filename ${config.home.homeDirectory}/.config/yaskkserv2/yaskkserv2.conf";
+      ExecStart = "/usr/bin/yaskkserv2 --no-daemonize --midashi-utf8 --config-filename ${config.xdg.configHome}/yaskkserv2/yaskkserv2.conf";
       Restart = "on-failure";
       RestartSec = 3;
     };

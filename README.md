@@ -73,7 +73,7 @@ systemctl --user status yaskkserv2
 python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",1178),2); s.sendall("1あい ".encode()); print(s.recv(8192).decode("utf-8","replace"))'
 ```
 
-設定 (`modules/yaskkserv2.nix`) を変更したら `home-manager switch` で自動反映されます（手動再起動が要る場合は `systemctl --user restart yaskkserv2`）。`listen-address = 0.0.0.0` なので WSL2 の localhostForwarding 経由で Windows からも `localhost:1178` で共有できます。
+設定 (`modules/yaskkserv2.nix`) を変更したら `home-manager switch` で自動反映されます（手動再起動が要る場合は `systemctl --user restart yaskkserv2`）。`listen-address = 127.0.0.1`（LAN へ露出しない）ですが、WSL2 の localhostForwarding 経由で Windows からも `localhost:1178` で接続できます。
 
 ### システムパッケージの確認
 
