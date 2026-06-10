@@ -49,6 +49,32 @@ sudo ln -sfn ~/.config/portage/repos.conf /etc/portage/repos.conf
 sudo getuto
 ```
 
+### SKK 辞書サーバ (yaskkserv2) のセットアップ（WSL Gentoo のみ）
+
+Emacs (nskk) の辞書本体を skkserv (yaskkserv2) に逃がし、nskk が全辞書を起動時にトライ索引へ全件展開することで full GC が 20-50 秒かかる問題を回避します。サーバは `modules/yaskkserv2.nix` が **systemd ユーザーサービス**として管理します（`/etc` も sudo も OpenRC も不要、ユーザー権限で `~/.config/yaskkserv2/` を読む）。バイナリと配信辞書のみ sudo で用意します。
+
+```bash
+# 1. yaskkserv2 をインストール（SKK-JISYO.L も依存で入る）
+sudo emerge -av app-i18n/yaskkserv2
+
+# 2. 配信辞書を SKK-JISYO.all.utf8 からビルド（辞書更新時のみ再実行）
+sudo install -d /usr/lib/yaskkserv2
+sudo yaskkserv2_make_dictionary \
+  --dictionary-filename /usr/lib/yaskkserv2/all \
+  --utf8 "$HOME/OneDrive - Skirnir Inc/emacs/ddskk/SKK-JISYO.all.utf8"
+
+# 3. home-manager switch で設定生成 + ユーザーサービス起動
+home-manager switch --flake '.#nanasess@wsl-gentoo'
+
+# 4. 稼働確認
+systemctl --user status yaskkserv2
+
+# 5. 変換動作確認（UTF-8 ワイヤ。1/愛/相/... が返れば OK。nc 不要）
+python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",1178),2); s.sendall("1あい ".encode()); print(s.recv(8192).decode("utf-8","replace"))'
+```
+
+設定 (`modules/yaskkserv2.nix`) を変更したら `home-manager switch` で自動反映されます（手動再起動が要る場合は `systemctl --user restart yaskkserv2`）。`listen-address = 0.0.0.0` なので WSL2 の localhostForwarding 経由で Windows からも `localhost:1178` で共有できます。
+
 ### システムパッケージの確認
 
 各ホストでシステムパッケージマネージャ（portage/apt/Homebrew）のパッケージが揃っているか確認できます。
