@@ -926,15 +926,20 @@
   ;; lsp-bridge-mode-lighter を設定しても画面には出ない。実際に見えているのは
   ;; mode-line-misc-info に積まれる lsp-bridge--mode-line-format の出力 ("lsp-bridge")。
   ;; そこで misc-info 側も lighter (= "橋") で描画するよう差し替える。
-  ;; NOTE: これは upstream の内部関数を上書きする。lsp-bridge 更新時に
-  ;;       lsp-bridge--mode-line-format の定義が変わったら追従が必要。
-  (defun lsp-bridge--mode-line-format ()
+  ;; defun での直接再定義ではなく advice-add :override を使う。再定義は lsp-bridge
+  ;; 再読み込み時に upstream 定義へ巻き戻るが、advice は再定義をまたいで残る。
+  ;; stringp ガードは redisplay 毎に走るため、非文字列設定でも string-trim が
+  ;; 落ちないようにする保険 (boundp は同一ファイル由来で常に bound のため省略)。
+  ;; NOTE: upstream の lsp-bridge--mode-line-format 定義が変わったら追従が必要。
+  (defun my/lsp-bridge--mode-line-format ()
     "Compose the LSP-bridge's mode-line (lsp-bridge-mode-lighter を表示する版)."
-    (when lsp-bridge-server
+    (when (and lsp-bridge-server
+               (stringp lsp-bridge-mode-lighter))
       (propertize (string-trim lsp-bridge-mode-lighter)
                   'face (if (lsp-bridge-process-live-p)
                             'lsp-bridge-alive-mode-line
                           'lsp-bridge-kill-mode-line))))
+  (advice-add 'lsp-bridge--mode-line-format :override #'my/lsp-bridge--mode-line-format)
   (global-lsp-bridge-mode))
 
 ;;;; ============================================================
