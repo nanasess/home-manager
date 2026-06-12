@@ -899,6 +899,9 @@
         (expand-file-name "~/.local/share/lsp-bridge/.venv/bin/python"))
   ;; PHP は phpactor を使用 (langserver/phpactor.json が同梱されている)
   (setq lsp-bridge-php-lsp-server "phpactor")
+  ;; モードライン表示は "橋" にする (PR #751 で defcustom 化された lighter)。
+  ;; commit ba34436 でデフォルトが " 橋" → " LSPB" に変わったが、好みで戻す。
+  (setq lsp-bridge-mode-lighter " 橋")
   ;; 対象モードを明示。csharp-ts-mode 等は LSP を入れていないので除外する。
   (setq lsp-bridge-default-mode-hooks
         '(php-ts-mode-hook
@@ -919,6 +922,24 @@
           ;; elisp symbol 同期 (lsp-bridge-elisp-symbols-update) で補完する。
           emacs-lisp-mode-hook))
   :config
+  ;; doom-modeline は minor-mode lighter を描画しない (doom-modeline-minor-modes nil) ため、
+  ;; lsp-bridge-mode-lighter を設定しても画面には出ない。実際に見えているのは
+  ;; mode-line-misc-info に積まれる lsp-bridge--mode-line-format の出力 ("lsp-bridge")。
+  ;; そこで misc-info 側も lighter (= "橋") で描画するよう差し替える。
+  ;; defun での直接再定義ではなく advice-add :override を使う。再定義は lsp-bridge
+  ;; 再読み込み時に upstream 定義へ巻き戻るが、advice は再定義をまたいで残る。
+  ;; stringp ガードは redisplay 毎に走るため、非文字列設定でも string-trim が
+  ;; 落ちないようにする保険 (boundp は同一ファイル由来で常に bound のため省略)。
+  ;; NOTE: upstream の lsp-bridge--mode-line-format 定義が変わったら追従が必要。
+  (defun my/lsp-bridge--mode-line-format ()
+    "Compose the LSP-bridge's mode-line (lsp-bridge-mode-lighter を表示する版)."
+    (when (and lsp-bridge-server
+               (stringp lsp-bridge-mode-lighter))
+      (propertize (string-trim lsp-bridge-mode-lighter)
+                  'face (if (lsp-bridge-process-live-p)
+                            'lsp-bridge-alive-mode-line
+                          'lsp-bridge-kill-mode-line))))
+  (advice-add 'lsp-bridge--mode-line-format :override #'my/lsp-bridge--mode-line-format)
   (global-lsp-bridge-mode))
 
 ;;;; ============================================================
