@@ -899,6 +899,9 @@
         (expand-file-name "~/.local/share/lsp-bridge/.venv/bin/python"))
   ;; PHP は phpactor を使用 (langserver/phpactor.json が同梱されている)
   (setq lsp-bridge-php-lsp-server "phpactor")
+  ;; モードライン表示は "橋" にする (PR #751 で defcustom 化された lighter)。
+  ;; commit ba34436 でデフォルトが " 橋" → " LSPB" に変わったが、好みで戻す。
+  (setq lsp-bridge-mode-lighter " 橋")
   ;; 対象モードを明示。csharp-ts-mode 等は LSP を入れていないので除外する。
   (setq lsp-bridge-default-mode-hooks
         '(php-ts-mode-hook
@@ -919,6 +922,19 @@
           ;; elisp symbol 同期 (lsp-bridge-elisp-symbols-update) で補完する。
           emacs-lisp-mode-hook))
   :config
+  ;; doom-modeline は minor-mode lighter を描画しない (doom-modeline-minor-modes nil) ため、
+  ;; lsp-bridge-mode-lighter を設定しても画面には出ない。実際に見えているのは
+  ;; mode-line-misc-info に積まれる lsp-bridge--mode-line-format の出力 ("lsp-bridge")。
+  ;; そこで misc-info 側も lighter (= "橋") で描画するよう差し替える。
+  ;; NOTE: これは upstream の内部関数を上書きする。lsp-bridge 更新時に
+  ;;       lsp-bridge--mode-line-format の定義が変わったら追従が必要。
+  (defun lsp-bridge--mode-line-format ()
+    "Compose the LSP-bridge's mode-line (lsp-bridge-mode-lighter を表示する版)."
+    (when lsp-bridge-server
+      (propertize (string-trim lsp-bridge-mode-lighter)
+                  'face (if (lsp-bridge-process-live-p)
+                            'lsp-bridge-alive-mode-line
+                          'lsp-bridge-kill-mode-line))))
   (global-lsp-bridge-mode))
 
 ;;;; ============================================================
