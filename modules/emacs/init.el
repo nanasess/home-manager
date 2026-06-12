@@ -201,8 +201,22 @@
          ("C-x C-j" . nskk-toggle-mode))
   :custom
   (nskk-dict-user-dictionary-file (concat external-directory "nskk/jisyo"))
-  (nskk-dict-system-dictionary-files
-   (list (concat external-directory "ddskk/SKK-JISYO.all.utf8")))
+  ;; 辞書本体は skkserv (yaskkserv2) に逃がし、Emacs ヒープには載せない。
+  ;; nskk は全システム辞書を起動時にトライ索引 (nskk--prolog-trie-indices) へ
+  ;; 全件展開するため、SKK-JISYO.all (50 万件) で索引が ~650MiB に膨張し、
+  ;; full GC が 20-50 秒かかっていた。system-dict を nil + ja-dic 無効にすると
+  ;; in-memory 辞書はユーザー辞書 (学習語) のみになりヒープが激減する。
+  ;; 変換は skkserv を第一ソースとして引く (nskk-henkan.el の optional-server-lookup)。
+  ;; サーバ未起動のホストではユーザー辞書のみに縮退する (接続は live-p で fast-fail)。
+  (nskk-dict-system-dictionary-files nil)
+  (nskk-dict-use-ja-dic nil)
+  (nskk-server-enable t)
+  (nskk-server-host "localhost")
+  (nskk-server-portnum 1178)
+  ;; yaskkserv2 を --midashi-utf8 で起動し、SKK-JISYO.all.utf8 (EUC-JP では
+  ;; 表現できない文字を含む) を UTF-8 でワイヤ送受信する。既定の euc-jp だと
+  ;; 文字化けするため utf-8 に合わせる (nskk-server.el の coding-system-for-read/write)。
+  (nskk-server-coding-system 'utf-8)
   (nskk-show-tooltip t)
   (nskk-use-color-cursor t)
   (nskk-converter-auto-start-henkan t)
