@@ -80,8 +80,8 @@ in
   home.activation.weztermFonts = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     fontdir="/mnt/c/Users/${config.home.username}/.local/share/fonts"
     mkdir -p "$fontdir"
-    install -m644 ${pkgs.udev-gothic}/share/fonts/udev-gothic/UDEVGothicJPDOC-*.ttf "$fontdir/"
-    install -m644 ${pkgs.udev-gothic-nf}/share/fonts/udev-gothic-nf/UDEVGothicNF-*.ttf "$fontdir/"
+    install -m644 ${pkgs.udev-gothic}/share/fonts/truetype/UDEVGothicJPDOC-*.ttf "$fontdir/"
+    install -m644 ${pkgs.udev-gothic-nf}/share/fonts/truetype/UDEVGothicNF-*.ttf "$fontdir/"
   '';
 
   # Ghostty Windows port (PR #12167) 向け設定を %LOCALAPPDATA%\ghostty\ にコピー
