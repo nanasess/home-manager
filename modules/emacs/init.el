@@ -197,10 +197,14 @@
            :files ("src/*.el")
            :build (:not elpaca-build-autoloads))
   :demand t
-  :bind (("C-j" . nskk-toggle-mode)
-         ("C-x C-j" . nskk-toggle-mode))
+  ;; ddskk の (global-set-key "\C-x\C-j" 'skk-mode) と等価。
+  ;; C-j はグローバルに束縛しない: nskk 無効時は素の改行に戻り、
+  ;; nskk 有効時は nskk-mode-map の C-j (#'nskk-kakutei) が確定/かな復帰/改行を担う。
+  :bind (("C-x C-j" . nskk-toggle-mode))
   :custom
   (nskk-dict-user-dictionary-file (concat external-directory "nskk/jisyo"))
+  ;; ddskk の skk-mode 同様、有効化したら直接ひらがな入力に入る (既定は 'ascii)。
+  (nskk-state-default-mode 'hiragana)
   ;; 辞書本体は skkserv (yaskkserv2) に逃がし、Emacs ヒープには載せない。
   ;; nskk は全システム辞書を起動時にトライ索引 (nskk--prolog-trie-indices) へ
   ;; 全件展開するため、SKK-JISYO.all (50 万件) で索引が ~650MiB に膨張し、
@@ -1158,7 +1162,11 @@
 ;;;; ============================================================
 ;;;; Minibuffer extras
 ;;;; ============================================================
-(bind-key "C-x C-j" #'nskk-kakutei minibuffer-local-map)
+;; ddskk の skk-define-minibuffer-maps 相当: ミニバッファでも確定キーは
+;; C-j (本体の nskk-mode-map と同じ) に統一する。
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-map)
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-completion-map)
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-ns-map)
 
 ;; npm i -g vscode-json-languageserver
 ;; for json format
