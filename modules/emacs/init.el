@@ -197,10 +197,14 @@
            :files ("src/*.el")
            :build (:not elpaca-build-autoloads))
   :demand t
-  :bind (("C-j" . nskk-toggle-mode)
-         ("C-x C-j" . nskk-toggle-mode))
+  ;; ddskk の (global-set-key "\C-x\C-j" 'skk-mode) と等価。
+  ;; C-j はグローバルに束縛しない: nskk 無効時は素の改行に戻り、
+  ;; nskk 有効時は nskk-mode-map の C-j (#'nskk-kakutei) が確定/かな復帰/改行を担う。
+  :bind (("C-x C-j" . nskk-toggle-mode))
   :custom
   (nskk-dict-user-dictionary-file (concat external-directory "nskk/jisyo"))
+  ;; ddskk の skk-mode 同様、有効化したら直接ひらがな入力に入る (既定は 'ascii)。
+  (nskk-state-default-mode 'hiragana)
   ;; 辞書本体は skkserv (yaskkserv2) に逃がし、Emacs ヒープには載せない。
   ;; nskk は全システム辞書を起動時にトライ索引 (nskk--prolog-trie-indices) へ
   ;; 全件展開するため、SKK-JISYO.all (50 万件) で索引が ~650MiB に膨張し、
@@ -220,7 +224,103 @@
   (nskk-show-tooltip t)
   (nskk-use-color-cursor t)
   (nskk-converter-auto-start-henkan t)
-  (nskk-henkan-show-candidates-nth 5))
+  (nskk-henkan-show-candidates-nth 5)
+  :config
+  ;; --- 学習データの永続化 (ddskk の個人辞書学習に相当) ---
+  ;; nskk は確定のたびに learning-score (頻度) と study-association (文脈) を
+  ;; 学習するが、デフォルトでは保存フックもロード経路も無く、再起動で学習が
+  ;; 失われる (実機検証済み)。learning には load 関数自体が存在しないため自前で
+  ;; 補い、study は nskk 本体が require しないため明示 require する。
+  (require 'nskk-study nil t)
+
+  (defun my/nskk-load-learning-data ()
+    "保存済みの learning-score を Prolog DB へ復元する。
+nskk 本体に learning データの load 関数が無いため補完する。形式は
+`nskk-search-save-learning-data' の出力 ((reading word score)...) と対称。"
+    (when (and (boundp 'nskk-search-learning-file)
+               (file-readable-p nskk-search-learning-file))
+      (condition-case err
+          (let ((data (with-temp-buffer
+                        (insert-file-contents nskk-search-learning-file)
+                        (read (current-buffer)))))
+            (when (listp data)
+              (dolist (entry data)
+                (pcase entry
+                  (`(,(and (pred stringp) reading)
+                     ,(and (pred stringp) word)
+                     ,(and (pred integerp) score))
+                   (nskk-prolog-assert
+                    (list `(learning-score ,reading ,word ,score))))))))
+        (error (message "NSKK: Failed to load learning data: %s"
+                        (error-message-string err))))))
+
+  (defun my/nskk-save-learning-data ()
+    "learning-score と study-association をファイルへ保存する。"
+    (when (fboundp 'nskk-search-save-learning-data)
+      (nskk-search-save-learning-data))
+    (when (fboundp 'nskk-study-save)
+      (nskk-study-save)))
+
+  ;; 起動時: Prolog DB を初期化してから学習データをロードする。
+  ;; nskk-state-initialize-prolog は idempotent で、後続の nskk-mode 有効化
+  ;; (nskk--enable 内の再初期化) でロード済みスコアは保持される (検証済み)。
+  (nskk-state-initialize-prolog)
+  (my/nskk-load-learning-data)
+  (when (fboundp 'nskk-study-load)
+    (nskk-study-load))
+  ;; Emacs 終了時に学習データを保存する。
+  (add-hook 'kill-emacs-hook #'my/nskk-save-learning-data)
+
+  ;; --- user 辞書を server 候補とマージする (ddskk 風) ---
+  ;; nskk-core-search の exact 検索は kakutei辞書 → server → local(user辞書) の
+  ;; 排他フォールバックで、server がヒットすると user 辞書 (登録語・学習語) が
+  ;; マージされず無視される (実機検証済み)。ddskk のように user 辞書を最優先で
+  ;; マージするため、dict-lookup ブランチのみ差し替えて再定義する。
+  ;; ベース: nskk e429c83。upstream で nskk-core-search が変わったら追従が必要。
+  (require 'nskk-cps-macros nil t)
+
+  (defun my/nskk-merge-user-first (primary secondary)
+    "PRIMARY (user 辞書) を先頭に、SECONDARY (server) の重複しない候補を後続させる。"
+    (delete-dups (append (copy-sequence primary) (copy-sequence secondary))))
+
+  (defun/k nskk-core-search (key &optional type limit)
+    "Search the dictionary for KEY.
+nskk 既定の dict-lookup は server がヒットすると user 辞書をマージしないため、
+本再定義は user 辞書ヒット時に server 候補をマージし (user 優先・重複排除)、
+ddskk と同様に登録語・学習語を最優先で表示する。"
+    (if (stringp key)
+        (let* ((search-type (or type :exact))
+               (action (nskk-prolog-query-value
+                        `(core-search-type ,search-type ,'\?a) '\?a)))
+          (pcase action
+            ('dict-lookup
+             (<-or result nskk--optional-kakutei-lookup key
+               :found (succeed result)
+               :fail  (<-or local nskk-dict-lookup key
+                        ;; user 辞書ヒット → server も引いてマージ (user 優先)
+                        :found (<-or srv nskk--optional-server-lookup key
+                                 :found (succeed (my/nskk-merge-user-first local srv))
+                                 :fail  (succeed local))
+                        ;; user 辞書が空 → server → builtin → program (既定の順)
+                        :fail  (<-or r nskk--optional-server-lookup key
+                                 :found (succeed r)
+                                 :fail  (<-or b nskk--optional-program-dict-builtin-lookup key
+                                          :found (succeed b)
+                                          :fail  (<-or p nskk--optional-program-dict-lookup key
+                                                   :found (succeed p)
+                                                   :fail  (fail)))))))
+            ('prefix-search
+             (if (nskk-dict-system-index)
+                 (<-or r nskk-search-prefix (nskk-dict-system-index) key nil limit
+                   :found (succeed r) :fail (fail))
+               (fail)))
+            ('partial-search
+             (if (nskk-dict-system-index)
+                 (<-or r nskk-search-partial (nskk-dict-system-index) key nil limit
+                   :found (succeed r) :fail (fail))
+               (fail)))
+            (_ (signal 'nskk-henkan-unknown-search-type (list search-type)))))
+      (fail))))
 
 (elpaca-wait)
 
@@ -1158,7 +1258,11 @@
 ;;;; ============================================================
 ;;;; Minibuffer extras
 ;;;; ============================================================
-(bind-key "C-x C-j" #'nskk-kakutei minibuffer-local-map)
+;; ddskk の skk-define-minibuffer-maps 相当: ミニバッファでも確定キーは
+;; C-j (本体の nskk-mode-map と同じ) に統一する。
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-map)
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-completion-map)
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-ns-map)
 
 ;; npm i -g vscode-json-languageserver
 ;; for json format
