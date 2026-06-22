@@ -23,16 +23,35 @@ let
     copy-on-select = "clipboard";
   };
 
-  # Windows 版固有の追加設定
+  # Windows で動作する版に共通のフォントフォールバック
+  # - Segoe UI Symbol を追加フォールバック
+  #   Ghostty 自動フォールバックリスト (CodepointResolver.zig) に seguisym.ttf が
+  #   含まれておらず、U+23F5 (⏵) 等の記号が豆腐になるため明示指定
+  windowsFontFamily = settings.font-family ++ [ "Segoe UI Symbol" ];
+
+  # Windows port (PR #12167) 固有の追加設定
   # - command: 起動時に WSL の Gentoo-systemd ディストリをログインシェルで立ち上げる
   #   "direct:" プレフィックスを付けて /bin/sh -c ラップを回避 (Windows には sh が無い)
   #   --cd ~ でホームディレクトリに入る (WezTerm の default_cwd と等価)
-  # - font-family: Segoe UI Symbol を追加フォールバック
-  #   Ghostty 自動フォールバックリスト (CodepointResolver.zig) に seguisym.ttf が
-  #   含まれておらず、U+23F5 (⏵) 等の記号が豆腐になるため明示指定
   windowsSettings = settings // {
     command = "direct:wsl.exe -d Gentoo-systemd --cd ~";
-    font-family = settings.font-family ++ [ "Segoe UI Symbol" ];
+    font-family = windowsFontFamily;
+  };
+
+  # GhostInTheWSL (Codavo/ghostinthewsl) 固有の設定
+  # ConPTY を経由せず Hyper-V ソケットのブリッジで WSL2 の Linux PTY に直結するため、
+  # Windows port のような command = "direct:wsl.exe ..." は不要 (ブリッジが WSL 接続を担う)。
+  # - working-directory: デフォルト (inherit 相当) だと起動プロセス (Windows 側 exe) の
+  #   cwd を引き継ぎ、/mnt/c/.../zig-out/bin で WSL シェルが起動してしまう。
+  #   そこに blocked な .envrc があると direnv が zsh 初期化中に出力し、p10k instant
+  #   prompt の警告を誘発する。
+  #   GhostInTheWSL では `home` は無効 (src/Surface.zig の WorkingDirectory.value() が
+  #   .home/.inherit に対し null を返し、ブリッジの cwd が空 → Windows cwd へフォールバック
+  #   するだけで、upstream のような passwd home 解決が繋がっていない)。
+  #   .path の明示パスのみブリッジへ cwd として渡るため、WSL ホームを直接指定する。
+  ghostinthewslSettings = settings // {
+    font-family = windowsFontFamily;
+    working-directory = "/home/nanasess";
   };
 
   # home-manager の programs.ghostty が内部で使っているのと同じフォーマッタ
@@ -43,10 +62,12 @@ let
   };
 
   configFile = pkgs.writeText "ghostty-config.ghostty" (renderConfig windowsSettings);
+  ghostinthewslConfigFile = pkgs.writeText "config.ghostinthewsl" (renderConfig ghostinthewslSettings);
 in
 {
-  # settings / configFile を他のモジュール (hosts/*.nix) から参照できるように公開
+  # settings / configFile / ghostinthewslConfigFile を
+  # 他のモジュール (hosts/*.nix) から参照できるように公開
   _module.args.ghostty = {
-    inherit settings configFile;
+    inherit settings configFile ghostinthewslConfigFile;
   };
 }
