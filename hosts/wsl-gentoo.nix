@@ -96,6 +96,21 @@ in
       ${pkgs.ghostty}/share/ghostty/themes/ "$ghostty_dir/themes/"
   '';
 
+  # GhostInTheWSL (Codavo/ghostinthewsl) 向け設定を %LOCALAPPDATA%\ghostinthewsl\ にコピー
+  # README は %APPDATA% と記載するが誤り。実装 (src/os/xdg.zig) では XDG ベースで解決し、
+  # Windows では $XDG_CONFIG_HOME 未設定時に %LOCALAPPDATA% (AppData\Local) を見る。
+  # (Windows port (%LOCALAPPDATA%\ghostty) と同じ env var)
+  # 探索順: config.ghostinthewsl (exe隣) → %LOCALAPPDATA%\ghostinthewsl\config (legacy)
+  #   → %LOCALAPPDATA%\ghostinthewsl\config.ghostinthewsl。後勝ちで XDG が exe隣を上書きする。
+  # themes/ も同梱されない想定のため Nix パッケージ付属の themes/ を同期する。
+  home.activation.ghostinthewslConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    gitw_dir="/mnt/c/Users/${config.home.username}/AppData/Local/ghostinthewsl"
+    install -Dm644 ${ghostty.ghostinthewslConfigFile} "$gitw_dir/config.ghostinthewsl"
+    mkdir -p "$gitw_dir/themes"
+    ${pkgs.rsync}/bin/rsync -rt --delete \
+      ${pkgs.ghostty}/share/ghostty/themes/ "$gitw_dir/themes/"
+  '';
+
 
   # WSL 固有の zsh 設定
   programs.zsh.initContent = lib.mkAfter ''
