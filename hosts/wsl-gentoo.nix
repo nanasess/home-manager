@@ -97,6 +97,17 @@ in
   '';
 
 
+  # LibreHardwareMonitor -> Mackerel カスタムメトリック (modules/mackerel/)
+  # Windows 上の mackerel-agent が data.json を取得しメトリック化する。
+  # 主 conf は apikey 平文 + Program Files 読取専用のため home-manager では触らず、
+  # プラグイン本体と include フラグメントだけをユーザープロファイル配下へ配置する。
+  # 主 conf 側に手動で include = 'C:\Users\nanasess\mackerel\conf.d\*.conf' を一度追記する。
+  home.activation.mackerelLhm = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    deploy_dir="/mnt/c/Users/${config.home.username}/mackerel"
+    install -Dm644 ${../modules/mackerel/lhm-metrics.ps1} "$deploy_dir/lhm-metrics.ps1"
+    install -Dm644 ${../modules/mackerel/lhm.conf} "$deploy_dir/conf.d/lhm.conf"
+  '';
+
   # WSL 固有の zsh 設定
   programs.zsh.initContent = lib.mkAfter ''
     # VS Code PATH (WSL)
