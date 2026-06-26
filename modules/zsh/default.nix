@@ -9,21 +9,31 @@
       export CLAUDE_CONFIG_DIR=$HOME/.config/claude
 
       # 1Password Environments から秘匿情報を読み込む（タイムアウト付き）
-      if [[ -p "$ZDOTDIR/.env.local" ]]; then
-        _OP_ENV_CONTENT=$(timeout 1 cat "$ZDOTDIR/.env.local" 2>/dev/null)
-        if [[ -n "$_OP_ENV_CONTENT" ]]; then
+      #
+      # 対話シェル限定にする理由: .zshenv は zsh の全起動 (非対話の `zsh -c`,
+      # scp/rsync/git-over-ssh, WSL の `wsl.exe -- <cmd>` 経由のプローブ等) で
+      # source される。ここで FIFO を読む・stderr に警告を出すと、コマンド出力を
+      # 捕捉するツールを壊す。実害例: ghostinthewsl の `wslinfo --vm-id` 出力に
+      # 警告が混入し VM-ID パース失敗 → vsock ConnectFailed (Windows 起動直後、
+      # 1Password GUI 未起動時)。非対話シェルで秘匿情報が必要なら op run/op read を
+      # 明示的に使う (プロジェクト方針)。
+      if [[ -o interactive ]]; then
+        if [[ -p "$ZDOTDIR/.env.local" ]]; then
+          _OP_ENV_CONTENT=$(timeout 1 cat "$ZDOTDIR/.env.local" 2>/dev/null)
+          if [[ -n "$_OP_ENV_CONTENT" ]]; then
+            set -a
+            source <(printf '%s\n' "$_OP_ENV_CONTENT")
+            set +a
+          else
+            echo "\e[33m[WARNING] Could not load secrets: 1Password is not running.\e[0m" >&2
+            echo "\e[33m          Please start 1Password and open a new shell.\e[0m" >&2
+          fi
+          unset _OP_ENV_CONTENT
+        elif [[ -f "$ZDOTDIR/.env.local" ]]; then
           set -a
-          source <(printf '%s\n' "$_OP_ENV_CONTENT")
+          source "$ZDOTDIR/.env.local"
           set +a
-        else
-          echo "\e[33m[WARNING] Could not load secrets: 1Password is not running.\e[0m" >&2
-          echo "\e[33m          Please start 1Password and open a new shell.\e[0m" >&2
         fi
-        unset _OP_ENV_CONTENT
-      elif [[ -f "$ZDOTDIR/.env.local" ]]; then
-        set -a
-        source "$ZDOTDIR/.env.local"
-        set +a
       fi
 
       export ENHANCD_HYPHEN_NUM=50
