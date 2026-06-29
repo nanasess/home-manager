@@ -23,13 +23,15 @@ let
     # 常駐は systemd ユーザーサービス (modules/yaskkserv2.nix) で管理。
     "app-i18n/yaskkserv2"
 
-    # 1Password (GURU overlay)
+    # 1Password (CLI は GURU overlay、GUI は jaredallard overlay)
     # Nix /nix/store では setgid を付与できず Linux GUI と通信できないため、
     # portage 経由で /usr/bin/op (setgid onepassword-cli) を導入する。
     # GUI は ~/.config/zsh/.env.local (FIFO) への secrets 注入と
     # SSH agent (~/.1password/agent.sock) を提供する。
+    # GUI は app-admin/1password::jaredallard を正とする (modules/portage.nix 参照。
+    # GURU gui-apps/1password は古くダウングレードすると起動不可のため不採用)
     "app-misc/1password-cli"
-    "gui-apps/1password"
+    "app-admin/1password"
 
     # mise PHP ビルド依存（asdf-php workflow.yml 参照）
     "dev-db/postgresql"
