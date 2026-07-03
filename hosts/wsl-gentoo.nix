@@ -17,11 +17,9 @@ let
     "app-shells/zsh"
     "sys-apps/plocate"
 
-    # SKK 辞書サーバ (skkserv)。Emacs nskk の辞書本体をこのサーバへ逃がし、
-    # nskk のトライ索引 (~650MiB) が full GC を 20-50 秒占有する問題を解消する。
-    # RDEPEND の app-i18n/skk-jisyo で SKK-JISYO.L も入る。
-    # 常駐は systemd ユーザーサービス (modules/yaskkserv2.nix) で管理。
-    "app-i18n/yaskkserv2"
+    # SKK 辞書サーバ yaskkserv2 は Nix ビルド (pkgs/yaskkserv2.nix) で ubuntu と
+    # 共通化したため portage 管理から外した。常駐は systemd ユーザーサービス
+    # (modules/yaskkserv2.nix)、辞書は ~/.local/share/yaskkserv2/all (sudo 不要)。
 
     # 1Password (CLI は GURU overlay、GUI は jaredallard overlay)
     # Nix /nix/store では setgid を付与できず Linux GUI と通信できないため、

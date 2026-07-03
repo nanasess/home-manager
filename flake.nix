@@ -38,6 +38,7 @@
             ./home.nix
             ./hosts/ubuntu.nix
             ./modules/onedrive.nix
+            ./modules/yaskkserv2.nix
             ./modules/emacs
             ./modules/zsh
             ./modules/ghostty

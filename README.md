@@ -49,22 +49,26 @@ sudo ln -sfn ~/.config/portage/repos.conf /etc/portage/repos.conf
 sudo getuto
 ```
 
-### SKK 辞書サーバ (yaskkserv2) のセットアップ（WSL Gentoo のみ）
+### SKK 辞書サーバ (yaskkserv2) のセットアップ（WSL Gentoo / Ubuntu 共通）
 
-Emacs (nskk) の辞書本体を skkserv (yaskkserv2) に逃がし、nskk が全辞書を起動時にトライ索引へ全件展開することで full GC が 20-50 秒かかる問題を回避します。サーバは `modules/yaskkserv2.nix` が **systemd ユーザーサービス**として管理します（`/etc` も sudo も OpenRC も不要、ユーザー権限で `~/.config/yaskkserv2/` を読む）。バイナリと配信辞書のみ sudo で用意します。
+Emacs (nskk) の辞書本体を skkserv (yaskkserv2) に逃がし、nskk が全辞書を起動時にトライ索引へ全件展開することで full GC が 20-50 秒かかる問題を回避します。サーバは `modules/yaskkserv2.nix` が **systemd ユーザーサービス**として管理します（`/etc` も sudo も OpenRC も不要）。
+
+バイナリ (`yaskkserv2` / `yaskkserv2_make_dictionary`) は nixpkgs / apt に無いため `pkgs/yaskkserv2.nix` で **Nix ビルド**し、両ホストで同一バイナリを共有します。配信辞書はユーザーパス `~/.local/share/yaskkserv2/all` に置くため、セットアップは **すべて sudo 不要**です。
 
 ```bash
-# 1. yaskkserv2 をインストール（SKK-JISYO.L も依存で入る）
-sudo emerge -av app-i18n/yaskkserv2
+# 1. home-manager switch でバイナリ導入 + 設定生成 + ユーザーサービス起動
+#    （<host> は wsl-gentoo または ubuntu）
+home-manager switch --flake '.#nanasess@<host>'
 
-# 2. 配信辞書を SKK-JISYO.all.utf8 からビルド（辞書更新時のみ再実行）
-sudo install -d /usr/lib/yaskkserv2
-sudo yaskkserv2_make_dictionary \
-  --dictionary-filename /usr/lib/yaskkserv2/all \
+# 2. 配信辞書を SKK-JISYO.all.utf8 からビルド（初回 + 辞書更新時のみ再実行）
+#    yaskkserv2_make_dictionary は上記 switch で ~/.nix-profile/bin に入る
+mkdir -p ~/.local/share/yaskkserv2
+yaskkserv2_make_dictionary \
+  --dictionary-filename ~/.local/share/yaskkserv2/all \
   --utf8 "$HOME/OneDrive - Skirnir Inc/emacs/ddskk/SKK-JISYO.all.utf8"
 
-# 3. home-manager switch で設定生成 + ユーザーサービス起動
-home-manager switch --flake '.#nanasess@wsl-gentoo'
+# 3. 辞書生成後にサービスを再起動して読み込ませる
+systemctl --user restart yaskkserv2
 
 # 4. 稼働確認
 systemctl --user status yaskkserv2
@@ -73,7 +77,7 @@ systemctl --user status yaskkserv2
 python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",1178),2); s.sendall("1あい ".encode()); print(s.recv(8192).decode("utf-8","replace"))'
 ```
 
-設定 (`modules/yaskkserv2.nix`) を変更したら `home-manager switch` で自動反映されます（手動再起動が要る場合は `systemctl --user restart yaskkserv2`）。`listen-address = 127.0.0.1`（LAN へ露出しない）ですが、WSL2 の localhostForwarding 経由で Windows からも `localhost:1178` で接続できます。
+設定 (`modules/yaskkserv2.nix`) を変更したら `home-manager switch` で自動反映されます（手動再起動が要る場合は `systemctl --user restart yaskkserv2`）。`listen-address = 127.0.0.1`（LAN へ露出しない）ですが、WSL2 では localhostForwarding 経由で Windows からも `localhost:1178` で接続できます。
 
 ### システムパッケージの確認
 
