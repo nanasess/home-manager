@@ -213,6 +213,39 @@ cd ~/.emacs.d/elpaca/sources/queue    && git checkout externals/queue
 
 その後あらためて `M-x elpaca-pull-all` を実行する。
 
+#### lock のリビジョンに追従する（composer install / npm ci 相当）
+
+上記「標準手順」はパッケージを最新化して lock を書き直す **更新**手順（`composer update` / `npm update` 相当）。
+一方、**lock に固定済みのリビジョンへローカルを合わせたい**場合（別マシンでの再現、
+CI や PR で更新された `elpaca.lock` の取り込み等）は手順が異なる。
+
+**注意:** `elpaca-pull-all` は default branch の最新へ更新するため lock 追従には使えない。
+`elpaca-checkout-branches` も detached HEAD（= lock 固定状態）を解除してしまうので実行しない。
+
+elpaca には lock 全体を一括復元する専用コマンドが無いため、対象の `builds` / `sources` を
+削除して再インストールさせるのが最も確実（`rm -rf node_modules && npm ci` 相当）。
+`elpaca-menu-lock-file` が最優先 menu のため、まっさらな状態から入れ直すと各パッケージは
+`elpaca.lock` の `:ref` でインストールされる。
+
+```bash
+# 1. 最新の init.el / elpaca.lock を反映（PR やブランチを適用済みにしてから）
+home-manager switch --flake '.#nanasess@wsl-gentoo'
+
+# 2a. 特定パッケージだけ lock の :ref に合わせる場合（推奨・高速）
+rm -rf ~/.emacs.d/elpaca/builds/<pkg> ~/.emacs.d/elpaca/sources/<pkg>
+#    例: nskk を elpaca.lock のリビジョンに追従させる
+rm -rf ~/.emacs.d/elpaca/builds/nskk ~/.emacs.d/elpaca/sources/nskk
+
+# 2b. 全パッケージを lock の :ref に合わせる場合（elpaca 本体も再 bootstrap される）
+rm -rf ~/.emacs.d/elpaca/builds ~/.emacs.d/elpaca/sources
+
+# 3. Emacs を起動
+#    elpaca が elpaca.lock の :ref で対象パッケージを clone / checkout し直す
+```
+
+削除したパッケージは次回起動時に lock の `:ref`（detached HEAD）で入り直すため、
+`M-x elpaca-write-lock-file` は不要（lock は変更しない）。
+
 ### Nix + Emacs を一括更新
 
 ```bash
