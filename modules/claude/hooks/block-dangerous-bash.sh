@@ -32,7 +32,7 @@ if echo "$cmd" | grep -qE '(^|[;&|]\s*|\s)rm\s' \
 
   # rm と同一コマンドセグメント内 ([;&|] を跨がない) にシステムパス等の致命的
   # ターゲットがあれば deny。/home 直下・~ 直下は deny、それより深い個別パスは ask に落ちる。
-  if echo "$cmd" | grep -qE "rm\s[^;&|]*\s(/(bin|boot|dev|etc|lib|lib64|opt|proc|root|run|sbin|srv|sys|usr|var)(/[^[:space:];&|]*)?|/home(/[^/[:space:]]+)?/?|/\*?|~/?|\\\$HOME/?|\.\.)([[:space:];&|'\"]|$)"; then
+  if echo "$cmd" | grep -qE "rm\s[^;&|]*\s['\"]?(/(bin|boot|dev|etc|lib|lib64|opt|proc|root|run|sbin|srv|sys|usr|var)(/[^[:space:];&|]*)?|/home(/[^/[:space:]]+)?/?|/\*?|~/?|\\\$HOME/?|\.\./?)([[:space:];&|'\"]|$)"; then
     emit deny "システムパス・ホーム直下への rm 再帰+強制削除はブロック対象です (block-dangerous-bash.sh)"
   fi
   emit ask "rm の再帰+強制削除が含まれます。対象パスを確認してください (block-dangerous-bash.sh)"
