@@ -8,6 +8,13 @@
 # stdin: {"tool_name":"Bash","tool_input":{"command":"..."}}
 set -u
 
+# jq が無い環境では検査不能のため fail-closed にする。exit 2 が「ブロッキング
+# エラー」(ツール実行を止める)。exit 1 等は非ブロッキングで実行が継続される。
+if ! command -v jq >/dev/null 2>&1; then
+  echo "block-dangerous-bash.sh: jq が見つからないため安全側でブロックします" >&2
+  exit 2
+fi
+
 cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null)
 [ -z "$cmd" ] && exit 0
 
@@ -18,10 +25,10 @@ emit() { # $1=permissionDecision $2=reason
 }
 
 # ファイルシステム・デバイス破壊系は無条件 deny
-if echo "$cmd" | grep -qE '(^|[;&|]\s*|\s)mkfs(\.[a-z0-9]+)?\s'; then
+if echo "$cmd" | grep -qE '(^|[;&|]\s*|\s)mkfs(\.[a-z0-9]+)?(\s|[;&|]|$)'; then
   emit deny "mkfs はブロック対象です (block-dangerous-bash.sh)"
 fi
-if echo "$cmd" | grep -qE '(^|[;&|]\s*|\s)dd\s[^;&|]*of=/dev/'; then
+if echo "$cmd" | grep -qE "(^|[;&|]\s*|\s)dd\s[^;&|]*of=['\"]?/dev/"; then
   emit deny "dd による /dev/* への直接書き込みはブロック対象です (block-dangerous-bash.sh)"
 fi
 
