@@ -146,7 +146,20 @@
 
         # git-worktree-manager シェル統合 (switch/create/checkout 後の自動 cd)
         # https://github.com/nanasess/git-worktree-manager/pull/24
-        if command -v worktree > /dev/null; then eval "$(worktree shell-init)"; fi
+        if command -v worktree > /dev/null; then
+          eval "$(worktree shell-init)"
+
+          # タブ補完 (サブコマンド / タスク名)。compinit 後に eval する必要がある。
+          # https://github.com/nanasess/git-worktree-manager/pull/32
+          #
+          # 成功時のみ eval する理由: completion 未対応バージョンでは
+          # "Unknown command" とヘルプ全文が *stdout* に出るため、
+          # eval "$(...)" 形式だと起動のたびにそれを実行しようとしてエラーが出る。
+          if _wt_completion=$(worktree completion zsh 2>/dev/null); then
+            eval "$_wt_completion"
+          fi
+          unset _wt_completion
+        fi
 
         # misc
         export BAT_THEME=ansi-light
