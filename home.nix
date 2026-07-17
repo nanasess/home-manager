@@ -147,10 +147,15 @@
     includes = [
       "~/.ssh/conf.d/*.conf"
     ];
-    matchBlocks."*" = {
-      extraOptions = {
-        "IdentityAgent" = "~/.1password/agent.sock";
-      };
+    settings."*" = {
+      IdentityAgent = "~/.1password/agent.sock";
+      # Ghostty の TERM=xterm-ghostty をそのまま送ると、terminfo エントリを
+      # 持たないリモートで zsh/readline の行編集・履歴表示が崩れる。
+      # GhostInTheWSL は Windows 側から WSL の PTY に直結するため WSL 側で
+      # shell integration が有効にならず、Ghostty 公式の
+      # shell-integration-features = ssh-terminfo に頼れない。
+      # TERM は SetEnv の例外でリモート sshd の AcceptEnv 不要 (man ssh_config)。
+      SetEnv.TERM = "xterm-256color";
     };
   };
 
