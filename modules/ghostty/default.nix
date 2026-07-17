@@ -70,4 +70,20 @@ in
   _module.args.ghostty = {
     inherit settings configFile ghostinthewslConfigFile;
   };
+
+  # xterm-ghostty の terminfo を ~/.terminfo に配置する。
+  #
+  # wsl-gentoo は端末が Windows 側で動く (Ghostty Windows port / GhostInTheWSL) ため
+  # WSL 側に ghostty パッケージを入れておらず、TERM=xterm-ghostty だけが渡ってくる。
+  # terminfo が無いと zsh/readline が行編集・履歴表示を崩すので、terminfo だけを
+  # 独立 output (クロージャ 4.9 KiB、ghostty 本体を引き込まない) から供給する。
+  #
+  # 配置先を ~/.terminfo にする理由: ncurses は system 版 (Gentoo/Ubuntu の
+  # /usr/bin) と Nix 版のどちらも ~/.terminfo を無条件に検索するため、
+  # TERMINFO_DIRS の設定なしで確実に引ける。home.packages 経由だと
+  # ~/.nix-profile/share/terminfo が検索パスに入る保証がない (非 NixOS のため)。
+  #
+  # 別名 g/ghostty は張らない。Ghostty が渡す TERM は常に xterm-ghostty。
+  home.file.".terminfo/x/xterm-ghostty".source =
+    "${pkgs.ghostty.terminfo}/share/terminfo/x/xterm-ghostty";
 }
