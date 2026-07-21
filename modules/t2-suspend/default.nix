@@ -55,8 +55,11 @@ in
         sudo rm -fv "$DST_HOOK" "$DST_CONF" "$DST_LID"
         sudo systemctl daemon-reload || true
         echo "完了。デフォルト (回避策・蓋閉じ設定なし) に戻りました。"
-        echo "蓋閉じ設定の反映には logind の再起動または再起動が必要:"
-        echo "  sudo systemctl restart systemd-logind   (Wayland では概ね安全)"
+        echo "蓋閉じ設定の変更を反映するには OS を再起動すること。"
+        echo "  警告: 稼働中の GNOME/Wayland セッション下で"
+        echo "        'systemctl restart systemd-logind' を実行してはいけない。"
+        echo "        セッションの入力デバイスが切り離され、キーボード/トラックパッドが"
+        echo "        操作不能になり強制電源OFFが必要になる (issue #111 参照)。"
         exit 0
       fi
 
@@ -76,9 +79,12 @@ in
 
       echo
       echo "配置完了。"
-      echo "蓋閉じサスペンドの反映には logind の再起動または OS 再起動が必要:"
-      echo "  sudo systemctl restart systemd-logind   (Wayland/GNOME では概ね安全。"
-      echo "                                            不安なら OS 再起動でも可)"
+      echo "蓋閉じサスペンド (logind 設定) の反映には OS の再起動が必要。"
+      echo "  警告: 稼働中の GNOME/Wayland セッション下で"
+      echo "        'systemctl restart systemd-logind' を実行してはいけない。"
+      echo "        セッションの入力デバイスが切り離され、キーボード/トラックパッドが"
+      echo "        操作不能になり強制電源OFFが必要になる (実際に発生。issue #111 参照)。"
+      echo "        apple_bce フックと hibernation 設定は再起動不要で即有効。"
       echo
       echo "確認:"
       echo "  cat /sys/power/mem_sleep        # [deep] が選択されているか"
