@@ -1,0 +1,32 @@
+#!/bin/sh
+# T2 Mac サスペンド回避スクリプト (systemd-sleep フック)
+#
+# Apple T2 Mac では apple_bce (内蔵キーボード/トラックパッドの VHCI を供給する
+# Buffer Copy Engine) が、サスペンド前にアンロード / 復帰後にリロードされないと
+# ハングまたは復帰失敗する。ドライバレベルの修正は上流 linux-t2-patches に
+# 取り込み進行中だが、Ubuntu (AdityaGarg8) 配布カーネルには未収録のため、
+# system-sleep フックで unload/reload して deep suspend を成立させる。
+# (詳細な経緯は home-manager リポジトリ issue #111 を参照)
+#
+# systemd-sleep は本スクリプトを root で、実ハードウェアのサスペンド遷移の
+# 前後に順序保証付きで呼ぶ ($1 = pre|post, $2 = suspend|hibernate|...)。
+# サービス unit (WantedBy=sleep.target) より堅牢なため、こちらを採用する。
+#
+# 対象機: MacBookPro16,2 (Touch Bar あり / dGPU なし / Broadcom WiFi)。
+# 再ロード順序は bce → appletb_bl → appletb_kbd (Touch Bar 依存関係)。
+#
+# 注意: 復帰時に apple_bce のリロードが失敗すると内蔵入力が使えなくなる。
+# 初回テストは必ず外部 USB キーボードを接続した状態で行うこと。
+
+case "$1" in
+  pre)
+    # Touch Bar 系 → apple_bce の順でアンロード (依存の逆順)。
+    modprobe -r hid_appletb_kbd hid_appletb_bl apple_bce 2>/dev/null || true
+    ;;
+  post)
+    # apple_bce → Touch Bar 系の順でリロード。
+    modprobe apple_bce
+    modprobe hid_appletb_bl
+    modprobe hid_appletb_kbd
+    ;;
+esac
