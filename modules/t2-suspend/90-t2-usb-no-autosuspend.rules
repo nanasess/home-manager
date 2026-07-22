@@ -1,0 +1,15 @@
+# T2 Mac: BCE VHCI の USB autosuspend を無効化 (長時間サスペンド復帰の緩和・実験的)
+#
+# 長時間 S3 後の初回復帰で BCE コントローラが desync し、VHCI 起動に失敗
+# (bce-vhci: startup error -5 / pci_pm_resume returns -5) して内蔵キーボード/
+# トラックパッドが再列挙されない症状への緩和策。研究資料でも「8時間超のサスペンドは
+# USB autosuspend を無効化しないと失敗する」とされている (issue #111 参照)。
+#
+# 本機では VHCI ルートハブ (usb5, serial=bce-vhci) と FaceTime カメラ (05ac:8514) が
+# control=auto で runtime autosuspend の対象。これらを control=on に固定し、S3 突入時に
+# runtime-suspend 状態へ入らないようにすることで、復帰時の desync を避けることを狙う。
+# 内蔵キーボード等は既定で control=on だが、念のため Apple 内蔵周辺 (05ac) も明示する。
+#
+# 効果は確定ではなく実験的。次の長時間サスペンドで検証する。
+ACTION=="add", SUBSYSTEM=="usb", ATTR{serial}=="bce-vhci", TEST=="power/control", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", TEST=="power/control", ATTR{power/control}="on"
