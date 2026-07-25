@@ -153,6 +153,8 @@
     (server-start)))
 
 (add-to-list 'load-path (expand-file-name (locate-user-emacs-file "secret.d/")))
+;; 自作 Elisp (modules/emacs/site-lisp/ から配置)
+(add-to-list 'load-path (expand-file-name (locate-user-emacs-file "site-lisp/")))
 
 ;;; exec-path settings
 (dolist (dir (list "/sbin" "/usr/sbin" "/bin" "/usr/bin" "/usr/local/bin"
@@ -1154,14 +1156,23 @@
   ;; ため、ロード済みの .so と実体が食い違う (upstream の推奨も同じ)。
   (ghostel-module-directory (expand-file-name "ghostel" user-emacs-directory)))
 
-;; nskk のような Emacs Lisp 入力メソッドは quail overlay を介してバッファへ
+;; quail 系の Emacs Lisp 入力メソッド (Hangul 等) は overlay を介してバッファへ
 ;; 直接文字を挿入するため、素のままでは ghostel の保護領域と衝突する。
 ;; ghostel-ime-mode が buffer-local な input-method-function をラップし、
-;; 確定した文字列を端末へ送る。vterm にはこの経路がない。
-;; ghostel-ime.el は ghostel パッケージ同梱なので :ensure nil。
+;; 確定した文字列を端末へ送る。ghostel-ime.el は ghostel 同梱なので :ensure nil。
+;; NOTE: nskk は input-method フレームワーク (register-input-method /
+;; input-method-function) を一切使わず、独自キーマップから self-insert-command
+;; と insert でバッファへ直接書くため、この経路には乗らない。
+;; nskk 用の橋渡しは下の nskk-ghostel が担う。
 (use-package ghostel-ime
   :ensure nil
   :hook (ghostel-mode . ghostel-ime-mode))
+
+;; nskk の書き込みを read-only な ghostel バッファで通し、確定文字列を PTY へ
+;; 転送する自作ブリッジ (modules/emacs/site-lisp/nskk-ghostel.el)。
+(use-package nskk-ghostel
+  :ensure nil
+  :hook (ghostel-mode . nskk-ghostel-mode))
 
 ;; claude-code-ide は Claude Code CLI を MCP (websocket) で Emacs に接続し、
 ;; xref / treesit / imenu / project の情報を Claude 側のツールとして公開する。
