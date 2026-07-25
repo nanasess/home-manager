@@ -40,6 +40,13 @@
                 :source "elpaca-menu-lock-file" :id bui :host github
                 :type git :protocol https :inherit t :depth treeless
                 :ref "4319e1bf3ff94ff0568eed280ac1f980a4b68679"))
+ (claude-code-ide :source "elpaca-menu-lock-file" :recipe
+                  (:source nil :package "claude-code-ide" :id
+                           claude-code-ide :host github :repo
+                           "manzaltu/claude-code-ide.el" :type git
+                           :protocol https :inherit t :depth treeless
+                           :ref
+                           "1de17bbadc650962a05fd68463fdff71697ec649"))
  (compat :source "elpaca-menu-lock-file" :recipe
          (:package "compat" :repo
                    ("https://github.com/emacs-compat/compat"
@@ -315,6 +322,12 @@
                  :source "elpaca-menu-lock-file" :id gcmh :type git
                  :protocol https :inherit t :depth treeless :ref
                  "0089f9c3a6d4e9a310d0791cf6fa8f35642ecfd9"))
+ (ghostel :source "elpaca-menu-lock-file" :recipe
+          (:package "ghostel" :fetcher github :repo "dakra/ghostel"
+                    :files (:defaults "etc") :source "MELPA" :id
+                    ghostel :type git :protocol https :inherit t
+                    :depth treeless :ref
+                    "f0b5735a7727edefea7ca7339d5d99a076fa50da"))
  (groovy-mode :source "elpaca-menu-lock-file" :recipe
               (:package "groovy-mode" :fetcher github :repo
                         "Groovy-Emacs-Modes/groovy-emacs-modes" :files
@@ -872,26 +885,54 @@
                      :host github :branch "eccube-engine" :type git
                      :protocol https :inherit t :depth treeless :ref
                      "b9c351e75ae9fc19a026b4386f15c46264bc4520"))
+ (web-server :source "elpaca-menu-lock-file" :recipe
+             (:package "web-server" :fetcher github :repo
+                       "eschulte/emacs-web-server" :files
+                       ("*.el" "*.el.in" "dir" "*.info" "*.texi"
+                        "*.texinfo" "doc/dir" "doc/*.info"
+                        "doc/*.texi" "doc/*.texinfo" "lisp/*.el"
+                        "docs/dir" "docs/*.info" "docs/*.texi"
+                        "docs/*.texinfo"
+                        (:exclude ".dir-locals.el" "test.el"
+                                  "tests.el" "*-test.el" "*-tests.el"
+                                  "LICENSE" "README*" "*-pkg.el"))
+                       :source "MELPA" :id web-server :type git
+                       :protocol https :inherit t :depth treeless :ref
+                       "6357a1c2d1718778503f7ee0909585094117525b"))
+ (websocket :source "elpaca-menu-lock-file" :recipe
+            (:package "websocket" :repo "ahyatt/emacs-websocket"
+                      :fetcher github :files
+                      ("*.el" "*.el.in" "dir" "*.info" "*.texi"
+                       "*.texinfo" "doc/dir" "doc/*.info" "doc/*.texi"
+                       "doc/*.texinfo" "lisp/*.el" "docs/dir"
+                       "docs/*.info" "docs/*.texi" "docs/*.texinfo"
+                       (:exclude ".dir-locals.el" "test.el" "tests.el"
+                                 "*-test.el" "*-tests.el" "LICENSE"
+                                 "README*" "*-pkg.el"))
+                      :source "MELPA" :id websocket :type git
+                      :protocol https :inherit t :depth treeless :ref
+                      "2195e1247ecb04c30321702aa5f5618a51c329c5"))
  (wgrep :source "elpaca-menu-lock-file" :recipe
         (:package "wgrep" :fetcher github :repo
                   "mhayashi1120/Emacs-wgrep" :files ("wgrep.el")
                   :source "elpaca-menu-lock-file" :id wgrep :type git
                   :protocol https :inherit t :depth treeless :ref
                   "49f09ab9b706d2312cab1199e1eeb1bcd3f27f6f"))
- (with-editor :source "elpaca-menu-lock-file"
-   :recipe
-   (:package "with-editor" :fetcher github :repo "magit/with-editor"
-             :files
-             ("*.el" "*.el.in" "dir" "*.info" "*.texi" "*.texinfo"
-              "doc/dir" "doc/*.info" "doc/*.texi" "doc/*.texinfo"
-              "lisp/*.el" "docs/dir" "docs/*.info" "docs/*.texi"
-              "docs/*.texinfo"
-              (:exclude ".dir-locals.el" "test.el" "tests.el"
-                        "*-test.el" "*-tests.el" "LICENSE" "README*"
-                        "*-pkg.el"))
-             :source "elpaca-menu-lock-file" :id with-editor :type git
-             :protocol https :inherit t :depth treeless :ref
-             "45bfc6084f03e3aa7f4f8db20836d559186c5957"))
+ (with-editor :source "elpaca-menu-lock-file" :recipe
+              (:package "with-editor" :fetcher github :repo
+                        "magit/with-editor" :files
+                        ("*.el" "*.el.in" "dir" "*.info" "*.texi"
+                         "*.texinfo" "doc/dir" "doc/*.info"
+                         "doc/*.texi" "doc/*.texinfo" "lisp/*.el"
+                         "docs/dir" "docs/*.info" "docs/*.texi"
+                         "docs/*.texinfo"
+                         (:exclude ".dir-locals.el" "test.el"
+                                   "tests.el" "*-test.el" "*-tests.el"
+                                   "LICENSE" "README*" "*-pkg.el"))
+                        :source "elpaca-menu-lock-file" :id
+                        with-editor :type git :protocol https :inherit
+                        t :depth treeless :ref
+                        "45bfc6084f03e3aa7f4f8db20836d559186c5957"))
  (yaml-mode :source "elpaca-menu-lock-file" :recipe
             (:package "yaml-mode" :repo "yoshiki/yaml-mode" :fetcher
                       github :files
