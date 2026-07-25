@@ -1154,7 +1154,14 @@
   ;; モジュールの置き場をパッケージツリーの外に出す。既定は elpaca の
   ;; builds/ghostel/ 配下になるが、そこは elpaca-rebuild で作り直される
   ;; ため、ロード済みの .so と実体が食い違う (upstream の推奨も同じ)。
-  (ghostel-module-directory (expand-file-name "ghostel" user-emacs-directory)))
+  (ghostel-module-directory (expand-file-name "ghostel" user-emacs-directory))
+  ;; 端末へ送らず Emacs 側で処理するキー。ghostel の既定値に 2 つ足す:
+  ;;   C-z -- init.el 全体でプレフィクスとして使う (C-z m = magit 等)。
+  ;;          端末へ送ると SIGTSTP でジョブが停止してしまう。
+  ;;   M-w -- kill-ring-save。既定では端末へ送られ Emacs 側のコピーができない。
+  ;; 他に Emacs 側へ残したいキー (C-t = other-window など) があればここに足す。
+  (ghostel-keymap-exceptions
+   '("C-c" "C-x" "C-u" "C-h" "M-x" "M-:" "C-\\" "C-z" "M-w")))
 
 ;; quail 系の Emacs Lisp 入力メソッド (Hangul 等) は overlay を介してバッファへ
 ;; 直接文字を挿入するため、素のままでは ghostel の保護領域と衝突する。

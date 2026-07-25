@@ -34,6 +34,7 @@
 (declare-function ghostel--send-string "ghostel" (string))
 (declare-function ghostel--send-event "ghostel")
 (declare-function ghostel--terminal-input-mode-p "ghostel")
+(declare-function ghostel--redraw-now "ghostel" (buffer &optional force))
 
 (defvar nskk-current-state)
 (defvar nskk--romaji-buffer)
@@ -140,7 +141,12 @@ DEL・RET・カーソル移動を nskk に渡すと、nskk はバッファ (= �
                 (when (and (not (string-empty-p text))
                            (ghostel--terminal-input-mode-p))
                   (ghostel--send-string (encode-coding-string text 'utf-8)))))
-            (nskk-ghostel--clear-origin)))
+            (nskk-ghostel--clear-origin)
+            ;; 未確定の間は再描画を止めているので、確定でテキストを取り除いた
+            ;; 直後にグリッドから描き直す。これを省くと、抑止が解けて次の描画が
+            ;; 走るまで ▽/▼ の残骸が画面に残り、送った文字と二重に見える。
+            (with-demoted-errors "nskk-ghostel redraw error: %S"
+              (ghostel--redraw-now (current-buffer) t))))
       (setq buffer-read-only t))))
 
 ;;;###autoload
