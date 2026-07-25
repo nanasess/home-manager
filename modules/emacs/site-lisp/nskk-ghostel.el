@@ -38,6 +38,7 @@
 
 (defvar nskk-current-state)
 (defvar nskk--romaji-buffer)
+(defvar ghostel--cursor-char-pos)
 
 (defgroup nskk-ghostel nil
   "nskk と ghostel の橋渡し."
@@ -106,6 +107,25 @@ DEL・RET・カーソル移動を nskk に渡すと、nskk はバッファ (= �
          (marker-position nskk-ghostel--origin)
          t)))
 
+(defun nskk-ghostel--goto-terminal-cursor ()
+  "point を端末カーソルの位置へ寄せる.
+
+nskk は `point' にテキストを書く。ghostel バッファの point は端末カーソルと
+一致しているとは限らない — Claude Code のような全画面 TUI は画面全体を描き
+替えるため、point がスクロールバック途中の行に取り残される。そのまま nskk に
+書かせると、未確定表示 (▽/▼) が入力欄とは無関係な行に現れる。
+
+`ghostel--cursor-char-pos' は端末カーソルのバッファ位置で、ghostel 自身が
+\"cursor's buffer position is the source of truth ... user input goes after\"
+として扱う基準点。未確定テキストもそこから書き始める。"
+  (let ((pos (and (boundp 'ghostel--cursor-char-pos)
+                  ghostel--cursor-char-pos)))
+    (when (and (integer-or-marker-p pos)
+               (<= (point-min) pos)
+               (<= pos (point-max))
+               (/= (point) pos))
+      (goto-char pos))))
+
 (defun nskk-ghostel--clear-origin ()
   "未確定マーカーを破棄する."
   (when (markerp nskk-ghostel--origin)
@@ -121,6 +141,7 @@ DEL・RET・カーソル移動を nskk に渡すと、nskk はバッファ (= �
              (memq this-command nskk-ghostel-passthrough-commands))
         (setq this-command #'ghostel--send-event)
       (unless nskk-ghostel--origin
+        (nskk-ghostel--goto-terminal-cursor)
         ;; insertion-type nil: 後続の挿入で前へ動かず、書き始めの位置を保つ。
         (setq nskk-ghostel--origin (copy-marker (point) nil)))
       (setq nskk-ghostel--unlocked t)
