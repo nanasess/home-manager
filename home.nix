@@ -26,6 +26,9 @@
     ffmpeg
     whois
     pandoc
+    # k1LoW/mo — Markdown をブラウザで開くビューア。バイナリ名は `mo`。
+    # nixpkgs の `mo` は別物 (tests-always-included/mo, Bash 用 Moustache) なので混同しないこと。
+    mo-viewer
     poppler-utils
     lftp
     pigz
