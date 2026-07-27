@@ -1,7 +1,7 @@
 # home-manager
 
 Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。
-WSL2 Gentoo Linux, Ubuntu, macOS の環境を1リポジトリで宣言的に管理する。
+WSL2 Gentoo Linux, Ubuntu の環境を1リポジトリで宣言的に管理する。
 
 ## 対応ホスト
 
@@ -9,7 +9,6 @@ WSL2 Gentoo Linux, Ubuntu, macOS の環境を1リポジトリで宣言的に管�
 |---------|-----|------------|
 | `nanasess@wsl-gentoo` | WSL2 Gentoo Linux | `hosts/wsl-gentoo.nix` |
 | `nanasess@ubuntu` | Ubuntu (Wayland) | `hosts/ubuntu.nix` |
-| `nanasess@macbook` | macOS (Intel) | `hosts/macos.nix` |
 
 ## セットアップ
 
@@ -113,7 +112,6 @@ home.nix               -- 全ホスト共通設定（パッケージ、git、dir
 hosts/
   wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm コピー、1Password CLI、WSLg）
   ubuntu.nix           -- Ubuntu 固有設定（Ghostty、Walker、OneDrive）
-  macos.nix            -- macOS 固有設定
 modules/
   zsh/
     default.nix        -- Zsh モジュール（プラグイン、エイリアス、補完、1Password 連携）
@@ -279,7 +277,6 @@ nix fmt
 
 # 各ホストのビルド
 nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
-nix build '.#homeConfigurations."nanasess@macbook".activationPackage'
 nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage'
 
 # ビルドログの確認
@@ -292,7 +289,7 @@ GitHub Actions (`.github/workflows/check.yml`) が push / PR 時に以下を実�
 
 - **check** -- `nix flake check` + WezTerm Lua 構文チェック
 - **emacs** -- `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
-- **build** -- 各ホストの `activationPackage` ビルド（ubuntu-latest, macos-15-intel）
+- **build** -- 各ホストの `activationPackage` ビルド（ubuntu-latest）
 
 ## East Asian Ambiguous 文字幅 (locale-eaw)
 
