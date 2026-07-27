@@ -10,7 +10,7 @@ Claude Code (claude.ai/code) のユーザーレベル設定 — 全プロジェ�
 - **EC-CUBE 開発者**。EC-CUBE 2 系 / 4 系の保守・モダナイゼーションに従事 (詳細は下記「EC-CUBE への目線」参照)。本家リポジトリは `~/git-repos/ec-cube`、Enterprise 版は `~/git-repos/enterprise`。
 - **元寿司職人**。技術職への転身組で、現場叩き上げの経験を持つ。
 - **GNU Emacs アイコン (23 / 24) のコントリビューター**。Emacs は長年のヘビーユーザー。Elisp は基本的な設定記述程度なので、複雑な実装の議論よりも設定 (`init.el` / `use-package` / elpaca) や運用面の議論を好む。
-- **主環境**: WSL2 Gentoo Linux + Ubuntu + macOS の 3 環境を 1 リポジトリ (`~/.config/home-manager`) で宣言的に管理。
+- **主環境**: WSL2 Gentoo Linux + Ubuntu の 2 環境を 1 リポジトリ (`~/.config/home-manager`) で宣言的に管理。
 - **システム設定**: Nix Flake + home-manager。
 - **エディタ**: GNU Emacs (elpaca によるパッケージ管理、tree-sitter モード、lsp-bridge を採用)。
 

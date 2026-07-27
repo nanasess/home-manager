@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 概要
 
-Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。WSL2 Gentoo Linux, Ubuntu, macOS の環境を1リポジトリで宣言的に管理する。
+Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。WSL2 Gentoo Linux, Ubuntu の環境を1リポジトリで宣言的に管理する。
 
 ### 目標
 
-- 1リポジトリで WSL2 Gentoo + Ubuntu + macOS の設定を管理
+- 1リポジトリで WSL2 Gentoo + Ubuntu の設定を管理
 - Nix Flakes による宣言的な構成管理
 - GitHub Actions CI で設定の乖離を防止
 - Emacs + elpaca 環境の管理
@@ -19,7 +19,6 @@ Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-mana
 |------|-----|
 | ユーザー名 | `nanasess` |
 | WSL ホームディレクトリ | `/home/nanasess` |
-| macOS ホームディレクトリ | `/Users/nanasess` |
 | CPU | AMD Ryzen Zen 3 (`-march=znver3`) |
 | ロケール | `ja_JP.UTF-8` |
 | SSH | 1Password SSH Agent (`~/.1password/agent.sock`) |
@@ -33,15 +32,11 @@ nix flake check
 # wsl-gentoo の設定をビルド（ローカル確認用）
 nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
 
-# macOS の設定をビルド
-nix build '.#homeConfigurations."nanasess@macbook".activationPackage'
-
 # Ubuntu の設定をビルド
 nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage'
 
 # 設定を適用
 home-manager switch --flake '.#nanasess@wsl-gentoo'
-home-manager switch --flake '.#nanasess@macbook'
 home-manager switch --flake '.#nanasess@ubuntu'
 
 # Nix ファイルのフォーマット
@@ -67,7 +62,6 @@ home.nix               -- 全ホスト共通設定（パッケージ、git、dir
 hosts/
   wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm / Ghostty コピー、1Password CLI、WSLg X11/Wayland）
   ubuntu.nix           -- Ubuntu 固有設定（Ghostty、Walker、OneDrive）
-  macos.nix            -- macOS 固有設定
 modules/
   zsh/
     default.nix        -- Zsh モジュール（プラグイン、エイリアス、補完、1Password 連携）
@@ -101,7 +95,6 @@ pkgs/
 
 1. `hosts/<hostname>.nix` を作成（ホスト固有の設定）
 2. `flake.nix` の `homeConfigurations` にエントリを追加（`modules = [ ./home.nix ./hosts/<hostname>.nix ./modules/emacs ./modules/zsh ]`）
-3. macOS ホストの場合は `pkgs` を `aarch64-darwin` の `legacyPackages` に変更
 
 ### 管理方針
 
@@ -132,14 +125,14 @@ pkgs/
 
 ### フォーマッター
 
-`nixpkgs-fmt` を使用。`nix fmt` で実行可能。`supportedSystems` は `x86_64-linux`, `aarch64-darwin`, `x86_64-darwin`。
+`nixpkgs-fmt` を使用。`nix fmt` で実行可能。`supportedSystems` は `x86_64-linux`。
 
 ## CI
 
 GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行:
 - **check** — `nix flake check` + WezTerm Lua 構文チェック
 - **emacs** — `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
-- **build** — 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest, macos-15-intel）
+- **build** — 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest）
 
 ## East Asian Ambiguous 文字幅 (locale-eaw)
 

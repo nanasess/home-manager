@@ -15,7 +15,7 @@
 
   outputs = { self, nixpkgs, home-manager, nixgl, ... }:
     let
-      supportedSystems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
+      supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
     in
     {
@@ -23,14 +23,6 @@
         "nanasess@wsl-gentoo" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
           modules = [ ./home.nix ./hosts/wsl-gentoo.nix ./modules/onedrive.nix ./modules/portage.nix ./modules/yaskkserv2.nix ./modules/locale-eaw ./modules/emacs ./modules/zsh ./modules/ghostty ./modules/wakatime ./modules/claude ];
-        };
-        "nanasess@macbook" = home-manager.lib.homeManagerConfiguration {
-          pkgs = nixpkgs.legacyPackages.x86_64-darwin;
-          modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ./modules/zsh ./modules/wakatime ./modules/claude ];
-        };
-        "nanasess@macbook-aarch64" = home-manager.lib.homeManagerConfiguration {
-          pkgs = nixpkgs.legacyPackages.aarch64-darwin;
-          modules = [ ./home.nix ./hosts/macos.nix ./modules/emacs ./modules/zsh ./modules/wakatime ./modules/claude ];
         };
         "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;

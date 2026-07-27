@@ -47,8 +47,6 @@ jobs:
             config: nanasess@wsl-gentoo
           - os: ubuntu-latest
             config: nanasess@ubuntu
-          - os: macos-15
-            config: nanasess@macbook-aarch64
 
     runs-on: ${{ matrix.os }}
 
