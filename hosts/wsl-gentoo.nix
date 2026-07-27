@@ -63,10 +63,18 @@ in
     emacs30-pgtk
     # 字形本体の Noto。home.nix 共通から移動 (Ubuntu のみ OS 静的 Noto に委譲する方針)。
     noto-fonts
+    # WSL から Windows 既定ブラウザを開く opener (内部で powershell.exe Start を呼ぶ)。
+    # BROWSER から参照する。portage の /usr/bin/wsl-open ではなく Nix で宣言して
+    # ホスト間の入手経路を揃える (CLAUDE.md「プラットフォーム非依存化の判断基準」)。
+    wsl-open
   ];
 
   home.sessionVariables = {
-    BROWSER = "wslview";
+    # 従来の wslview (wslu) は upstream が archive され nixpkgs からも削除済みで、
+    # 実体が無いまま参照だけが残っていた。BROWSER を argv[0] として spawn する
+    # 呼び出し側 (Claude Code の URL オープン等) では ENOENT で無反応になるため
+    # wsl-open へ置き換える。
+    BROWSER = "wsl-open";
   };
 
   # WezTerm 設定を Windows 側にコピー
