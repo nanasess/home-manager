@@ -35,9 +35,27 @@ nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage' --no-li
 nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage' --no-link
 ```
 
+CI の build matrix (`.github/workflows/check.yml`) と `flake.nix` の `homeConfigurations` が
+一致しているとは限らない。**PR 本文に検証状況を書く前に workflow を読んで確認する**こと。
+
 - 時間がかかるのでバックグラウンド実行を推奨。
-- `nanasess@macbook` は Linux ホストではビルド不可。**ローカル未検証と明示**し、CI (macos-15-intel) の結果に委ねる。
-- `nix flake check` は `aarch64-darwin` / `x86_64-darwin` を非対応システムとしてスキップする。これは失敗ではない。
+- 対象は `x86_64-linux` の 2 ホストのみ (macOS 設定は削除済み)。ローカルで全ホスト検証できる。
+
+### `nix flake check` が上流の破壊的変更で落ちた場合
+
+`homeConfigurations` は**実行中のシステムに関係なく全エントリが評価される**。
+そのため、あるホストが使えなくなったプラットフォームを参照していると Linux ランナー上でも失敗する。
+
+過去の実例: nixpkgs 26.11 が x86_64-darwin のサポートを打ち切り、
+`legacyPackages.x86_64-darwin` へのアクセス自体が throw するようになった (PR #122)。
+
+```
+error: Nixpkgs 26.11 has dropped support for x86_64-darwin.
+… while evaluating the attribute 'legacyPackages.x86_64-darwin'
+```
+
+lock を戻して回避せず、**該当ホスト設定を整理するか別 input に固定するか**を判断すること。
+実機で使っているかどうかはユーザーに確認する (CI の matrix に無い = 使っていない、とは限らない)。
 
 ## 4. コミット
 
