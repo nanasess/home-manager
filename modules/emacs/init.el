@@ -189,6 +189,30 @@
 ;; https://github.com/hamano/locale-eaw
 (load (expand-file-name (locate-user-emacs-file "site-lisp/eaw-console")) t t)
 
+;; Ubuntu (GNOME + Wayland) では ibus が常駐しており、入力ソースに ibus-skk が
+;; 選ばれた状態だと Emacs にプリエディットが送り込まれて nskk が使えなくなる。
+;; emacs-wrapper が設定する GTK_IM_MODULE / XMODIFIERS はそれぞれ GTK の IM モジュール
+;; 選択と X11 の XIM 用で、pgtk ビルド (emacs30-pgtk) + Wayland では GNOME Shell が
+;; text-input-v3 プロトコル経由で直接繋ぐため効かない。そこで Emacs 側で
+;; GtkIMContext 自体を切り、キーイベントを ibus を介さず直接受け取る。
+;; ibus の設定 (入力ソース一覧や ibus-skk の辞書設定) には手を入れないので、
+;; 他のアプリケーションでの ibus-skk の利用は従来どおり。
+;;
+;; `pgtk-use-im-context' はフレーム未作成の状態では "Frames are not in use or not
+;; initialized" で失敗する (early-init.el からは呼べない) ため、フレーム生成後の
+;; フックから呼ぶ。daemon 起動時は最初の emacsclient -c まで遅延する。
+(defun my/pgtk-disable-im-context (&optional frame)
+  "FRAME (既定は選択中のフレーム) の GtkIMContext を無効化する。
+pgtk フレーム以外 (X11 の `x' や tty の `t') では何もしないので、
+wsl-gentoo の非 pgtk 構成に読み込まれても無害。"
+  (let ((frame (or frame (selected-frame))))
+    (when (and (fboundp 'pgtk-use-im-context)
+               (eq (framep frame) 'pgtk))
+      (pgtk-use-im-context nil (frame-terminal frame)))))
+
+(add-hook 'window-setup-hook #'my/pgtk-disable-im-context)
+(add-hook 'after-make-frame-functions #'my/pgtk-disable-im-context)
+
 ;; nskk は upstream で *.el を src/ サブディレクトリに移動したため、
 ;; elpaca のデフォルト :files では nskk.el が見つからずビルドが失敗する。
 ;; src/*.el を明示的にビルド対象に加える。

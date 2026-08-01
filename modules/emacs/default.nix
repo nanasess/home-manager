@@ -68,6 +68,11 @@ in
     cmigemo
   ];
 
+  # GTK_IM_MODULE は GTK の IM モジュール選択、XMODIFIERS は X11 の XIM 用。
+  # どちらも pgtk ビルド (ubuntu の emacs30-pgtk) + Wayland では効かない
+  # (GNOME Shell が text-input-v3 で直接繋ぐため)。そちらは init.el の
+  # my/pgtk-disable-im-context が pgtk-use-im-context で無効化している。
+  # ここの 2 行は X11 (WSLg / XWayland) 経由で起動した場合の保険として残す。
   home.file.".local/bin/emacs-wrapper" = lib.mkIf pkgs.stdenv.isLinux {
     executable = true;
     text = ''
