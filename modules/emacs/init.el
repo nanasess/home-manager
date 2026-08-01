@@ -198,9 +198,31 @@
            :build (:not elpaca-build-autoloads))
   :demand t
   ;; ddskk の (global-set-key "\C-x\C-j" 'skk-mode) と等価。
-  ;; C-j はグローバルに束縛しない: nskk 無効時は素の改行に戻り、
-  ;; nskk 有効時は nskk-mode-map の C-j (#'nskk-kakutei) が確定/かな復帰/改行を担う。
-  :bind (("C-x C-j" . nskk-toggle-mode))
+  ;; C-j はグローバルに束縛しない: nskk 無効時は素の改行に戻る。
+  ;; nskk 有効時の C-j は nskk-mode-map で my/nskk-kakutei-or-latin に差し替える。
+  :preface
+  (defun my/nskk-kakutei-or-latin ()
+    "▽/▼ 変換中は確定し、■ひらがな待機中は ASCII モードへ切り替える。
+
+nskk 既定の `nskk-kakutei' は ■ひらがな待機中に改行を挿入する
+\(nskk.el の kakutei-action/2 fact: hiragana-idle -> insert-newline)。
+一方、旧 ddskk 環境では C-j がグローバルに `skk-mode' へ束縛されており
+\(dotfiles 39a2239 の init.el:166)、■かなモードの C-j は日本語入力の
+ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j が
+張られない (skk.el の `(when (vectorp skk-kakutei-key) ...)' ガード) ため
+グローバル束縛が優先されていたことによる。
+
+その指使いを nskk-mode 自体を落とさずに復元する。ASCII モードからの
+復帰は `nskk-kakutei' 既定の direct-idle -> enter-hiragana がそのまま
+担うので、C-j 一発で ■かな <-> ASCII を往復できる。▽/▼ 中の確定と
+ローマ字ペンディングの破棄も `nskk-kakutei' に委譲する。"
+    (interactive)
+    (if (eq (nskk--current-kakutei-state) 'hiragana-idle)
+        (nskk-set-mode-latin)
+      (nskk-kakutei)))
+  :bind (("C-x C-j" . nskk-toggle-mode)
+         :map nskk-mode-map
+         ("C-j" . my/nskk-kakutei-or-latin))
   :custom
   (nskk-dict-user-dictionary-file (concat external-directory "nskk/jisyo"))
   ;; ddskk の skk-mode 同様、有効化したら直接ひらがな入力に入る (既定は 'ascii)。
@@ -243,7 +265,17 @@
   ;; study (文脈学習) は nskk 本体が require しない。nskk--enable の
   ;; (featurep 'nskk-study) 判定で永続化対象に含めるため、初回有効化より前に
   ;; 明示 require する (learning-score のみなら不要)。
-  (require 'nskk-study nil t))
+  (require 'nskk-study nil t)
+  ;; nskk の入力モード表示は minor-mode lighter として実装されているが
+  ;; (nskk.el の `:lighter (:eval (nskk-modeline-indicator))')、doom-modeline は
+  ;; minor-mode lighter を描画しない (doom-modeline-minor-modes nil) ため
+  ;; 画面に出ない。lsp-bridge と同じ方針で mode-line-misc-info へ積み、
+  ;; doom-modeline の misc-info セグメント経由で描画させる。
+  ;; `nskk-mode' を条件に置いているので無効なバッファでは何も出ない。
+  ;; doom-modeline を切ると lighter と二重に出るが、常用構成では有効なため許容する。
+  (add-to-list 'mode-line-misc-info
+               '(nskk-mode (:eval (nskk-modeline-indicator)))
+               t))
 
 (elpaca-wait)
 
