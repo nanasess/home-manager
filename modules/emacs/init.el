@@ -153,6 +153,8 @@
     (server-start)))
 
 (add-to-list 'load-path (expand-file-name (locate-user-emacs-file "secret.d/")))
+;; 自作 Elisp (modules/emacs/site-lisp/ から配置)
+(add-to-list 'load-path (expand-file-name (locate-user-emacs-file "site-lisp/")))
 
 ;;; exec-path settings
 (dolist (dir (list "/sbin" "/usr/sbin" "/bin" "/usr/bin" "/usr/local/bin"
@@ -161,8 +163,7 @@
                    (expand-file-name "~/.cabal/bin")
                    (expand-file-name "~/bin")
                    (expand-file-name "~/.emacs.d/bin")
-                   (expand-file-name "~/.local/bin")
-                   (expand-file-name "~/.config/claude/local/")))
+                   (expand-file-name "~/.local/bin")))
   (when (and (file-exists-p dir) (not (member dir exec-path)))
     (setenv "PATH" (concat dir ":" (getenv "PATH")))
     (setq exec-path (append (list dir) exec-path))))
@@ -1176,6 +1177,76 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
 (use-package oauth2
   :ensure (:host github :repo "emacsmirror/oauth2")
   :defer t)
+
+;;;; ============================================================
+;;;; Terminal (ghostel) & AI coding (claude-code-ide)
+;;;; ============================================================
+;; ghostel は libghostty-vt を Zig 製ダイナミックモジュールとして組み込む
+;; 端末エミュレータ。Claude Code の TUI を Emacs 内で動かすのに vterm ではなく
+;; ghostel を選ぶ理由は、文字幅の計算経路が一本化されること:
+;;
+;;   Claude Code (Ink) : Node の string-width → EAW Ambiguous = 1
+;;   vterm (libvterm)  : システムの wcwidth() → locale-eaw により 2
+;;   バッファ表示      : char-width-table     → eaw-console.el により 2
+;;
+;; Ink が 1 セルとして進めた位置を vterm は 2 セルで描くため、TUI の再描画の
+;; たびに桁がずれる。ghostel は Ghostty 本体と同じ VT 実装 (libghostty-vt) を
+;; 使うので端末側の幅計算が GhostInTheWSL と揃い、食い違う層が 1 つ減る。
+;; ただし画面上の見え方は最終的に Emacs の char-width-table が決めるため、
+;; eaw-console.el が幅 2 にしている文字 (△ 等) で桁がずれる余地は残る。
+;; その場合は ghostel-mode バッファに限り char-width-table を eaw-console.el
+;; 適用前の親テーブルへ戻す。
+;;
+;; ネイティブモジュールは GitHub Releases の prebuilt バイナリを初回利用時に
+;; 取得する (ghostel-module-auto-install の既定 'ask で確認プロンプトが出る)。
+;; TODO: 宣言的に管理するなら nixpkgs の zig_0_15 (= 0.15.2。ghostel は
+;; このバージョンでしかビルドできない) で自前ビルドし、
+;; ghostel-module-directory を Nix store に向ける。まずは prebuilt で運用する。
+(use-package ghostel
+  :ensure t
+  :bind ("C-z t" . ghostel)
+  :custom
+  ;; モジュールの置き場をパッケージツリーの外に出す。既定は elpaca の
+  ;; builds/ghostel/ 配下になるが、そこは elpaca-rebuild で作り直される
+  ;; ため、ロード済みの .so と実体が食い違う (upstream の推奨も同じ)。
+  (ghostel-module-directory (expand-file-name "ghostel" user-emacs-directory))
+  ;; 端末へ送らず Emacs 側で処理するキー。ghostel の既定値に 2 つ足す:
+  ;;   C-z -- init.el 全体でプレフィクスとして使う (C-z m = magit 等)。
+  ;;          端末へ送ると SIGTSTP でジョブが停止してしまう。
+  ;;   M-w -- kill-ring-save。既定では端末へ送られ Emacs 側のコピーができない。
+  ;; 他に Emacs 側へ残したいキー (C-t = other-window など) があればここに足す。
+  (ghostel-keymap-exceptions
+   '("C-c" "C-x" "C-u" "C-h" "M-x" "M-:" "C-\\" "C-z" "M-w")))
+
+;; quail 系の Emacs Lisp 入力メソッド (Hangul 等) は overlay を介してバッファへ
+;; 直接文字を挿入するため、素のままでは ghostel の保護領域と衝突する。
+;; ghostel-ime-mode が buffer-local な input-method-function をラップし、
+;; 確定した文字列を端末へ送る。ghostel-ime.el は ghostel 同梱なので :ensure nil。
+;; NOTE: nskk は input-method フレームワーク (register-input-method /
+;; input-method-function) を一切使わず、独自キーマップから self-insert-command
+;; と insert でバッファへ直接書くため、この経路には乗らない。
+;; nskk 用の橋渡しは下の nskk-ghostel が担う。
+(use-package ghostel-ime
+  :ensure nil
+  :hook (ghostel-mode . ghostel-ime-mode))
+
+;; nskk の書き込みを read-only な ghostel バッファで通し、確定文字列を PTY へ
+;; 転送する自作ブリッジ (modules/emacs/site-lisp/nskk-ghostel.el)。
+(use-package nskk-ghostel
+  :ensure nil
+  :hook (ghostel-mode . nskk-ghostel-mode))
+
+;; claude-code-ide は Claude Code CLI を MCP (websocket) で Emacs に接続し、
+;; xref / treesit / imenu / project の情報を Claude 側のツールとして公開する。
+;; MELPA 未登録のため GitHub から直接取得する (依存の websocket / transient /
+;; web-server は elpaca が Package-Requires から解決する)。
+;; NOTE: MCP の参照検索ツールは xref ベース。lsp-bridge は xref を経由しない
+;; 独自 API なので、xref-find-references が期待どおり動くとは限らない。
+(use-package claude-code-ide
+  :ensure (:host github :repo "manzaltu/claude-code-ide.el")
+  :bind ("C-z a" . claude-code-ide-menu)
+  :custom
+  (claude-code-ide-terminal-backend 'ghostel))
 
 ;;;; ============================================================
 ;;;; Misc tools
