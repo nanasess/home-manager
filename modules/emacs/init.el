@@ -189,6 +189,30 @@
 ;; https://github.com/hamano/locale-eaw
 (load (expand-file-name (locate-user-emacs-file "site-lisp/eaw-console")) t t)
 
+;; Ubuntu (GNOME + Wayland) では ibus が常駐しており、入力ソースに ibus-skk が
+;; 選ばれた状態だと Emacs にプリエディットが送り込まれて nskk が使えなくなる。
+;; emacs-wrapper が設定する GTK_IM_MODULE / XMODIFIERS はそれぞれ GTK の IM モジュール
+;; 選択と X11 の XIM 用で、pgtk ビルド (emacs30-pgtk) + Wayland では GNOME Shell が
+;; text-input-v3 プロトコル経由で直接繋ぐため効かない。そこで Emacs 側で
+;; GtkIMContext 自体を切り、キーイベントを ibus を介さず直接受け取る。
+;; ibus の設定 (入力ソース一覧や ibus-skk の辞書設定) には手を入れないので、
+;; 他のアプリケーションでの ibus-skk の利用は従来どおり。
+;;
+;; `pgtk-use-im-context' はフレーム未作成の状態では "Frames are not in use or not
+;; initialized" で失敗する (early-init.el からは呼べない) ため、フレーム生成後の
+;; フックから呼ぶ。daemon 起動時は最初の emacsclient -c まで遅延する。
+(defun my/pgtk-disable-im-context (&optional frame)
+  "FRAME (既定は選択中のフレーム) の GtkIMContext を無効化する。
+pgtk フレーム以外 (X11 の `x' や tty の `t') では何もしないので、
+wsl-gentoo の非 pgtk 構成に読み込まれても無害。"
+  (let ((frame (or frame (selected-frame))))
+    (when (and (fboundp 'pgtk-use-im-context)
+               (eq (framep frame) 'pgtk))
+      (pgtk-use-im-context nil (frame-terminal frame)))))
+
+(add-hook 'window-setup-hook #'my/pgtk-disable-im-context)
+(add-hook 'after-make-frame-functions #'my/pgtk-disable-im-context)
+
 ;; nskk は upstream で *.el を src/ サブディレクトリに移動したため、
 ;; elpaca のデフォルト :files では nskk.el が見つからずビルドが失敗する。
 ;; src/*.el を明示的にビルド対象に加える。
@@ -198,9 +222,31 @@
            :build (:not elpaca-build-autoloads))
   :demand t
   ;; ddskk の (global-set-key "\C-x\C-j" 'skk-mode) と等価。
-  ;; C-j はグローバルに束縛しない: nskk 無効時は素の改行に戻り、
-  ;; nskk 有効時は nskk-mode-map の C-j (#'nskk-kakutei) が確定/かな復帰/改行を担う。
-  :bind (("C-x C-j" . nskk-toggle-mode))
+  ;; C-j はグローバルに束縛しない: nskk 無効時は素の改行に戻る。
+  ;; nskk 有効時の C-j は nskk-mode-map で my/nskk-kakutei-or-latin に差し替える。
+  :preface
+  (defun my/nskk-kakutei-or-latin ()
+    "▽/▼ 変換中は確定し、■ひらがな待機中は ASCII モードへ切り替える。
+
+nskk 既定の `nskk-kakutei' は ■ひらがな待機中に改行を挿入する
+\(nskk.el の kakutei-action/2 fact: hiragana-idle -> insert-newline)。
+一方、旧 ddskk 環境では C-j がグローバルに `skk-mode' へ束縛されており
+\(dotfiles 39a2239 の init.el:166)、■かなモードの C-j は日本語入力の
+ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j が
+張られない (skk.el の `(when (vectorp skk-kakutei-key) ...)' ガード) ため
+グローバル束縛が優先されていたことによる。
+
+その指使いを nskk-mode 自体を落とさずに復元する。ASCII モードからの
+復帰は `nskk-kakutei' 既定の direct-idle -> enter-hiragana がそのまま
+担うので、C-j 一発で ■かな <-> ASCII を往復できる。▽/▼ 中の確定と
+ローマ字ペンディングの破棄も `nskk-kakutei' に委譲する。"
+    (interactive)
+    (if (eq (nskk--current-kakutei-state) 'hiragana-idle)
+        (nskk-set-mode-latin)
+      (nskk-kakutei)))
+  :bind (("C-x C-j" . nskk-toggle-mode)
+         :map nskk-mode-map
+         ("C-j" . my/nskk-kakutei-or-latin))
   :custom
   (nskk-dict-user-dictionary-file (concat external-directory "nskk/jisyo"))
   ;; ddskk の skk-mode 同様、有効化したら直接ひらがな入力に入る (既定は 'ascii)。
@@ -243,7 +289,17 @@
   ;; study (文脈学習) は nskk 本体が require しない。nskk--enable の
   ;; (featurep 'nskk-study) 判定で永続化対象に含めるため、初回有効化より前に
   ;; 明示 require する (learning-score のみなら不要)。
-  (require 'nskk-study nil t))
+  (require 'nskk-study nil t)
+  ;; nskk の入力モード表示は minor-mode lighter として実装されているが
+  ;; (nskk.el の `:lighter (:eval (nskk-modeline-indicator))')、doom-modeline は
+  ;; minor-mode lighter を描画しない (doom-modeline-minor-modes nil) ため
+  ;; 画面に出ない。lsp-bridge と同じ方針で mode-line-misc-info へ積み、
+  ;; doom-modeline の misc-info セグメント経由で描画させる。
+  ;; `nskk-mode' を条件に置いているので無効なバッファでは何も出ない。
+  ;; doom-modeline を切ると lighter と二重に出るが、常用構成では有効なため許容する。
+  (add-to-list 'mode-line-misc-info
+               '(nskk-mode (:eval (nskk-modeline-indicator)))
+               t))
 
 (elpaca-wait)
 
