@@ -483,6 +483,23 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
   :custom
   (ediff-window-setup-function 'ediff-setup-windows-plain))
 
+(use-package browse-url
+  :ensure nil
+  :defer t
+  :config
+  ;; WSL では browse-url の既定経路 (browse-url-default-browser → xdg-open) が
+  ;; WSLg 上の Linux ブラウザを起動してしまい、Windows 側の既定ブラウザに渡らない。
+  ;; xdg-open は DE を検出できた場合 $BROWSER を見ずに .desktop 側へ振るため。
+  ;; そこで BROWSER が指すコマンド (wsl-gentoo.nix では wsl-open) を
+  ;; browse-url から直接叩く。BROWSER 未設定のホスト (ubuntu 等) では既定のまま。
+  ;; BROWSER は XDG 仕様上 ":" 区切りのリストになり得るので xdg-open と同じく
+  ;; 順に試し、実体のあるものを採る (wslview が消えていた事例があるため
+  ;; executable-find は必須)。どれも無ければ既定経路にフォールバックする。
+  (when-let* ((program (seq-some #'executable-find
+                                 (split-string (or (getenv "BROWSER") "") ":" t))))
+    (setopt browse-url-browser-function #'browse-url-generic
+            browse-url-generic-program program)))
+
 ;;;; ============================================================
 ;;;; Theme & UI
 ;;;; ============================================================
@@ -929,8 +946,134 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
   :custom
   (markdown-fontify-code-blocks-natively t)
   (markdown-indent-on-enter 'indent-and-new-item)
+  ;; C-c C-c o (markdown-open) を mo 連携に差し替える。関数を指定した場合
+  ;; markdown-open は save-buffer を呼ばないため、保存は my/mo-open 側で行う。
+  (markdown-open-command #'my/mo-open)
   :bind (:map markdown-mode-map
-         ("<S-tab>" . markdown-shifttab)))
+         ("<S-tab>" . markdown-shifttab)
+         ("C-c C-v" . my/mo-open)))
+
+;;;; ------------------------------------------------------------
+;;;; mo (k1LoW/mo) — Markdown をブラウザで表示するローカルサーバ
+;;;; ------------------------------------------------------------
+;; home.nix の mo-viewer で導入 (バイナリ名は `mo`)。既定ポート 6275 に単一
+;; サーバが常駐し、以降の `mo FILE` は同じセッションへファイルを追加していく。
+;;
+;; mo 側の性質と、それに合わせた設計方針:
+;;   - 開いたファイルは fsnotify で監視され、保存するたびにブラウザが自動再描画
+;;     される。よって Emacs 側に「プレビュー再生成」の仕組みは不要で、
+;;     一度開いた後は普通に C-x C-s するだけでよい。
+;;   - --json は「そのファイル専用の URL」(…/?file=<hash>) を返す。ブラウザ起動を
+;;     mo 任せにするとグループ先頭が開かれるだけなので、--no-open で抑止して
+;;     URL を受け取り、Emacs の browse-url で対象ファイルへ直接ジャンプさせる。
+;;   - --target でタブグループを分けられるので、project ルート名を割り当てる。
+;;   - 標準入力からも読めるため、ファイルを訪問していないバッファやリージョンの
+;;     一時プレビューに使える (ただし実ファイルが無いのでライブリロードは効かない)。
+;;
+;; --json 指定時、JSON は stdout に出て進捗メッセージは stderr に分離される。
+;; サーバ未起動でも mo は自身をデーモン化して即座に返るため call-process で問題ない。
+
+(defvar my/mo-program "mo"
+  "mo (k1LoW/mo) の実行ファイル名。")
+
+(defvar my/mo-use-project-target t
+  "非 nil なら project のルート名を mo の --target グループ名として使う。")
+
+(defun my/mo--target-args ()
+  "現在の project 名を --target 引数のリストとして返す。project 外なら nil。"
+  (when my/mo-use-project-target
+    (when-let* ((project (project-current))
+                (root (project-root project)))
+      (list "--target" (file-name-nondirectory (directory-file-name root))))))
+
+(defun my/mo--call (args &optional input)
+  "mo を ARGS で実行し、標準出力を文字列で返す。
+INPUT が非 nil なら、その文字列を mo の標準入力へ渡す。
+リージョンではなく文字列を受け取るのは、`with-temp-buffer' の内側では
+`call-process-region' の領域指定が一時バッファ基準になってしまうため。"
+  (unless (executable-find my/mo-program)
+    (user-error "mo が PATH にありません (home.nix の mo-viewer を参照)"))
+  (with-temp-buffer
+    ;; DESTINATION を (BUFFER nil) にして stderr の進捗メッセージを捨てる。
+    (let ((status (if input
+                      ;; START が文字列の場合 END は無視される。
+                      (apply #'call-process-region input nil my/mo-program
+                             nil (list t nil) nil args)
+                    (apply #'call-process my/mo-program
+                           nil (list t nil) nil args))))
+      (unless (eq status 0)
+        (user-error "mo が exit code %s で失敗しました" status))
+      (buffer-string))))
+
+(defun my/mo--browse (output &optional group-only)
+  "mo --json の OUTPUT から URL を取り出し `browse-url' で開く。
+GROUP-ONLY が非 nil なら ?file=… を落としてグループの一覧を開く。"
+  (let* ((json (json-parse-string output :object-type 'alist :array-type 'list))
+         (url (or (alist-get 'url (car (alist-get 'files json)))
+                  (alist-get 'url json))))
+    (unless url
+      (user-error "mo の JSON 出力から URL を取得できませんでした"))
+    (when group-only
+      (setq url (replace-regexp-in-string "\\?file=.*\\'" "" url)))
+    (browse-url url)
+    (message "mo: %s" url)))
+
+(defun my/mo-send-region (start end)
+  "START..END (リージョン未選択ならバッファ全体) を標準入力で mo に渡して開く。
+実ファイルではないためライブリロードは効かない。一時的なプレビュー用。"
+  (interactive (if (use-region-p)
+                   (list (region-beginning) (region-end))
+                 (list (point-min) (point-max))))
+  (my/mo--browse
+   (my/mo--call (append '("--json" "--no-open") (my/mo--target-args))
+                (buffer-substring-no-properties start end))))
+
+(defun my/mo-open ()
+  "現在のバッファの Markdown を mo で開く。
+ファイルを訪問していればそれを保存してから mo に渡すので、以降は保存するだけで
+ブラウザ側が追従する。ファイル未訪問またはリージョン選択中は
+`my/mo-send-region' にフォールバックする。"
+  (interactive)
+  (if (or (use-region-p) (not buffer-file-name))
+      (call-interactively #'my/mo-send-region)
+    (when (buffer-modified-p)
+      (save-buffer))
+    (my/mo--browse
+     (my/mo--call (append '("--json" "--no-open")
+                          (my/mo--target-args)
+                          (list (expand-file-name buffer-file-name)))))))
+
+(defun my/mo-close ()
+  "現在のファイルを mo のセッションから外す。"
+  (interactive)
+  (unless buffer-file-name
+    (user-error "ファイルを訪問していないバッファです"))
+  (my/mo--call (append '("--close")
+                       (my/mo--target-args)
+                       (list (expand-file-name buffer-file-name))))
+  (message "mo: closed %s" (file-name-nondirectory buffer-file-name)))
+
+(defun my/mo-watch-project ()
+  "project 配下の Markdown を再帰的に mo の監視対象に加え、一覧を開く。
+--watch なので、以後そのツリーに追加された .md も自動でセッションに入る。"
+  (interactive)
+  (let ((root (project-root (project-current t))))
+    (my/mo--browse
+     (my/mo--call (append '("--json" "--no-open" "--watch" "--recursive")
+                          (my/mo--target-args)
+                          (list (expand-file-name root))))
+     t)))
+
+(defun my/mo-status ()
+  "起動中の mo サーバの一覧を表示する。"
+  (interactive)
+  (message "%s" (string-trim (my/mo--call '("--status")))))
+
+(defun my/mo-shutdown ()
+  "mo サーバを停止する。セッションは保存され、次回起動時に復元される。"
+  (interactive)
+  (my/mo--call '("--shutdown"))
+  (message "mo: shutdown"))
 
 (use-package polymode
   :ensure (:host github :repo "polymode/polymode")
