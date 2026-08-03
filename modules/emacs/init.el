@@ -979,11 +979,24 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
 (defvar my/mo-use-project-target t
   "非 nil なら project のルート名を mo の --target グループ名として使う。")
 
-(defun my/mo--target-args ()
-  "現在の project 名を --target 引数のリストとして返す。project 外なら nil。"
+(defun my/mo--target-args (&optional project)
+  "PROJECT (省略時は現在の project) 名を --target 引数のリストとして返す。
+project 外なら nil。
+
+PROJECT を受け取れるようにしてあるのは、`my/mo-watch-project' が
+`project-current' にプロンプトを許して取得した instance を、ここでも
+使い回す必要があるため。引き直すと元バッファの `default-directory'
+基準になり、監視対象とグループがずれる。
+
+グループ名に root の basename を使うのは、--target が mo の URL パス
+\(http://localhost:6275/<target>) とサイドバーのラベルにそのまま出るため。
+同名 root (例: ~/work/docs と ~/archive/docs) は同じグループに混ざるが、
+一意性より可読性を優先した意図的なトレードオフ。ハッシュや UUID に
+置き換えないこと。グループ分け自体が不要なら
+`my/mo-use-project-target' を nil にする。"
   (when my/mo-use-project-target
-    (when-let* ((project (project-current))
-                (root (project-root project)))
+    (when-let* ((current (or project (project-current)))
+                (root (project-root current)))
       (list "--target" (file-name-nondirectory (directory-file-name root))))))
 
 (defun my/mo--call (args &optional input)
@@ -1005,16 +1018,21 @@ INPUT が非 nil なら、その文字列を mo の標準入力へ渡す。
         (user-error "mo が exit code %s で失敗しました" status))
       (buffer-string))))
 
-(defun my/mo--browse (output &optional group-only)
+(defun my/mo--browse (output &optional group)
   "mo --json の OUTPUT から URL を取り出し `browse-url' で開く。
-GROUP-ONLY が非 nil なら ?file=… を落としてグループの一覧を開く。"
+既定ではファイル個別の URL (…/?file=<hash>) を開く。
+GROUP が非 nil なら、代わりにそのグループの一覧 (…/<group>) を開く。
+
+グループ URL を JSON から作らずベース URL と GROUP から組み立てるのは、
+既に登録済みのファイル・パターンを再登録したときに mo が files:[] を返し、
+JSON からはグループを特定できないため。"
   (let* ((json (json-parse-string output :object-type 'alist :array-type 'list))
-         (url (or (alist-get 'url (car (alist-get 'files json)))
-                  (alist-get 'url json))))
-    (unless url
+         (base (alist-get 'url json))
+         (url (if group
+                  (concat base "/" group)
+                (or (alist-get 'url (car (alist-get 'files json))) base))))
+    (unless base
       (user-error "mo の JSON 出力から URL を取得できませんでした"))
-    (when group-only
-      (setq url (replace-regexp-in-string "\\?file=.*\\'" "" url)))
     (browse-url url)
     (message "mo: %s" url)))
 
@@ -1057,12 +1075,18 @@ GROUP-ONLY が非 nil なら ?file=… を落としてグループの一覧を�
   "project 配下の Markdown を再帰的に mo の監視対象に加え、一覧を開く。
 --watch なので、以後そのツリーに追加された .md も自動でセッションに入る。"
   (interactive)
-  (let ((root (project-root (project-current t))))
+  ;; project-current に t を渡すと project 外のバッファでもプロンプトで選べる。
+  ;; その instance を my/mo--target-args にも渡すこと。渡さないと --target 側
+  ;; だけ元バッファの default-directory で引き直されて nil になり、監視対象は
+  ;; 選んだ root なのにグループは mo 既定の default という食い違いが起きる。
+  (let* ((project (project-current t))
+         (root (project-root project))
+         (target-args (my/mo--target-args project)))
     (my/mo--browse
      (my/mo--call (append '("--json" "--no-open" "--watch" "--recursive")
-                          (my/mo--target-args)
+                          target-args
                           (list (expand-file-name root))))
-     t)))
+     (cadr target-args))))
 
 (defun my/mo-status ()
   "起動中の mo サーバの一覧を表示する。"
