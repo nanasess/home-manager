@@ -1049,23 +1049,41 @@ JSON からはグループを特定できないため。"
 (defun my/mo-open ()
   "現在のバッファの Markdown を mo で開く。
 ファイルを訪問していればそれを保存してから mo に渡すので、以降は保存するだけで
-ブラウザ側が追従する。ファイル未訪問またはリージョン選択中は
-`my/mo-send-region' にフォールバックする。"
+ブラウザ側が追従する。
+
+以下の場合は `my/mo-send-region' (標準入力) にフォールバックする。
+この経路では mo 側に実ファイルが無いためライブリロードは効かない。
+  - ファイルを訪問していないバッファ
+  - リージョン選択中
+  - TRAMP 越しのリモートファイル。mo はローカルプロセスなので
+    /ssh:host:/path/file.md をそのまま渡しても file not found で失敗する
+    (consult-tramp を使うため実際に起こりうる)。"
   (interactive)
-  (if (or (use-region-p) (not buffer-file-name))
-      (call-interactively #'my/mo-send-region)
+  (cond
+   ((or (use-region-p) (not buffer-file-name))
+    (call-interactively #'my/mo-send-region))
+   ((file-remote-p buffer-file-name)
+    (my/mo-send-region (point-min) (point-max))
+    ;; my/mo--browse の URL 表示を上書きしてでも、劣化していることを伝える。
+    (message "mo: リモートファイルのため内容のみ送信しました (ライブリロード不可)"))
+   (t
     (when (buffer-modified-p)
       (save-buffer))
     (my/mo--browse
      (my/mo--call (append '("--json" "--no-open")
                           (my/mo--target-args)
-                          (list (expand-file-name buffer-file-name)))))))
+                          (list (expand-file-name buffer-file-name))))))))
 
 (defun my/mo-close ()
   "現在のファイルを mo のセッションから外す。"
   (interactive)
   (unless buffer-file-name
     (user-error "ファイルを訪問していないバッファです"))
+  ;; リモートファイルはそもそもパスで mo に登録されない (my/mo-open が標準入力
+  ;; へ回す)。渡しても mo 側は該当なしで終わるのに closed と報告してしまうため、
+  ;; ここで弾く。
+  (when (file-remote-p buffer-file-name)
+    (user-error "リモートファイルは mo のセッションに入っていません"))
   (my/mo--call (append '("--close")
                        (my/mo--target-args)
                        (list (expand-file-name buffer-file-name))))
@@ -1082,6 +1100,11 @@ JSON からはグループを特定できないため。"
   (let* ((project (project-current t))
          (root (project-root project))
          (target-args (my/mo--target-args project)))
+    ;; mo はローカルプロセスなのでリモート root は監視できない。渡しても
+    ;; file not found で exit 1 になり、stderr を捨てている都合で理由の
+    ;; 分からないエラーになるため、ここで明示的に弾く。
+    (when (file-remote-p root)
+      (user-error "リモート project (%s) は mo で監視できません" root))
     (my/mo--browse
      (my/mo--call (append '("--json" "--no-open" "--watch" "--recursive")
                           target-args
