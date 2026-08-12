@@ -33,6 +33,7 @@
             ./modules/yaskkserv2.nix
             ./modules/t2-suspend
             ./modules/bluetooth-audio
+            ./modules/ibus-skk
             ./modules/emacs
             ./modules/zsh
             ./modules/ghostty
@@ -44,6 +45,12 @@
           ];
         };
       };
+
+      # 自作 derivation は packages にも出して CI (nix flake check) でビルド検証する。
+      packages = forAllSystems (system: {
+        ibus-skk = nixpkgs.legacyPackages.${system}.callPackage ./pkgs/ibus-skk.nix { };
+        yaskkserv2 = nixpkgs.legacyPackages.${system}.callPackage ./pkgs/yaskkserv2.nix { };
+      });
 
       formatter = forAllSystems (system:
         nixpkgs.legacyPackages.${system}.nixpkgs-fmt

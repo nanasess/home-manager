@@ -7,6 +7,17 @@ let
     # TODO: 実環境から精査して追加
   ];
 
+  # apt で入っていてはいけないパッケージ (Nix 側と衝突するもの)。
+  # 未インストールであることを check-system-packages が検証する。
+  aptConflictPackages = [
+    # ibus-skk: Ubuntu 24.04 の 1.4.3 には ▼変換中に母音を打つと確定文字列が消える
+    # バグがあり (詳細は pkgs/ibus-skk.nix)、modules/ibus-skk の Nix ビルド 1.4.4 に
+    # 置き換えている。component 名 (org.freedesktop.IBus.SKK) とエンジン名 (skk) が
+    # 同一なので、両方が IBUS_COMPONENT_PATH の探索対象にあると二重登録になる。
+    #   sudo apt remove ibus-skk
+    "ibus-skk"
+  ];
+
   # GNOME セッションの XDG_DATA_DIRS には ~/.nix-profile/share が含まれないため、
   # .desktop の Icon=<name> がテーマ検索で解決できずアイコンが出ない
   # (CLAUDE.md「Nix GUI アプリのランチャー登録」参照)。
@@ -81,11 +92,21 @@ in
           missing=$((missing + 1))
         fi
       done
-      if [ "$missing" -eq 0 ]; then
+      echo "=== apt 競合パッケージチェック ==="
+      conflict=0
+      for pkg in ${lib.concatStringsSep " " aptConflictPackages}; do
+        if dpkg -s "$pkg" 2>/dev/null | grep -q 'Status: install ok installed'; then
+          echo "CONFLICT: $pkg (Nix 側と衝突するため削除してください: sudo apt remove $pkg)"
+          conflict=$((conflict + 1))
+        fi
+      done
+
+      echo "---"
+      if [ "$missing" -eq 0 ] && [ "$conflict" -eq 0 ]; then
         echo "OK: すべてのパッケージがインストールされています"
       else
-        echo "---"
-        echo "$missing 個のパッケージが未インストールです"
+        [ "$missing" -eq 0 ] || echo "$missing 個のパッケージが未インストールです"
+        [ "$conflict" -eq 0 ] || echo "$conflict 個の競合パッケージが残っています"
         exit 1
       fi
     '';
@@ -172,6 +193,8 @@ in
 
   dconf.settings = {
     # ibus-skk の辞書設定。yaskkserv2 (skkserv) を辞書サーバとして参照する。
+    # エンジン本体は modules/ibus-skk (Nix ビルドの 1.4.4) が提供する。エンジン名 skk は
+    # apt 版と同一なのでこの dconf パス (desktop/ibus/engine/skk) はそのまま引き継がれる。
     # encoding=UTF-8 が必須: yaskkserv2 は --midashi-utf8 で UTF-8 通信専用のため。
     # ibus-skk (libskk) の既定は EUC-JP で、省略すると見出し語が化けて変換不能になる
     # (ueno/ibus-skk src/engine.vala が encoding= を Skk.SkkServ へ渡す)。
