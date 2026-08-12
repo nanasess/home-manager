@@ -6,6 +6,24 @@ let
   aptPackages = [
     # TODO: 実環境から精査して追加
   ];
+
+  # GNOME セッションの XDG_DATA_DIRS には ~/.nix-profile/share が含まれないため、
+  # .desktop の Icon=<name> がテーマ検索で解決できずアイコンが出ない
+  # (CLAUDE.md「Nix GUI アプリのランチャー登録」参照)。
+  # XDG_DATA_HOME (~/.local/share) 配下は GTK が常に検索するので、アイコンだけ
+  # ここへリンクする。Icon= に絶対パスを書く手もあるが解像度が固定になるため、
+  # 複数サイズを張って HiDPI でのスケーリングを効かせる。
+  #
+  # sizes には「パッケージが持っていて、かつ /usr/share/icons/hicolor/index.theme
+  # が定義しているサイズ」だけを渡すこと。index.theme に無いディレクトリ
+  # (ghostty の 1024x1024 や *@2 など) は張っても GTK に引かれない。
+  iconLinks = { package, icon, sizes }: lib.listToAttrs (map
+    (size:
+      let file = "${icon}.${if size == "scalable" then "svg" else "png"}";
+      in lib.nameValuePair
+        "icons/hicolor/${size}/apps/${file}"
+        { source = "${package}/share/icons/hicolor/${size}/apps/${file}"; })
+    sizes);
 in
 {
   home.homeDirectory = "/home/nanasess";
@@ -32,6 +50,24 @@ in
     StartupWMClass=com.mitchellh.ghostty
     Terminal=false
   '';
+
+  # ランチャー用アイコンの配置 (詳細は let ブロックの iconLinks を参照)。
+  # emacs は modules/emacs の emacs.desktop / emacsclient.desktop (Icon=emacs) 用。
+  # apt の emacs-common が /usr/share/icons/hicolor に同名アイコンを置いており
+  # 未配置でも表示自体はされるが、それは apt 版に依存した偶然なのでここで
+  # nixpkgs 側 (実際に起動する emacs30-pgtk) のアイコンを優先させる。
+  xdg.dataFile =
+    iconLinks
+      {
+        package = pkgs.ghostty;
+        icon = "com.mitchellh.ghostty";
+        sizes = [ "16x16" "32x32" "128x128" "256x256" "512x512" ];
+      }
+    // iconLinks {
+      package = pkgs.emacs30-pgtk;
+      icon = "emacs";
+      sizes = [ "16x16" "24x24" "32x32" "48x48" "128x128" "scalable" ];
+    };
 
   home.file.".local/bin/check-system-packages" = {
     executable = true;
