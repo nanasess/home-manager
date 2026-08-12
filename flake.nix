@@ -32,6 +32,7 @@
             ./modules/onedrive.nix
             ./modules/yaskkserv2.nix
             ./modules/t2-suspend
+            ./modules/bluetooth-audio
             ./modules/emacs
             ./modules/zsh
             ./modules/ghostty
