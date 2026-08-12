@@ -180,6 +180,10 @@
       "x-scheme-handler/about" = "google-chrome.desktop";
       "x-scheme-handler/unknown" = "google-chrome.desktop";
       "x-scheme-handler/claude-cli" = "claude-code-url-handler.desktop";
+      # Slack が実行時に ~/.config/mimeapps.list へ自力で書き込むエントリ。
+      # 宣言しておかないと home-manager が同ファイルを管理下に置いた時点で
+      # 消え、slack:// リンク (チャンネル招待等) が開かなくなる。
+      "x-scheme-handler/slack" = "slack.desktop";
     };
   };
 
