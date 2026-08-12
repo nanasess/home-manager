@@ -33,9 +33,14 @@ in
   # エンジン名 (skk) が同一なので、両方が探索対象にあると二重登録になる。
   # hosts/ubuntu.nix の check-system-packages が競合として検出する。
   #
-  # 反映手順 (home-manager switch 後):
-  #   systemctl --user import-environment IBUS_COMPONENT_PATH  # または再ログイン
-  #   ibus restart
+  # 反映手順 (home-manager switch 後): 再ログインが確実。現在のセッションを維持する場合は
+  #   systemctl --user daemon-reload   # environment.d を読み直す
+  #   systemctl --user restart org.freedesktop.IBus.session.GNOME.service
+  #
+  # systemctl --user import-environment IBUS_COMPONENT_PATH は使えない。この変数は
+  # environment.d にしか書かれずシェルには入らないため、「クライアント側で設定済みの値を
+  # 取り込む」import-environment には渡すものが無い。ibus restart も daemon の自己 re-exec
+  # なので environ を引き継いでしまう。
 
   xdg.dataFile."ibus/component/skk.xml".source =
     "${ibus-skk}/share/ibus/component/skk.xml";

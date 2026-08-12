@@ -331,6 +331,16 @@ component 名 (`org.freedesktop.IBus.SKK`) とエンジン名 (`skk`) が apt �
 
 ```bash
 sudo apt remove ibus-skk
-systemctl --user import-environment IBUS_COMPONENT_PATH   # または再ログイン
-ibus restart
+# 推奨: 再ログイン (systemd --user が environment.d を読み直す)
 ```
+
+現在のセッションを維持したい場合は、`environment.d` を読み直してから IBus のユニットを再起動する。
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart org.freedesktop.IBus.session.GNOME.service
+```
+
+`systemctl --user import-environment IBUS_COMPONENT_PATH` は**使えない**。`systemd.user.sessionVariables` が書き出すのは `environment.d/10-home-manager.conf` だけでシェルには値が入らず、`import-environment` は「クライアント側で設定済みの値」を取り込むコマンドだからである。
+
+`ibus restart` も避ける。D-Bus 経由で daemon に自己 re-exec を要求するもので、re-exec は environ を引き継ぐため新しい値が反映されない (未検証だが、ユニットごと再起動すれば確実に manager 環境を継承する)。
