@@ -56,7 +56,7 @@ home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
 
 ### ディレクトリ構成
 
-```
+```text
 flake.nix              -- エントリポイント（inputs と homeConfigurations）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
@@ -144,7 +144,7 @@ glibc 2.39+ で `wcwidth()` が East Asian Ambiguous 文字 (△→○●■□�
 
 ### メカニズム
 
-```
+```text
 locale-eaw EAW-CONSOLE
 ├── glibc wcwidth()     -- LOCPATH でカスタムロケール適用 (△→=2, ─│=1)
 ├── WezTerm cell_widths -- eaw-console-wezterm.lua で同じ幅テーブルを適用
@@ -178,7 +178,7 @@ UDEV Gothic JPDOC (全角グリフ提供)
 
 断続的な切断の真因は **イヤホン側のマルチポイント（iPhone との同時接続）** だった。他機器が A2DP スロットを掴んでいると `bluetoothd` が EBUSY を返し、15 秒周期の再接続ループに入る。
 
-```
+```text
 a2dp-sink profile connect failed for <addr>: Device or resource busy
 plugins/policy.c:reconnect_timeout() Reconnecting services failed: Device or resource busy (16)
 ```

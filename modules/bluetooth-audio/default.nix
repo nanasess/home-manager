@@ -56,16 +56,19 @@
   # そこで XDG_DATA_HOME 配下に自前のエントリを置く。Ghostty (hosts/ubuntu.nix) と
   # 同じ回避策。
   #
-  # 副作用として Exec / Icon も解決できないため、いずれも ~/.nix-profile 経由の
-  # フルパスで指定する (store パスを直書きすると更新のたびに切れる)。
+  # 副作用として Exec / Icon も解決できないため、いずれも profileDirectory 経由の
+  # フルパスで指定する (store パスを直書きすると更新のたびに切れる)。ここを
+  # ~/.nix-profile と直書きしないのは、NixOS の nix.useUserPackages 等では
+  # プロファイルが /etc/profiles/per-user/<user> になり解決に失敗するため。
   #
   # 根治するなら targets.genericLinux.enable = true で XDG_DATA_DIRS ごと直す手も
   # あるが、セッション全体に影響するため本モジュールでは踏み込まない。
   #
-  # Categories は AudioVideo のみにしている。上流の .desktop は Settings も
-  # 併記しているが、どちらもメインカテゴリのためメニューに二重登録されうる
-  # (desktop-file-validate の hint)。
-  home.file.".local/share/applications/org.pulseaudio.pavucontrol.desktop".text = ''
+  # Categories から Settings を外している。上流の .desktop は AudioVideo と併記して
+  # いるが、どちらもメインカテゴリのためメニューに二重登録されうる
+  # (desktop-file-validate の hint)。Audio はメインカテゴリだが AudioVideo との
+  # 併記が仕様上必須 (単独だと desktop-file-validate が error) なので残す。
+  xdg.dataFile."applications/org.pulseaudio.pavucontrol.desktop".text = ''
     [Desktop Entry]
     Version=1.0
     Type=Application
@@ -75,8 +78,8 @@
     GenericName[ja]=音量調節
     Comment=Adjust volume and switch Bluetooth profiles (A2DP / HFP)
     Comment[ja]=音量調整と Bluetooth プロファイル切替 (A2DP / HFP)
-    Exec=${config.home.homeDirectory}/.nix-profile/bin/pavucontrol
-    Icon=${config.home.homeDirectory}/.nix-profile/share/icons/hicolor/scalable/apps/org.pulseaudio.pavucontrol.svg
+    Exec=${config.home.profileDirectory}/bin/pavucontrol
+    Icon=${config.home.profileDirectory}/share/icons/hicolor/scalable/apps/org.pulseaudio.pavucontrol.svg
     Terminal=false
     StartupNotify=true
     Categories=AudioVideo;Audio;Mixer;GTK;
