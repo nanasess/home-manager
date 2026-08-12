@@ -85,11 +85,14 @@ modules/
   bluetooth-audio/
     default.nix        -- Bluetooth オーディオ（HFP 自動切替の無効化 + pavucontrol。ubuntu 用）
     51-disable-headset-autoswitch.lua -- WirePlumber の自動プロファイル切替を無効化
+  ibus-skk/
+    default.nix        -- IBus SKK エンジン（Nix ビルドの 1.4.4 + IBUS_COMPONENT_PATH。ubuntu 用）
   portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
   onedrive.nix         -- OneDrive 設定（WSL Gentoo 用）
   yaskkserv2.nix       -- SKK 辞書サーバ（systemd ユーザーサービス。wsl-gentoo / ubuntu 共通）
 pkgs/
   yaskkserv2.nix       -- yaskkserv2 の自作 Nix derivation（buildRustPackage、nixpkgs 未収録のため）
+  ibus-skk.nix         -- ibus-skk 1.4.4 の自作 Nix derivation（nixpkgs 未収録 + apt は 1.4.3 で停滞）
 .github/workflows/
   check.yml            -- CI 設定
 ```
@@ -114,6 +117,7 @@ pkgs/
 | Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` に書き出し、`/etc/portage/` から個別にシンボリックリンク |
 | システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
 | SKK 辞書サーバ (yaskkserv2) | Nix ビルド (`pkgs/yaskkserv2.nix`) + systemd ユーザーサービス (`modules/yaskkserv2.nix`) | nixpkgs / apt に無いため上流を `buildRustPackage`。全ホスト同一バイナリ + ユーザーパス辞書 (`~/.local/share/yaskkserv2/all`) で sudo 不要・共通化 |
+| IBus SKK エンジン | Nix ビルド (`pkgs/ibus-skk.nix`) + `IBUS_COMPONENT_PATH` (`modules/ibus-skk/`) | apt / nixpkgs とも 1.4.4 未提供。apt 版 1.4.3 は変換確定が壊れる（下記参照）。IBus は `XDG_DATA_DIRS` を見ないため `systemd.user.sessionVariables` でエンジンを登録する |
 | Bluetooth オーディオ | home-manager (xdg.configFile) + pavucontrol | WirePlumber の HFP 自動切替を無効化し、A2DP (ステレオ) / HFP (マイク) は pavucontrol で手動切替。プロファイルの記憶 (`~/.local/state/wireplumber/`) はランタイム状態のため管理外 |
 
 **プラットフォーム非依存化の判断基準**: portage / apt など特定ホストのパッケージマネージャに依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で wsl-gentoo (旧 portage) と ubuntu を統一した先例 (PR #110)。
@@ -267,3 +271,76 @@ i=Gtk.IconTheme.new().lookup_icon("com.mitchellh.ghostty",128,0); print(i.get_fi
 `/usr/bin/python3` を使うこと (Nix の python3 では GI typelib を拾えず落ちる)。
 
 **Walker は対象外**: nixpkgs の walker は `bin/walker` だけで `share/` を持たず、上流 (`abenz1267/walker`) にもアプリアイコンが存在しない (`v2.17.0` / 旧 Go 版 `v0.13.26` ともスクリーンショット画像のみ)。パス問題ではないので上記の方法では直せない。必要なら application id `dev.benz.walker` で `.desktop` を作り、システムテーマの汎用アイコン (`system-search` 等) を代用する。
+
+**IBus エンジンには通用しない**: IBus のコンポーネント探索は `XDG_DATA_DIRS` も `XDG_DATA_HOME` も見ない。詳細は下記「ibus-skk」節。
+
+## ibus-skk (SKK 入力メソッド)
+
+設定: `pkgs/ibus-skk.nix` + `modules/ibus-skk/`（`nanasess@ubuntu` のみ）。apt 版 1.4.3 を Nix ビルドの 1.4.4 で置き換えている。
+
+### apt 版 1.4.3 は ▼変換中に母音を打つと確定文字列が消える
+
+`▽じょうき` → `SPC` → `▼上記` の状態から `C-j` を省いてローマ字入力を続けたときの挙動:
+
+| 続けて打つ文字 | ddskk | ibus-skk 1.4.3 |
+|---|---|---|
+| `あ`（母音・1 打鍵） | 「上記あ」 | **「あ」のみ**（上記が消える） |
+| `は`（子音+母音・2 打鍵） | 「上記は」 | 「上記は」（正常） |
+
+原因は libskk ではなく ibus-skk 側。1 回の `process_key_event` 中に `commit_text` が 2 回呼ばれ、クライアントには最後の 1 回しか反映されない。
+
+- `src/engine.vala:142` — `context.candidates.selected` シグナル内で `poll_output()` → `commit_text("上記")`
+- `src/engine.vala:441` — `process_key_event` 末尾で `poll_output()` → `commit_text("あ")`
+
+母音は 1 打鍵で仮名が確定するので同一イベント内で 2 回、子音+母音はイベントごとに 1 回ずつになるため、母音のときだけ壊れる。上流 1.4.4 の `Don't split sending CommitText when auto-start conversion [#71]` がシグナル側の `commit_text` を削除して修正済み。
+
+libskk 側は 1.0.5 の時点で正しく動作する（`SelectStateHandler` が `candidates.select()` → `state.reset()` → `return false` し、`Context.process_key_event_internal` のループが `NoneStateHandler` で同じキーを再処理する）。切り分けには `gir1.2-skk-1.0` を展開して python から `Skk.Context` を直接叩くのが早い。
+
+### IBus のコンポーネント探索は XDG を一切見ない
+
+`ibus_registry_load()` の実装:
+
+```c
+envstr = g_getenv ("IBUS_COMPONENT_PATH");
+if (envstr) {
+    /* ← 設定されていれば「これだけ」を探索 */
+} else {
+    dirname = g_build_filename (IBUS_DATA_DIR, "component", NULL);  /* /usr/share/ibus/component のみ */
+}
+```
+
+`g_get_user_data_dir()` は FIXME でコメントアウトされている。そのため Ghostty / pavucontrol で使っている「`XDG_DATA_HOME` に置く」回避策は効かない。
+
+一方 `ibus-daemon` は GNOME では systemd ユーザーサービス (`org.freedesktop.IBus.session.GNOME.service`) として起動するため `~/.config/environment.d/` が届く。`systemd.user.sessionVariables.IBUS_COMPONENT_PATH` でエンジンを登録している。
+
+**`IBUS_COMPONENT_PATH` を設定すると `/usr/share/ibus/component` が探索対象から外れる**（上記の `else` 分岐）。mozc など他エンジンが消えるので、必ず併記すること。
+
+### apt 版は削除が必須
+
+component 名 (`org.freedesktop.IBus.SKK`) とエンジン名 (`skk`) が apt 版と同一なので、両方が探索対象にあると二重登録になる。`sudo apt remove ibus-skk` すること。`check-system-packages` が競合として検出する。
+
+エンジン名が同一なので、`dconf` の辞書設定 (`desktop/ibus/engine/skk`、`hosts/ubuntu.nix`) はそのまま引き継がれる。`encoding=` の受け渡し (`engine.vala` → `Skk.SkkServ`) も 1.4.4 + libskk 1.1.0 で変わっていない。
+
+### layout は default に固定している
+
+上流の `skk.xml.in.in` は `<layout>jp</layout>` で、SKK を有効にすると JIS 配列が強制される。Ubuntu 側では `/usr/share/ibus/component/skk.xml` を手で `default` に書き換えて運用していた（`dpkg --verify ibus-skk` が改変を検出。2026-03-06）ため、`pkgs/ibus-skk.nix` の `postPatch` でその状態を宣言的に再現している。
+
+### 反映手順
+
+`home-manager switch` だけでは既存セッションに `IBUS_COMPONENT_PATH` が届かない。
+
+```bash
+sudo apt remove ibus-skk
+# 推奨: 再ログイン (systemd --user が environment.d を読み直す)
+```
+
+現在のセッションを維持したい場合は、`environment.d` を読み直してから IBus のユニットを再起動する。
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart org.freedesktop.IBus.session.GNOME.service
+```
+
+`systemctl --user import-environment IBUS_COMPONENT_PATH` は**使えない**。`systemd.user.sessionVariables` が書き出すのは `environment.d/10-home-manager.conf` だけでシェルには値が入らず、`import-environment` は「クライアント側で設定済みの値」を取り込むコマンドだからである。
+
+`ibus restart` も避ける。D-Bus 経由で daemon に自己 re-exec を要求するもので、re-exec は environ を引き継ぐため新しい値が反映されない (未検証だが、ユニットごと再起動すれば確実に manager 環境を継承する)。
