@@ -202,12 +202,20 @@ WirePlumber の既定では、`/usr/share/wireplumber/policy.lua.d/10-default-po
 
 `51-disable-headset-autoswitch.lua` でこれを無効化し、**運用は pavucontrol での手動切替**（音楽 = `a2dp-sink` / 会議 = `headset-head-unit-msbc`）に統一した。
 
-HFP に落ちているかの判定:
+現在のプロファイルの確認（`select` を `Device` 型に絞らないと、同じ `device.api` を持つ
+Node オブジェクト 2 件を拾って `null` 行が混ざる）:
 
 ```bash
-pw-dump | grep -o 'Bose QC Earbuds:playback_[A-Z]*' | sort -u
-# playback_FL + playback_FR → A2DP ステレオ
-# playback_MONO            → HFP に落ちている
+pw-dump | jq -r '.[]
+  | select(.type == "PipeWire:Interface:Device" and .info.props."device.api" == "bluez5")
+  | "\(.info.props."device.description"): \(.info.params.Profile[0].description)"'
+```
+
+実機での出力:
+
+```text
+Bose QC Earbuds: High Fidelity Playback (A2DP Sink, codec SBC)   ← ステレオ
+Bose QC Earbuds: Headset Head Unit (HSP/HFP, codec mSBC)         ← HFP（モノラル）
 ```
 
 ### プロファイルの記憶は home-manager 管理外
