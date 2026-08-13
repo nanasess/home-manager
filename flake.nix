@@ -34,6 +34,7 @@
             ./modules/t2-suspend
             ./modules/bluetooth-audio
             ./modules/ibus-skk
+            ./modules/xremap
             ./modules/emacs
             ./modules/zsh
             ./modules/ghostty
