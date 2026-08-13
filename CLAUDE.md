@@ -179,7 +179,9 @@ UDEV Gothic JPDOC (全角グリフ提供)
 
 ## Bluetooth オーディオ (T2 Mac + Bose QC Earbuds)
 
-設定: `modules/bluetooth-audio/`（`nanasess@ubuntu` のみ）。2026-08-12 の実機調査に基づく。
+設定: `modules/bluetooth-audio/`（`nanasess@ubuntu` のみ）。2026-08-12 / 08-13 の実機調査に基づく。
+
+接続不安定の原因は実際に 2 種類あった。どちらも「電波が弱い」「混線」ではなく、**単一コントローラ（Bluetooth / WiFi ワンチップ・アンテナ共用）の奪い合い**である。切り分けは下記 2 節の順で行う。
 
 ### 「接続がぷつぷつ切れる」はマルチポイントを最初に疑う
 
@@ -191,6 +193,47 @@ plugins/policy.c:reconnect_timeout() Reconnecting services failed: Device or res
 ```
 
 iPhone とのペアリング解除で EBUSY はゼロになり、Link quality 255 / RSSI 0 で安定した。**設定では直せない運用上の問題**なので、再発時は WirePlumber や bluez をいじる前に他機器との同時接続を確認する。電波干渉や WiFi との coexistence を疑うのはその後。
+
+### GNOME の Bluetooth 設定パネルを開きっぱなしにしない
+
+このパネルは**開いている間ずっと inquiry + LE スキャンを回し続ける**。discovery 中はコントローラが取られ、音声リンクのスケジューリングが押しのけられる。2026-08-13 には**ペアリング情報ごと消し飛んだ**。
+
+引き金は「パスキーのクロスデバイス認証」との組み合わせだった。FIDO2 の hybrid transport（caBLE）は iPhone を探すのに BLE を使うため、iPhone が RPA（Resolvable Private Address）でアドバタイズする。それを開きっぱなしのパネルが新規デバイスと見なして接続を試み、無線時間の奪い合いが決定的になった。
+
+```text
+gnome-control-c: Setting up /org/bluez/hci0/dev_5A_52_D5_CA_44_98 failed: ConnectionAttemptFailed: Page Timeout
+bluetoothd: Wrong size of start discovery return parameters          ← スキャン開始
+gnome-control-c: Setting up /org/bluez/hci0/dev_60_AB_D2_EE_4E_84 failed: InProgress   ← イヤホンが割り込めない
+bluetoothd: Add Device complete for unknown device 60:AB:D2:EE:4E:84  ← ペアリング喪失
+bluetoothd: avdtp.c:cancel_request() Open: Connection timed out (110)
+```
+
+アドレス先頭 2 ビットが `01` なら RPA（`0x5A` = `01`011010）。BLE のプライバシー用ランダムアドレスで、iPhone のアドバタイズと整合する。
+
+スキャン状態の確認:
+
+```bash
+bluetoothctl show | grep -iE 'Discovering|Discoverable'
+```
+
+パスキー認証は BLE を使う仕様上、音切れを完全には避けられない。会議中に走らせない運用が無難。なお **`ControllerMode = bredr`（LE 無効化）でスキャン負荷を消す案は採用しないこと** — パスキーのクロスデバイス認証が使えなくなる。
+
+デバイスを `trust` しておけば再接続にスキャンが不要になるので、パネルを開く機会自体を減らせる。
+
+### ペアリングが壊れたら GUI で復旧する
+
+`bluetoothctl` の**非対話モードの `pair` はボンドが確定しないこと**がある。実際 `Pairing successful` / `Paired: yes` の直後に `Paired: no` へ戻り、A2DP が `br-connection-unknown` で張れなかった。ペアリングエージェントの応答が絡むため、GNOME の設定パネル（開いたらすぐ閉じる）のほうが確実。
+
+成否は `hcitool con` の**リンクモードで判定する**。`Paired: yes` の表示だけでは不十分:
+
+```text
+< ACL ... lm PERIPHERAL                    ← 失敗（未認証・未暗号化。A2DP を張れない）
+> ACL ... lm CENTRAL AUTH ENCRYPT          ← 成功
+```
+
+BR/EDR 側で検出されているかは名前でも分かる。`LE-Bose QC Earbuds` は BLE アドバタイズ由来の名前で、この状態でペアリングしても A2DP に必要な BR/EDR のリンクキーは得られない。BR/EDR の inquiry は LE スキャンより時間がかかるため、**スキャン開始から 20 秒程度待って `Bose QC Earbuds`（`LE-` なし）になってから**操作する。
+
+なお `btmgmt` は bluetoothd を迂回してカーネルの mgmt ソケットを直接叩くため、bluetoothd 稼働中のペアリングには使わない。
 
 ### A2DP（ステレオ）と HFP（マイク）は排他
 
