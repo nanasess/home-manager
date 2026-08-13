@@ -42,6 +42,12 @@ in
   #     | sudo tee /etc/udev/rules.d/99-input.rules
   #   echo uinput | sudo tee /etc/modules-load.d/uinput.conf
   #   sudo udevadm control --reload-rules && sudo udevadm trigger
+  #   sudo modprobe uinput
+  #
+  # 最後の modprobe を省かないこと。modules-load.d は systemd-modules-load.service が
+  # 早期ブートで処理する仕組みなので、ファイルを置いた時点ではロードされない。
+  # (この T2 Mac のカーネルでは uinput が組み込みで /dev/uinput が静的ノードとして
+  # 既に存在するため実質 no-op だが、他機での再現手順として必要。)
   #
   # 反映には再ログインが必要 (input グループの反映 + Wayland では GNOME Shell を
   # 再起動できないため拡張のロードにログインし直しが要る)。
@@ -78,6 +84,16 @@ in
     # keymap は「修飾キー付きの組み合わせ」を置換する (単キーの入れ替えは modmap)。
     # 物理 Ctrl キーを使った場合もこの keymap にマッチする。
     keymap:
+      # exact_match は既定の false のままにしてある (意図的)。
+      #
+      # false だと Ctrl+Shift+H のように修飾キーが増えた組み合わせにもマッチするが、
+      # 余った修飾キーは解放されず保持される実装なので (event_handler.rs の
+      # `extra_modifiers.retain(|key| ... && !extra_modifiers_pressed.contains(key))`)、
+      # 出力は Ctrl+Shift+PageUp = Chrome のタブ並び替えになる。H / L のニーモニックと
+      # 整合する有用な副産物であり、これで潰れる Chrome 標準ショートカットも無い。
+      #
+      # exact_match: true を足すとこの動作が消えるだけなので、レビューで指摘されても
+      # 「バグではなく意図」であることを確認してから判断すること。
       - name: Chrome tab switching
         application:
           # WMClass 完全一致。実測値は次のコマンドで確認できる:
@@ -127,8 +143,20 @@ in
       PartOf = [ "graphical-session.target" ];
     };
     Service = {
-      # --watch: 後から接続したキーボード (Bluetooth 等) も自動で対象にする。
-      ExecStart = "${xremap}/bin/xremap --watch ${configPath}";
+      # --watch=config,device の両方が要る。
+      #   device — 後から接続したキーボード (Bluetooth 等) も自動で対象にする
+      #   config — config.yml の変更を検知して設定を再読み込みする
+      #
+      # 裸の --watch は device のみ (xremap の CLI 定義が default_missing_value = "device")。
+      # ExecStart が参照するのは安定パス ~/.config/xremap/config.yml なので、設定内容が
+      # 変わってもユニットファイルは変化せず home-manager はサービスを再起動しない。
+      # config を external すると `home-manager switch` だけでは反映されず、毎回
+      # `systemctl --user restart xremap.service` が要る状態になる (実際にそうなった)。
+      #
+      # home-manager のシンボリックリンク差し替えでも検知できる。ConfigWatcher は
+      # 親ディレクトリを IN_CREATE | IN_MOVED_TO で監視し、ファイル名を照合して watch を
+      # 張り直す実装 (src/platform_linux/config_watcher.rs)。
+      ExecStart = "${xremap}/bin/xremap --watch=config,device ${configPath}";
       Restart = "on-failure";
       RestartSec = 3;
     };

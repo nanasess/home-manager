@@ -414,7 +414,10 @@ echo 'KERNEL=="uinput", GROUP="input", TAG+="uaccess", MODE:="0660", OPTIONS+="s
   | sudo tee /etc/udev/rules.d/99-input.rules
 echo uinput | sudo tee /etc/modules-load.d/uinput.conf
 sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo modprobe uinput
 ```
+
+最後の `modprobe` を省かないこと。`modules-load.d` は `systemd-modules-load.service` が早期ブートで処理する仕組みで、ファイルを置いた時点ではロードされない。ただし**この T2 Mac のカーネルでは `uinput` は組み込み**で、`/dev/uinput` が静的ノードとして最初から存在する（`lsmod | grep uinput` は空、`/sys/devices/virtual/misc/uinput` は存在）。つまり本機では `modules-load.d` も `modprobe` も実質 no-op で、効いているのは udev ルールと `input` グループだけ。手順は他機での再現のために残してある。
 
 **セキュリティ上のトレードオフ**: `input` グループ加入は、このユーザーアカウントに全アプリのキー入力を読む権限を与える（xremap の `doc/running_without_sudo.md` も明記）。画面ロック中もリマップは有効。承知のうえで採用している。「セキュリティ向上のため」と称してこの構成を勝手に変更しないこと。
 
@@ -426,6 +429,16 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 - **Wayland では GNOME Shell を再起動できない**（X11 の `Alt+F2` → `r` に相当する手段がない）ため、拡張のロードにログインし直しが要る
 
 権限が無い間、`xremap.service` は `Failed to prepare input devices: No device was selected!` で 3 秒ごとに再起動を繰り返す。これは想定内で、権限が付けば解消する。
+
+### 設定変更は `--watch=config,device` で反映される
+
+`ExecStart` が参照するのは安定パス `~/.config/xremap/config.yml` なので、**設定内容が変わってもユニットファイルは変化せず、home-manager はサービスを再起動しない**。裸の `--watch` は device 監視のみ（xremap の CLI 定義が `default_missing_value = "device"`）なので、config も監視対象に含めておかないと `home-manager switch` のたびに `systemctl --user restart xremap.service` が必要になる。
+
+home-manager のシンボリックリンク差し替えでも検知できる。`ConfigWatcher` が親ディレクトリを `IN_CREATE | IN_MOVED_TO` で監視し、ファイル名を照合して watch を張り直す実装になっている（`src/platform_linux/config_watcher.rs`）。
+
+### `exact_match` は既定の false のままにしてある
+
+`false` だと `Ctrl+Shift+H` のように修飾キーが増えた組み合わせにもマッチするが、**余った修飾キーは解放されず保持される**（`event_handler.rs` の `extra_modifiers.retain(|key| ... && !extra_modifiers_pressed.contains(key))`）。つまり出力は `Ctrl+Shift+PageUp` = Chrome のタブ並び替えになる。`H` / `L` のニーモニックと整合する有用な副産物で、これで潰れる Chrome 標準ショートカットも無い。`exact_match: true` を足すとこの動作が消えるだけなので、レビューで指摘されても意図的な選択であることを確認してから判断する。
 
 ### 動作確認
 
