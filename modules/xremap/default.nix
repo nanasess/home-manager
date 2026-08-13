@@ -32,8 +32,8 @@ in
   # 動作 (xprop / xlsclients に現れない) なので、この経路が必須になる。
   #
   # 拡張の置き場所は ~/.local/share/gnome-shell/extensions/。GNOME セッションの
-  # XDG_DATA_DIRS に ~/.nix-profile/share が入らない問題 (CLAUDE.md「Nix GUI アプリの
-  # ランチャー登録」) はここにも当てはまるため、xdg.dataFile でリンクする。
+  # XDG_DATA_DIRS に ~/.nix-profile/share が入らない問題
+  # (docs/nix-desktop-integration.md) はここにも当てはまるため、xdg.dataFile でリンクする。
   #
   # ■ 前提となる root 権限の設定 (home-manager では宣言できない)
   #

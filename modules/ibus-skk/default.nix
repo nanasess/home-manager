@@ -22,7 +22,7 @@ in
   #
   # という実装になっている (g_get_user_data_dir() は FIXME でコメントアウト)。
   # そのため Ghostty / pavucontrol で使っている「XDG_DATA_HOME に置く」回避策
-  # (CLAUDE.md「Nix GUI アプリのランチャー登録」) は IBus には効かない。
+  # (docs/nix-desktop-integration.md) は IBus には効かない。
   #
   # 一方 ibus-daemon は GNOME では systemd ユーザーサービス
   # (org.freedesktop.IBus.session.GNOME.service) として起動するため、

@@ -20,7 +20,7 @@ let
 
   # GNOME セッションの XDG_DATA_DIRS には ~/.nix-profile/share が含まれないため、
   # .desktop の Icon=<name> がテーマ検索で解決できずアイコンが出ない
-  # (CLAUDE.md「Nix GUI アプリのランチャー登録」参照)。
+  # (docs/nix-desktop-integration.md 参照)。
   # XDG_DATA_HOME (~/.local/share) 配下は GTK が常に検索するので、アイコンだけ
   # ここへリンクする。Icon= に絶対パスを書く手もあるが解像度が固定になるため、
   # 複数サイズを張って HiDPI でのスケーリングを効かせる。
