@@ -181,7 +181,7 @@ UDEV Gothic JPDOC (全角グリフ提供)
 
 設定: `modules/bluetooth-audio/`（`nanasess@ubuntu` のみ）。2026-08-12 / 08-13 の実機調査に基づく。
 
-接続不安定の原因は実際に 2 種類あった。どちらも「電波が弱い」「混線」ではなく、**単一コントローラ（Bluetooth / WiFi ワンチップ・アンテナ共用）の奪い合い**である。切り分けは下記 2 節の順で行う。
+接続不安定の原因は実際に 3 種類あった。いずれも「電波が弱い」「混線」ではなく、**単一コントローラ（Bluetooth / WiFi ワンチップ・アンテナ共用）の奪い合い**である。切り分けは下記 3 節の順で行う。
 
 ### 「接続がぷつぷつ切れる」はマルチポイントを最初に疑う
 
@@ -234,6 +234,31 @@ bluetoothctl show | grep -iE 'Discovering|Discoverable'
 BR/EDR 側で検出されているかは名前でも分かる。`LE-Bose QC Earbuds` は BLE アドバタイズ由来の名前で、この状態でペアリングしても A2DP に必要な BR/EDR のリンクキーは得られない。BR/EDR の inquiry は LE スキャンより時間がかかるため、**スキャン開始から 20 秒程度待って `Bose QC Earbuds`（`LE-` なし）になってから**操作する。
 
 なお `btmgmt` は bluetoothd を迂回してカーネルの mgmt ソケットを直接叩くため、bluetoothd 稼働中のペアリングには使わない。
+
+### 音が途切れるだけなら WiFi が 2.4GHz に落ちていないか見る
+
+**リンク品質が最良値のまま音だけ途切れる**場合はこれ。切断もプロファイル切替も起きず、再生だけがぷつぷつする症状で現れる。
+
+Bluetooth は 2.4GHz 固定なので、WiFi が同じ帯域に来ると直接干渉に加えてチップ内部の時分割も発生する。自宅 AP は同一 SSID で 3 バンド（ch 11 / ch 36 / ch 149）を出しており、バンドステアリングで 2.4GHz に寄せられることがある。
+
+```bash
+iwconfig wlp229s0 | grep -E 'Frequency|Bit Rate'
+```
+
+実測（2026-08-13、Chrome で Spotify を A2DP 再生中）:
+
+```text
+Frequency:2.462 GHz   Bit Rate=216.6 Mb/s   ← 音が途切れる（ch 11 = Bluetooth と同帯域）
+Frequency:5.745 GHz   Bit Rate=1.17 Gb/s    ← WiFi 再接続後、5 分間 30/30 サンプル正常
+```
+
+**`hcitool lq` / `rssi` を見ても分からない**のが厄介な点。これらは BR/EDR リンクの受信品質を示す指標で、同一チップ内での WiFi との時分割は反映しない。実際、途切れている最中も `Link quality: 255`（最大）/ `RSSI: 0`（ゴールデンレンジ）のままだった。**電波が良好なのに音が飛ぶときは、リンク品質ではなく WiFi の周波数を見る。**
+
+対処は WiFi を 5GHz に再接続するだけ。**`nmcli connection modify <conn> 802-11-wireless.band a` による 5GHz 固定は採用しない** — 会議で使う個室には 5GHz が届かず、フォールバックしないため圏外になる。
+
+会議時の影響は相対的に小さい。HFP（mSBC 16kHz モノラル、約 60〜90kbps）は A2DP ステレオ（SBC、約 200〜320kbps）の 1/3 以下しか帯域を使わないため、同じ 2.4GHz 環境でも競合の圧力が低い。つまり「個室でステレオ再生」が最も厳しい条件になる。
+
+次の候補は WiFi の省電力無効化（現在 `/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf` で `wifi.powersave = 3`）。省電力のスリープ/復帰のたびに共存の調停がリセットされるため。**未検証**（5GHz では競合しないため検証機会がない）。2.4GHz の個室で乱れたときに `sudo iw dev wlp229s0 set power_save off` で一時的に試すこと。バッテリー消費と引き換えになる。
 
 ### A2DP（ステレオ）と HFP（マイク）は排他
 
