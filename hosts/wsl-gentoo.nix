@@ -67,6 +67,9 @@ in
     # BROWSER から参照する。portage の /usr/bin/wsl-open ではなく Nix で宣言して
     # ホスト間の入手経路を揃える (CLAUDE.md「プラットフォーム非依存化の判断基準」)。
     wsl-open
+    # WSLg クリップボードの BMP を PNG に変換する wl-paste shim (下記) が使う。
+    # portage の /usr/bin/magick に依存させず Nix で入手経路を固定する。
+    imagemagick
   ];
 
   home.sessionVariables = {
@@ -231,6 +234,82 @@ in
       echo ""
       echo "--- コピー結果の確認 ---"
       ls /mnt/c/Windows/Fonts/UDEVGothic*.ttf 2>/dev/null || echo "(まだ見つかりません — UAC を拒否したか、別の理由で失敗しています)"
+    '';
+  };
+
+  # WSLg のクリップボードブリッジは Windows 側の画像を image/bmp としてのみ広告し、
+  # CF_PNG を落とす。しかもその BMP は BITMAPINFOHEADER.biCompression == 3
+  # (BI_BITFIELDS) で、Claude Code が同梱する sharp/libvips はこれをデコードできない。
+  # Claude Code は先頭が 'BM' のとき PNG 変換を試み、失敗した例外を無言で握り潰すため、
+  # Ctrl+V が「何も起きない」状態になる (anthropics/claude-code#50552。詳細な解析付きで
+  # 報告されたが修正されないまま stale クローズ。#77102 / #36420 も重複扱いで閉じられた)。
+  #
+  # 対処: image/png を「追加で」広告し、要求されたら ImageMagick で BMP から変換して返す。
+  # 既存の image/bmp 経路には手を入れないので、BMP を直接扱う他アプリの挙動は変わらない。
+  # ~/.local/bin は PATH 上で ~/.nix-profile/bin より前にあるため、この shim が優先される。
+  home.file.".local/bin/wl-paste" = {
+    executable = true;
+    text = ''
+      #!/bin/sh
+      real=${pkgs.wl-clipboard}/bin/wl-paste
+      magick=${pkgs.imagemagick}/bin/magick
+      grep=${pkgs.gnugrep}/bin/grep
+
+      # 引数を走査して介入すべきかを決める。位置と短縮形に依存しないようにする。
+      # --primary / --seat / --watch はクリップボード以外や別モードを対象にするため、
+      # 介入すると要求と違うデータを返してしまう。素通しして本物に委ねる。
+      mode=""
+      want=""
+      passthrough=""
+      pending=""
+      for arg in "$@"; do
+        if [ "$pending" = "type" ]; then
+          want="$arg"
+          pending=""
+          continue
+        fi
+        case "$arg" in
+          -l | --list-types) mode="list" ;;
+          -t | --type) pending="type" ;;
+          --type=*) want="''${arg#--type=}" ;;
+          -p | --primary | -s | --seat | --seat=* | -w | --watch) passthrough="yes" ;;
+        esac
+      done
+
+      if [ -n "$passthrough" ]; then
+        exec "$real" "$@"
+      fi
+
+      # 型一覧: bmp しか無いときだけ png を追加で見せる
+      if [ "$mode" = "list" ]; then
+        types=$("$real" "$@") || exit $?
+        printf '%s\n' "$types"
+        if printf '%s\n' "$types" | "$grep" -qx 'image/bmp' &&
+           ! printf '%s\n' "$types" | "$grep" -qx 'image/png'; then
+          printf 'image/png\n'
+        fi
+        exit 0
+      fi
+
+      # png 要求: 本物の png があれば委譲、無ければ bmp から変換
+      if [ "$want" = "image/png" ]; then
+        types=$("$real" -l 2>/dev/null) || exit 1
+        if printf '%s\n' "$types" | "$grep" -qx 'image/png'; then
+          exec "$real" "$@"
+        fi
+        if printf '%s\n' "$types" | "$grep" -qx 'image/bmp'; then
+          # パイプで繋ぐと終了状態が magick のものになり、取得失敗を握り潰す。
+          # 一時ファイルに落として取得側の終了状態を確かめてから変換する。
+          tmp=$(mktemp) || exit 1
+          trap 'rm -f "$tmp"' EXIT HUP INT TERM
+          "$real" --type image/bmp > "$tmp" || exit 1
+          "$magick" bmp:"$tmp" png:-
+          exit $?
+        fi
+        exit 1
+      fi
+
+      exec "$real" "$@"
     '';
   };
 
