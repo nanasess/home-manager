@@ -255,27 +255,55 @@ in
       magick=${pkgs.imagemagick}/bin/magick
       grep=${pkgs.gnugrep}/bin/grep
 
+      # 引数を走査して介入すべきかを決める。位置と短縮形に依存しないようにする。
+      # --primary / --seat / --watch はクリップボード以外や別モードを対象にするため、
+      # 介入すると要求と違うデータを返してしまう。素通しして本物に委ねる。
+      mode=""
+      want=""
+      passthrough=""
+      pending=""
+      for arg in "$@"; do
+        if [ "$pending" = "type" ]; then
+          want="$arg"
+          pending=""
+          continue
+        fi
+        case "$arg" in
+          -l | --list-types) mode="list" ;;
+          -t | --type) pending="type" ;;
+          --type=*) want="''${arg#--type=}" ;;
+          -p | --primary | -s | --seat | --seat=* | -w | --watch) passthrough="yes" ;;
+        esac
+      done
+
+      if [ -n "$passthrough" ]; then
+        exec "$real" "$@"
+      fi
+
       # 型一覧: bmp しか無いときだけ png を追加で見せる
-      case "$1" in
-        -l | --list-types)
-          types=$("$real" "$@") || exit $?
-          printf '%s\n' "$types"
-          if printf '%s\n' "$types" | "$grep" -qx 'image/bmp' &&
-             ! printf '%s\n' "$types" | "$grep" -qx 'image/png'; then
-            printf 'image/png\n'
-          fi
-          exit 0
-          ;;
-      esac
+      if [ "$mode" = "list" ]; then
+        types=$("$real" "$@") || exit $?
+        printf '%s\n' "$types"
+        if printf '%s\n' "$types" | "$grep" -qx 'image/bmp' &&
+           ! printf '%s\n' "$types" | "$grep" -qx 'image/png'; then
+          printf 'image/png\n'
+        fi
+        exit 0
+      fi
 
       # png 要求: 本物の png があれば委譲、無ければ bmp から変換
-      if [ "$1" = "--type" ] && [ "$2" = "image/png" ]; then
+      if [ "$want" = "image/png" ]; then
         types=$("$real" -l 2>/dev/null) || exit 1
         if printf '%s\n' "$types" | "$grep" -qx 'image/png'; then
           exec "$real" "$@"
         fi
         if printf '%s\n' "$types" | "$grep" -qx 'image/bmp'; then
-          "$real" --type image/bmp | "$magick" bmp:- png:-
+          # パイプで繋ぐと終了状態が magick のものになり、取得失敗を握り潰す。
+          # 一時ファイルに落として取得側の終了状態を確かめてから変換する。
+          tmp=$(mktemp) || exit 1
+          trap 'rm -f "$tmp"' EXIT HUP INT TERM
+          "$real" --type image/bmp > "$tmp" || exit 1
+          "$magick" bmp:"$tmp" png:-
           exit $?
         fi
         exit 1
