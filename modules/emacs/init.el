@@ -712,14 +712,14 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
 (defun my/copy-buffer-file-name ()
   "Copy full path to kill ring."
   (interactive)
-  (if-let ((f (buffer-file-name)))
+  (if-let* ((f (buffer-file-name)))
       (progn (kill-new f) (message "Copied: %s" f))
     (message "Buffer has no file")))
 
 (defun my/copy-buffer-file-name-nondirectory ()
   "Copy file name only to kill ring."
   (interactive)
-  (if-let ((f (buffer-file-name)))
+  (if-let* ((f (buffer-file-name)))
       (let ((name (file-name-nondirectory f)))
         (kill-new name) (message "Copied: %s" name))
     (message "Buffer has no file")))
@@ -727,7 +727,7 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
 (defun my/copy-buffer-directory ()
   "Copy directory to kill ring."
   (interactive)
-  (if-let ((f (buffer-file-name)))
+  (if-let* ((f (buffer-file-name)))
       (let ((dir (file-name-directory f)))
         (kill-new dir) (message "Copied: %s" dir))
     (message "Buffer has no file")))
@@ -735,7 +735,7 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
 (defun my/copy-buffer-file-name-with-line ()
   "Copy file:line format to kill ring."
   (interactive)
-  (if-let ((f (buffer-file-name)))
+  (if-let* ((f (buffer-file-name)))
       (let ((loc (format "%s:%d" f (line-number-at-pos))))
         (kill-new loc) (message "Copied: %s" loc))
     (message "Buffer has no file")))
