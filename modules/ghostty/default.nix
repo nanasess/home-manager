@@ -54,6 +54,43 @@ let
     working-directory = "/home/nanasess";
   };
 
+  # noctty (amanthanvi/noctty、旧 winghostty) 固有の設定
+  # ConPTY 経由で wsl.exe を spawn する構造 (vsock ブリッジを持たない) のため、
+  # WSL への接続方法は GhostInTheWSL ではなく Ghostty Windows port と同じになる。
+  # よって windowsSettings をそのまま使う。
+  # - command: WSL はプロファイルピッカーには出るが、明示指定しない限り既定シェルには
+  #   ならない (docs/windows.md#shells: `wsl.exe --status` が健全と報告しても起動が
+  #   失敗しうるため、暗黙の既定にしない設計)。
+  #   "direct:" プレフィックスは src/config/command.zig で対応済み。
+  # - working-directory は指定しない。--cd ~ で WSL 側のホームに入るため不要。
+  #   (ghostinthewslSettings の working-directory はブリッジ固有の回避策であり、
+  #   ConPTY 経由の noctty に POSIX パスを渡しても意味がない)
+  # - *-inherit-working-directory: 新規ウィンドウ/タブ/split が「起動プロセスの
+  #   Windows cwd」を引き継いでしまうため 3 つとも無効化する。
+  #   継承の可否は文脈ごとに別オプションで決まる
+  #   (src/apprt/surface.zig:757-763 の shouldInheritWorkingDirectory:
+  #    .window/.tab/.split → window-/tab-/split-inherit-working-directory)。
+  #   既定はいずれも true (Config.zig:1981/1986/1991) なので、タブだけ直したい
+  #   場合でも tab- を明示する必要がある。
+  #   noctty は WSL 直起動を prepareCommand (src/config/windows_shell.zig:257-280) で
+  #   書き換える: ユーザーが書いた --cd と裸の ~ を prepareWslDirect が無条件に除去し
+  #   (:712-721)、代わりに解決済み cwd を --cd として注入する (:735-740)。
+  #   解決順は「継承/明示 cwd > working-directory = home」なので、この設定が既定の
+  #   true のままだと command の --cd ~ は常に無視される。
+  #   初回タブは cwd 未確定で --cd ~ になるが、その際 safeCurrentDirectoryWithCurrent
+  #   (:230-241) が起動プロセスの Windows cwd を端末の pwd として採用する
+  #   ("using inherited windows cwd")。zig-out\bin から起動していると新規タブが
+  #   それを継承して /mnt/c/.../zig-out/bin で zsh が立ち上がり、blocked な .envrc に
+  #   direnv が反応して p10k instant prompt 警告を誘発する。
+  #   WSL 側には Ghostty の shell integration が届かず OSC 7 が来ないので
+  #   (ghostinthewsl と同じ制約)、cwd 継承はそもそも正しく機能しない。無効化して
+  #   常に working-directory = home (= wsl.exe --cd ~) を使わせる。
+  nocttySettings = windowsSettings // {
+    window-inherit-working-directory = false;
+    tab-inherit-working-directory = false;
+    split-inherit-working-directory = false;
+  };
+
   # home-manager の programs.ghostty が内部で使っているのと同じフォーマッタ
   # (listsAsDuplicateKeys = true で keybind = ... 行を複数行に展開)
   renderConfig = lib.generators.toKeyValue {
@@ -63,12 +100,13 @@ let
 
   configFile = pkgs.writeText "ghostty-config.ghostty" (renderConfig windowsSettings);
   ghostinthewslConfigFile = pkgs.writeText "config.ghostinthewsl" (renderConfig ghostinthewslSettings);
+  nocttyConfigFile = pkgs.writeText "noctty-config.ghostty" (renderConfig nocttySettings);
 in
 {
-  # settings / configFile / ghostinthewslConfigFile を
+  # settings / configFile / ghostinthewslConfigFile / nocttyConfigFile を
   # 他のモジュール (hosts/*.nix) から参照できるように公開
   _module.args.ghostty = {
-    inherit settings configFile ghostinthewslConfigFile;
+    inherit settings configFile ghostinthewslConfigFile nocttyConfigFile;
   };
 
   # xterm-ghostty の terminfo を ~/.terminfo に配置する。
