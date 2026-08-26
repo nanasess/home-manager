@@ -188,7 +188,7 @@
                         :source "elpaca-menu-lock-file" :id
                         doom-themes :type git :protocol https :inherit
                         t :depth treeless :ref
-                        "cc7686783e5e6e4174a345c768047d524f0dd54f"))
+                        "d114523c4c436d899170afe9ea9b99cd214c344f"))
  (easy-kill :source "elpaca-menu-lock-file" :recipe
             (:package "easy-kill" :fetcher github :repo
                       "leoliu/easy-kill" :files
