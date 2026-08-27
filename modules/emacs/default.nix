@@ -4,19 +4,11 @@ let
   # Emacs treesit が探すファイル名 (拡張子なし) → nixpkgs の grammar 派生物。
   # キー名は各 major mode が `treesit-ready-p` などに渡す言語シンボルに合わせる
   # (例: csharp-ts-mode は 'c-sharp を使うため、ファイル名も libtree-sitter-c-sharp.so にする)。
-  # Emacs 30.2 内蔵 php-ts-mode の font-lock クエリは tree-sitter-php v0.23.x の
-  # ノード型 (例: var_modifier) に依存している。nixpkgs の tree-sitter-php は
-  # 0.24.2 でこのノードが削除されているため `treesit-query-error` が発生する。
-  # php-ts-mode--language-source-alist が要求する v0.23.11 にダウングレードする。
-  treesitPhp = pkgs.tree-sitter-grammars.tree-sitter-php.overrideAttrs (_: rec {
-    version = "0.23.11";
-    src = pkgs.fetchFromGitHub {
-      owner = "tree-sitter";
-      repo  = "tree-sitter-php";
-      rev   = "v${version}";
-      hash  = "sha256-+CnUnrNRaD+CejyYjqelMYA1K3GN/WPeZBJoP2y5cmI=";
-    };
-  });
+  # Emacs 31.1 内蔵 php-ts-mode は treesit-library-abi-version >= 15 の環境で
+  # tree-sitter-php v0.24.2 を要求する (php-ts-mode--language-source-alist の
+  # :commit が ABI で分岐する)。nixpkgs 標準が 0.24.2 なのでそのまま使う。
+  # 30.2 時代に必要だった v0.23.11 へのダウングレードは、31.1 では逆に
+  # treesit-query-error を招くため復活させないこと。
 
   treesitGrammarMap = with pkgs.tree-sitter-grammars; {
     typescript = tree-sitter-typescript;
@@ -30,7 +22,7 @@ let
     bash       = tree-sitter-bash;
     c-sharp    = tree-sitter-c-sharp;
     dockerfile = tree-sitter-dockerfile;
-    php        = treesitPhp;
+    php        = tree-sitter-php;
     phpdoc     = tree-sitter-phpdoc;
   };
 
@@ -69,7 +61,7 @@ in
   ];
 
   # GTK_IM_MODULE は GTK の IM モジュール選択、XMODIFIERS は X11 の XIM 用。
-  # どちらも pgtk ビルド (ubuntu の emacs30-pgtk) + Wayland では効かない
+  # どちらも pgtk ビルド (ubuntu の emacs31-pgtk) + Wayland では効かない
   # (GNOME Shell が text-input-v3 で直接繋ぐため)。そちらは init.el の
   # my/pgtk-disable-im-context が pgtk-use-im-context で無効化している。
   # ここの 2 行は X11 (WSLg / XWayland) 経由で起動した場合の保険として残す。
