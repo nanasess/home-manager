@@ -66,7 +66,7 @@ in
   # emacs は modules/emacs の emacs.desktop / emacsclient.desktop (Icon=emacs) 用。
   # apt の emacs-common が /usr/share/icons/hicolor に同名アイコンを置いており
   # 未配置でも表示自体はされるが、それは apt 版に依存した偶然なのでここで
-  # nixpkgs 側 (実際に起動する emacs30-pgtk) のアイコンを優先させる。
+  # nixpkgs 側 (実際に起動する emacs31-pgtk) のアイコンを優先させる。
   xdg.dataFile =
     iconLinks
       {
@@ -75,7 +75,7 @@ in
         sizes = [ "16x16" "32x32" "128x128" "256x256" "512x512" ];
       }
     // iconLinks {
-      package = pkgs.emacs30-pgtk;
+      package = pkgs.emacs31-pgtk;
       icon = "emacs";
       sizes = [ "16x16" "24x24" "32x32" "48x48" "128x128" "scalable" ];
     };
@@ -116,7 +116,7 @@ in
     # Wayland セッションでは pgtk ビルドを使う。XWayland (X11) 経由を避けることで
     # GTK の長年のバグ (X11 接続喪失時に daemon ごとクラッシュ / GNOME #85715) を
     # 回避し、HiDPI スケーリングと IME 連携も Wayland ネイティブになる。
-    emacs30-pgtk
+    emacs31-pgtk
     walker
     elephant
     libqalculate

@@ -60,7 +60,7 @@ in
     # WSLg では Weston が Wayland コンポジタとして動作し、Wayland ネイティブアプリは
     # XWayland を経由せず Weston に直接接続する。pgtk ビルドにすることで XWayland の
     # レイヤを外し、GTK の X11 接続喪失クラッシュ (GNOME #85715) を原理的に回避する。
-    emacs30-pgtk
+    emacs31-pgtk
     # 字形本体の Noto。home.nix 共通から移動 (Ubuntu のみ OS 静的 Noto に委譲する方針)。
     noto-fonts
     # WSL から Windows 既定ブラウザを開く opener (内部で powershell.exe Start を呼ぶ)。
