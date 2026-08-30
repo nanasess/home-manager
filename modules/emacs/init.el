@@ -443,6 +443,17 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
   (defun risky-local-variable-p (sym &optional _ignored) nil)
   (defun safe-local-variable-p (sym val) t)
 
+  ;; Emacs 31.1 の newcomers-presets テーマ (etc/themes/) 由来。
+  ;; テーマを load-theme で丸ごと有効にすると setopt で設定した値が上書きされ
+  ;; (completion-styles が orderless から basic/emacs22/flex に戻る)、
+  ;; prog-mode-hook に flymake/flyspell が入って flycheck と二重になる。
+  ;; そのため衝突しない項目だけを個別に採る。
+  (context-menu-mode 1)
+  (setopt frame-resize-pixelwise t
+          window-resize-pixelwise t
+          shell-command-prompt-show-cwd t
+          compilation-scroll-output 'first-error)
+
   ;; treesit
   (setopt treesit-font-lock-level 4)
 
@@ -471,6 +482,7 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
   :custom
   (dired-bind-jump nil)
   (dired-dwim-target t)
+  (dired-auto-revert-buffer t)
   :config
   (require 'dired-x)
   :bind (:map dired-mode-map
@@ -499,6 +511,19 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
                                  (split-string (or (getenv "BROWSER") "") ":" t))))
     (setopt browse-url-browser-function #'browse-url-generic
             browse-url-generic-program program)))
+
+;; 以下 3 つも newcomers-presets 由来 (いずれも Emacs 同梱、既定は無効)。
+(use-package saveplace
+  :ensure nil
+  :hook (after-init . save-place-mode))
+
+(use-package which-key
+  :ensure nil
+  :hook (after-init . which-key-mode))
+
+(use-package editorconfig
+  :ensure nil
+  :hook (after-init . editorconfig-mode))
 
 ;;;; ============================================================
 ;;;; Theme & UI
