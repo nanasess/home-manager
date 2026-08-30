@@ -14,6 +14,12 @@
                      gcs-done)))
 
 (setopt load-prefer-newer t)
+;; NOTE: newcomers-presets 由来の frame-inhibit-implied-resize t は入れない。
+;; init.el:139-147 で起動後に set-face-attribute でデフォルトフォントを
+;; UDEV Gothic JPDOC に差し替えているため、暗黙リサイズを止めるとフレームの
+;; ピクセルサイズが固定されたまま文字セルだけ大きくなり、行数・桁数が減る
+;; (ウィンドウが縮み、幅不足でスプラッシュの GNU ロゴも出なくなる)。
+;; 既定の '(tab-bar-lines) のままにしておくこと。
 (push '(tool-bar-lines . 0) default-frame-alist)
 
 ;; doom-solarized-light のフラッシュ防止
