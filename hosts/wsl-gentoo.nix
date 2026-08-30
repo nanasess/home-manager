@@ -122,6 +122,20 @@ in
       ${pkgs.ghostty}/share/ghostty/themes/ "$gitw_dir/themes/"
   '';
 
+  # noctty (amanthanvi/noctty、旧 winghostty) 向け設定を %LOCALAPPDATA%\noctty\ にコピー
+  # 設定探索は src/config/file_load.zig。Windows では XDG ベース解決で
+  # $XDG_CONFIG_HOME 未設定時に %LOCALAPPDATA% を見る (src/os/xdg.zig、他 2 つと同じ)。
+  # loadDefaultFiles が読むのは %LOCALAPPDATA%\ghostty\config (拡張子なし・legacy) と
+  # %LOCALAPPDATA%\noctty\config.ghostty の 2 つだけ。Ghostty Windows port 用に置いている
+  # %LOCALAPPDATA%\ghostty\config.ghostty (拡張子あり) は loadDefaultFiles の対象外なので
+  # 混線しない (preferredXdgPath = 設定を開く UI 用の解決にのみ登場する)。
+  # themes/ は同期しない。noctty は exe の隣に share/ghostty/themes/ を同梱しており
+  # (src/config/theme.zig の探索 2 番目)、theme = "iTerm2 Solarized Light" もその中にある。
+  home.activation.nocttyConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    noctty_dir="/mnt/c/Users/${config.home.username}/AppData/Local/noctty"
+    install -Dm644 ${ghostty.nocttyConfigFile} "$noctty_dir/config.ghostty"
+  '';
+
 
   # LibreHardwareMonitor -> Mackerel カスタムメトリック (modules/mackerel/)
   # Windows 上の mackerel-agent が data.json を取得しメトリック化する。
