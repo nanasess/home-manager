@@ -136,6 +136,97 @@ in
     install -Dm644 ${ghostty.nocttyConfigFile} "$noctty_dir/config.ghostty"
   '';
 
+  # noctty の同梱 ConPTY (conpty.dll + OpenConsole.exe) を自前ビルドへ配置するヘルパー
+  #
+  # noctty は in-box conhost の代わりに Microsoft の ConPTY 再頒布物を使う機構を持つ
+  # (noctty#129 / #132)。exe と同じディレクトリに 2 ファイルを置くだけで自動的に
+  # 切り替わる (src/pty.zig の loadBundled が exe_dir を見る。config オプションは無く
+  # NOCTTY_CONPTY=inbox で強制無効化のみ)。
+  #
+  # これは見た目の問題ではなく実測差がある (#143):
+  # - in-box conhost は APC を握り潰すため kitty graphics (画像表示) が一切通らない。
+  #   さらに Primary DA を横取りして自分で答えるので、端末判定が conhost 相当になる。
+  # - バルク描画も in-box では Plain scroll 0.065s / Unicode 0.176s だが、同梱では
+  #   0.023s / 0.123s (同一バイナリの A/B。前者は GhostInTheWSL と同値)。
+  #
+  # 公式リリースには scripts/package-windows.ps1 が Install-ConPtyRedist で入れるが、
+  # zig build は staging しない。zig-out を消すと道連れになるので、ビルドし直したら
+  # これを実行する。
+  #
+  # 取得元とハッシュはすべて checkout 内の dist/windows/conpty-redist.json から読む。
+  # noctty 側が pin を上げれば追随するので、ここに版を焼き込まない。
+  # 検証は src/update/conpty_redist.zig と同じ 3 ガード (schemaVersion / packageId /
+  # license) + nupkg と展開後 2 ファイルの SHA256。
+  home.file.".local/bin/install-noctty-conpty" = {
+    executable = true;
+    text = ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      CURL=${pkgs.curl}/bin/curl
+      JQ=${pkgs.jq}/bin/jq
+      UNZIP=${pkgs.unzip}/bin/unzip
+      SHA=${pkgs.coreutils}/bin/sha256sum
+
+      repo="''${1:-/mnt/c/Users/${config.home.username}/source/repos/nanasess/winghostty}"
+      pin="$repo/dist/windows/conpty-redist.json"
+      dest="$repo/zig-out/bin"
+      cache="''${XDG_CACHE_HOME:-$HOME/.cache}/noctty-conpty"
+
+      die() { echo "ERROR: $*" >&2; exit 1; }
+      sha_is() { [ -r "$1" ] && [ "$("$SHA" "$1" | cut -d' ' -f1)" = "$2" ]; }
+
+      [ -r "$pin" ] || die "pin が読めません: $pin"
+      [ -d "$dest" ] || die "配置先がありません: $dest (先に zig build を実行)"
+
+      schema=$("$JQ" -r '.schemaVersion' "$pin")
+      pkgid=$("$JQ" -r '.packageId' "$pin")
+      license=$("$JQ" -r '.license' "$pin")
+      [ "$schema" = "1" ] || die "未対応の schemaVersion: $schema"
+      [ "$pkgid" = "Microsoft.Windows.Console.ConPTY" ] || die "想定外の packageId: $pkgid"
+      [ "$license" = "MIT" ] || die "想定外の license: $license"
+
+      version=$("$JQ" -r '.version' "$pin")
+      url=$("$JQ" -r '.nupkg.url' "$pin")
+      nupkg_sha=$("$JQ" -r '.nupkg.sha256' "$pin")
+      dll_path=$("$JQ" -r '.architectures.x64.conptyDll.entryPath' "$pin")
+      dll_sha=$("$JQ" -r '.architectures.x64.conptyDll.sha256' "$pin")
+      exe_path=$("$JQ" -r '.architectures.x64.openConsoleExe.entryPath' "$pin")
+      exe_sha=$("$JQ" -r '.architectures.x64.openConsoleExe.sha256' "$pin")
+
+      echo "pin: $pkgid $version"
+
+      if sha_is "$dest/conpty.dll" "$dll_sha" && sha_is "$dest/OpenConsole.exe" "$exe_sha"; then
+        echo "OK: 配置済み (SHA256 一致)。何もしません"
+        exit 0
+      fi
+
+      mkdir -p "$cache/$version"
+      nupkg="$cache/$version/package.nupkg"
+      if ! sha_is "$nupkg" "$nupkg_sha"; then
+        echo "取得: $url"
+        "$CURL" -fsSL -o "$nupkg" "$url" || die "ダウンロード失敗"
+        sha_is "$nupkg" "$nupkg_sha" || die "nupkg の SHA256 が pin と不一致"
+      fi
+      echo "nupkg SHA256 一致"
+
+      tmp=$(mktemp -d)
+      trap 'rm -rf "$tmp"' EXIT
+      "$UNZIP" -o -q "$nupkg" "$dll_path" "$exe_path" -d "$tmp" || die "展開失敗"
+      sha_is "$tmp/$dll_path" "$dll_sha" || die "conpty.dll の SHA256 が pin と不一致"
+      sha_is "$tmp/$exe_path" "$exe_sha" || die "OpenConsole.exe の SHA256 が pin と不一致"
+      echo "ペイロード SHA256 一致"
+
+      locked="配置失敗。noctty 起動中はロックされます。全ウィンドウを閉じて再実行してください"
+      install -m644 "$tmp/$dll_path" "$dest/conpty.dll" || die "$locked"
+      install -m755 "$tmp/$exe_path" "$dest/OpenConsole.exe" || die "$locked"
+
+      echo "配置完了: $dest/{conpty.dll,OpenConsole.exe}"
+      echo "反映には noctty の全ウィンドウを閉じて再起動が必要です"
+      echo "確認: bash ~/check-graphics-protocol.sh の T3 が PASS になれば有効"
+    '';
+  };
+
 
   # LibreHardwareMonitor -> Mackerel カスタムメトリック (modules/mackerel/)
   # Windows 上の mackerel-agent が data.json を取得しメトリック化する。
