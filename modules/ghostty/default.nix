@@ -1,3 +1,26 @@
+# Ghostty 系ターミナルの共有設定。
+#
+# Windows 側で動く実装が 3 つあり、いずれも同じ `settings` から設定を生成する。
+# **常用は noctty**、他の 2 つは比較・退避用として維持している (経緯は #143、旧 #116)。
+#
+# | 実装 | 位置づけ | WSL への接続 |
+# |---|---|---|
+# | noctty (amanthanvi/noctty) | **主 (常用)** | ConPTY 経由で `wsl.exe` を spawn |
+# | GhostInTheWSL (Codavo/ghostinthewsl) | 従 (退避先) | Hyper-V ソケット + vsock で Linux PTY に直結 |
+# | Ghostty Windows port (PR #12167) | 従 (参照実装) | ConPTY 経由 |
+#
+# noctty を主にした判断 (#143):
+# - #116 で唯一残った不可理由「ConPTY 由来のバルク描画 2.8 倍差」は、noctty の
+#   同梱 ConPTY に切り替えると消える (Plain scroll は GhostInTheWSL と同値)。
+#   同じ切り替えで kitty graphics も通るようになる
+# - 開発の継続性の差が決定的。過去 30 日で noctty 72 コミット / GhostInTheWSL 0。
+#   自分が出した PR は noctty で最短 1 時間マージ、GhostInTheWSL では 30 日放置
+# - IME・フォントのスタイル解決・ホイール座標も noctty が優位
+#
+# **同梱 ConPTY は自前ビルドには入らない**。`zig build` は staging しないので、
+# ビルドし直したら `install-noctty-conpty` (hosts/wsl-gentoo.nix) を実行すること。
+# 忘れると画像プロトコルとバルク描画性能が同時に失われる。
+
 { pkgs, lib, ... }:
 
 let
@@ -38,7 +61,12 @@ let
     font-family = windowsFontFamily;
   };
 
-  # GhostInTheWSL (Codavo/ghostinthewsl) 固有の設定
+  # GhostInTheWSL (Codavo/ghostinthewsl) 固有の設定 — **従 (退避先)**
+  #
+  # 2026-08-02 を最後に上流が停止しており (#143)、常用は noctty へ移した。
+  # vsock 直結という設計はこれにしか無いため、noctty 側に致命的な回帰が出たときの
+  # 退避先として設定を維持する。
+  #
   # ConPTY を経由せず Hyper-V ソケットのブリッジで WSL2 の Linux PTY に直結するため、
   # Windows port のような command = "direct:wsl.exe ..." は不要 (ブリッジが WSL 接続を担う)。
   # - working-directory: デフォルト (inherit 相当) だと起動プロセス (Windows 側 exe) の
@@ -54,7 +82,8 @@ let
     working-directory = "/home/nanasess";
   };
 
-  # noctty (amanthanvi/noctty、旧 winghostty) 固有の設定
+  # noctty (amanthanvi/noctty、旧 winghostty) 固有の設定 — **主 (常用)**
+  #
   # ConPTY 経由で wsl.exe を spawn する構造 (vsock ブリッジを持たない) のため、
   # WSL への接続方法は GhostInTheWSL ではなく Ghostty Windows port と同じになる。
   # よって windowsSettings をそのまま使う。
@@ -65,6 +94,9 @@ let
   # - working-directory は指定しない。--cd ~ で WSL 側のホームに入るため不要。
   #   (ghostinthewslSettings の working-directory はブリッジ固有の回避策であり、
   #   ConPTY 経由の noctty に POSIX パスを渡しても意味がない)
+  # - 同梱 ConPTY はここでは設定できない。config オプションが無く、conpty.dll と
+  #   OpenConsole.exe を exe の隣に置くかどうかで決まる (src/pty.zig の loadBundled)。
+  #   配置は install-noctty-conpty (hosts/wsl-gentoo.nix) が行う。
   # - *-inherit-working-directory: 新規ウィンドウ/タブ/split が「起動プロセスの
   #   Windows cwd」を引き継いでしまうため 3 つとも無効化する。
   #   継承の可否は文脈ごとに別オプションで決まる
