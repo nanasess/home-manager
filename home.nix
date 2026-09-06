@@ -48,6 +48,9 @@
     # Development
     gh
     uv
+    # herdr — Claude Code 等のエージェントを workspace/tab/pane で多重化する TUI。
+    # headless サーバー + アタッチ型クライアント構成 (tmux 的にデタッチで生存)。
+    herdr
     terraform
     azure-cli
     awscli2
