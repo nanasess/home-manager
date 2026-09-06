@@ -168,7 +168,7 @@ in
       UNZIP=${pkgs.unzip}/bin/unzip
       SHA=${pkgs.coreutils}/bin/sha256sum
 
-      repo="''${1:-/mnt/c/Users/${config.home.username}/source/repos/nanasess/winghostty}"
+      repo="''${1:-/mnt/c/Users/${config.home.username}/source/repos/nanasess/noctty}"
       pin="$repo/dist/windows/conpty-redist.json"
       dest="$repo/zig-out/bin"
       cache="''${XDG_CACHE_HOME:-$HOME/.cache}/noctty-conpty"
