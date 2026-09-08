@@ -114,9 +114,13 @@ let
   #   ("using inherited windows cwd")。zig-out\bin から起動していると新規タブが
   #   それを継承して /mnt/c/.../zig-out/bin で zsh が立ち上がり、blocked な .envrc に
   #   direnv が反応して p10k instant prompt 警告を誘発する。
-  #   WSL 側には Ghostty の shell integration が届かず OSC 7 が来ないので
-  #   (ghostinthewsl と同じ制約)、cwd 継承はそもそも正しく機能しない。無効化して
-  #   常に working-directory = home (= wsl.exe --cd ~) を使わせる。
+  #   OSC 7 自体は modules/zsh で shell integration を手動ロードするようにしたので
+  #   WSL 側から届くようになった (自動注入は Windows 側 env の境界で届かない)。
+  #   noctty 側の受け口も用意されている (windows_shell.zig の osc7PathToLocal /
+  #   isWslPath が POSIX パスを WSL 形式のまま保持し、後続の WSL シェルへ継承する)
+  #   が、実機での継承挙動は未検証のため無効化は維持する。常に
+  #   working-directory = home (= wsl.exe --cd ~) を使わせる。
+  #   新規タブが期待どおりの cwd で開くことを確認できたら、この 3 行は外せる。
   nocttySettings = windowsSettings // {
     window-inherit-working-directory = false;
     tab-inherit-working-directory = false;
