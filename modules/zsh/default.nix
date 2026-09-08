@@ -193,8 +193,9 @@
         #
         # noctty / GhostInTheWSL / Ghostty Windows port はいずれも Windows 側の
         # プロセスとして動くため、Ghostty が自動注入に使う GHOSTTY_RESOURCES_DIR と
-        # GHOSTTY_SHELL_FEATURES が WSL 側のシェルに届かない (noctty に WSLENV の
-        # 処理は無く、wsl.exe が素通しするのは TERM だけ)。noctty 自身も
+        # GHOSTTY_SHELL_FEATURES が WSL 側のシェルに届かない (ConPTY 経由では TERM
+        # すら自動では渡らない。TERM だけは modules/ghostty の env = WSLENV=TERM で
+        # 明示的に伝播させており、この判定条件が成立するのはそのため)。noctty 自身も
         # src/config/windows_shell.zig の shellIntegrationDiagnostic で
         # 「WSL は Linux シェル側で有効化せよ」と案内しているので手動でロードする。
         #

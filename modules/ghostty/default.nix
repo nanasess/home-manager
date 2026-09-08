@@ -56,8 +56,21 @@ let
   # - command: 起動時に WSL の Gentoo-systemd ディストリをログインシェルで立ち上げる
   #   "direct:" プレフィックスを付けて /bin/sh -c ラップを回避 (Windows には sh が無い)
   #   --cd ~ でホームディレクトリに入る (WezTerm の default_cwd と等価)
+  # - env = WSLENV=TERM: ConPTY 経由で wsl.exe を起動する構成では、Windows 側
+  #   プロセスの env は WSL のシェルに届かない。TERM も例外ではなく、何もしないと
+  #   WSL 側の既定である xterm-256color になる。実測:
+  #     TERM=probe wsl.exe -d Gentoo-systemd -- sh -c 'echo $TERM'  → xterm-256color
+  #     TERM=probe WSLENV=TERM wsl.exe ... 同上                      → probe
+  #   WSLENV は wsl.exe 自身の env から読まれるので、ghostty の env オプションで
+  #   注入すれば Windows 側のユーザー環境変数 (setx) を触らずに伝播できる。これで
+  #   xterm-ghostty が WSL に届き、下で ~/.terminfo に置いている terminfo が実際に
+  #   引かれる (同期出力・styled underline 等)。modules/zsh の shell integration も
+  #   この TERM を判定条件にしている。
+  #   GHOSTTY_RESOURCES_DIR / TERMINFO は載せない。どちらも Windows パスで、WSL から
+  #   読むと 9p 経由になる。統合スクリプトは modules/zsh が Nix ストアから source する。
   windowsSettings = settings // {
     command = "direct:wsl.exe -d Gentoo-systemd --cd ~";
+    env = [ "WSLENV=TERM" ];
     font-family = windowsFontFamily;
   };
 
@@ -164,8 +177,11 @@ in
 
   # xterm-ghostty の terminfo を ~/.terminfo に配置する。
   #
-  # wsl-gentoo は端末が Windows 側で動く (Ghostty Windows port / GhostInTheWSL) ため
-  # WSL 側に ghostty パッケージを入れておらず、TERM=xterm-ghostty だけが渡ってくる。
+  # wsl-gentoo は端末が Windows 側で動く (noctty / Ghostty Windows port /
+  # GhostInTheWSL) ため WSL 側に ghostty パッケージを入れておらず、
+  # TERM=xterm-ghostty だけが渡ってくる。ConPTY 経由の noctty / Windows port では
+  # それも自動では渡らないので、上の env = WSLENV=TERM で明示的に伝播させている
+  # (GhostInTheWSL はブリッジが Linux 側プロセスの env を直接組むので不要)。
   # terminfo が無いと zsh/readline が行編集・履歴表示を崩すので、terminfo だけを
   # 独立 output (クロージャ 4.9 KiB、ghostty 本体を引き込まない) から供給する。
   #
