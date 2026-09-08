@@ -91,9 +91,26 @@ let
   #   ならない (docs/windows.md#shells: `wsl.exe --status` が健全と報告しても起動が
   #   失敗しうるため、暗黙の既定にしない設計)。
   #   "direct:" プレフィックスは src/config/command.zig で対応済み。
-  # - working-directory は指定しない。--cd ~ で WSL 側のホームに入るため不要。
+  # - working-directory は指定しない。Windows では probableCliEnvironment() が常に
+  #   false を返すため (Config.zig:4846-4849)、finalize が既定で .home を選び、
+  #   command が WSL 起動のときは .home のまま残る (:4361-4368)。結果として
+  #   prepareCommandWithLookup (windows_shell.zig:391-395) が target_cwd = "~" を選び、
+  #   prepareWslDirect が --cd ~ を注入する (command に書いた --cd ~ 自体は無条件に
+  #   除去されるので、効いているのはこの経路)。`noctty.com +show-config` で
+  #   working-directory = home と表示されることを確認済み。
   #   (ghostinthewslSettings の working-directory はブリッジ固有の回避策であり、
   #   ConPTY 経由の noctty に POSIX パスを渡しても意味がない)
+  # - **単一インスタンス転送はこの既定を上書きする。config 側では防げない**。
+  #   single-instance も probableCliEnvironment() 由来で既定 true になるため
+  #   (Config.zig:4415-4420)、既に起動している状態での 2 回目以降の launch は
+  #   collectStartupForwardArguments (apprt/win32.zig:1804-1830) が
+  #   --working-directory=<起動プロセスの Windows cwd> を先頭に自動挿入して既存
+  #   インスタンスへ転送し、受け手はそれを設定として loadIter する。ランチャ
+  #   (ショートカット) の「作業フォルダー」が zig-out\bin だと、新規ウィンドウが
+  #   /mnt/c/.../zig-out/bin で開く。
+  #   対処はランチャ側で --working-directory=home を渡すこと。値が home / inherit の
+  #   ときだけ normalizeForwardedStartupArg (:1758-1766) が素通しし、同時に
+  #   working_directory_seen が立って cwd の自動挿入が止まる。
   # - 同梱 ConPTY はここでは設定できない。config オプションが無く、conpty.dll と
   #   OpenConsole.exe を exe の隣に置くかどうかで決まる (src/pty.zig の loadBundled)。
   #   配置は install-noctty-conpty (hosts/wsl-gentoo.nix) が行う。
