@@ -127,35 +127,27 @@ let
   # - 同梱 ConPTY はここでは設定できない。config オプションが無く、conpty.dll と
   #   OpenConsole.exe を exe の隣に置くかどうかで決まる (src/pty.zig の loadBundled)。
   #   配置は install-noctty-conpty (hosts/wsl-gentoo.nix) が行う。
-  # - *-inherit-working-directory: 新規ウィンドウ/タブ/split が「起動プロセスの
-  #   Windows cwd」を引き継いでしまうため 3 つとも無効化する。
-  #   継承の可否は文脈ごとに別オプションで決まる
-  #   (src/apprt/surface.zig:757-763 の shouldInheritWorkingDirectory:
-  #    .window/.tab/.split → window-/tab-/split-inherit-working-directory)。
-  #   既定はいずれも true (Config.zig:1981/1986/1991) なので、タブだけ直したい
-  #   場合でも tab- を明示する必要がある。
-  #   noctty は WSL 直起動を prepareCommand (src/config/windows_shell.zig:257-280) で
-  #   書き換える: ユーザーが書いた --cd と裸の ~ を prepareWslDirect が無条件に除去し
-  #   (:712-721)、代わりに解決済み cwd を --cd として注入する (:735-740)。
-  #   解決順は「継承/明示 cwd > working-directory = home」なので、この設定が既定の
-  #   true のままだと command の --cd ~ は常に無視される。
-  #   初回タブは cwd 未確定で --cd ~ になるが、その際 safeCurrentDirectoryWithCurrent
-  #   (:230-241) が起動プロセスの Windows cwd を端末の pwd として採用する
-  #   ("using inherited windows cwd")。zig-out\bin から起動していると新規タブが
-  #   それを継承して /mnt/c/.../zig-out/bin で zsh が立ち上がり、blocked な .envrc に
-  #   direnv が反応して p10k instant prompt 警告を誘発する。
-  #   OSC 7 自体は modules/zsh で shell integration を手動ロードするようにしたので
-  #   WSL 側から届くようになった (自動注入は Windows 側 env の境界で届かない)。
-  #   noctty 側の受け口も用意されている (windows_shell.zig の osc7PathToLocal /
-  #   isWslPath が POSIX パスを WSL 形式のまま保持し、後続の WSL シェルへ継承する)
-  #   が、実機での継承挙動は未検証のため無効化は維持する。常に
-  #   working-directory = home (= wsl.exe --cd ~) を使わせる。
-  #   新規タブが期待どおりの cwd で開くことを確認できたら、この 3 行は外せる。
-  nocttySettings = windowsSettings // {
-    window-inherit-working-directory = false;
-    tab-inherit-working-directory = false;
-    split-inherit-working-directory = false;
-  };
+  # - *-inherit-working-directory は指定しない (既定の true のまま)。新規ウィンドウ /
+  #   タブ / split は直前のサーフェスの cwd を引き継ぐ。継承の可否は文脈ごとに別
+  #   オプションで決まる (src/apprt/surface.zig の shouldInheritWorkingDirectory:
+  #   .window/.tab/.split → window-/tab-/split-inherit-working-directory)。既定は
+  #   いずれも true (Config.zig:1981/1986/1991) なので、片方だけ変えたい場合は明示が要る。
+  #
+  #   かつては 3 つとも false にしていた。noctty は WSL 直起動を prepareWslDirect で
+  #   書き換え、ユーザーが書いた --cd を除去して解決済み cwd を --cd として注入する。
+  #   解決順は「継承/明示 cwd > working-directory = home」なので、継承が有効だと
+  #   継承 cwd が勝つ。当時は OSC 7 が WSL 側から届かず、代わりに
+  #   safeCurrentDirectoryWithCurrent が起動プロセスの Windows cwd を端末の pwd として
+  #   採用していた ("using inherited windows cwd")。zig-out\bin から起動していると
+  #   新規タブがそれを継承して /mnt/c/.../zig-out/bin で zsh が立ち上がり、blocked な
+  #   .envrc に direnv が反応して p10k instant prompt 警告を誘発していた。
+  #
+  #   modules/zsh の shell integration 手動ロード + env = WSLENV=TERM で OSC 7 が
+  #   WSL 側から届くようになり、この前提が解消した。noctty 側の受け口も
+  #   osc7PathToLocal / isWslPath が POSIX パスを WSL 形式のまま保持して後続の WSL
+  #   シェルへ継承するので、本来の「直前の cwd を引き継ぐ」挙動が成立する。
+  #   親サーフェスが無い初回ウィンドウは working-directory = home (= --cd ~) になる。
+  nocttySettings = windowsSettings;
 
   # home-manager の programs.ghostty が内部で使っているのと同じフォーマッタ
   # (listsAsDuplicateKeys = true で keybind = ... 行を複数行に展開)
