@@ -56,8 +56,29 @@ let
   # - command: 起動時に WSL の Gentoo-systemd ディストリをログインシェルで立ち上げる
   #   "direct:" プレフィックスを付けて /bin/sh -c ラップを回避 (Windows には sh が無い)
   #   --cd ~ でホームディレクトリに入る (WezTerm の default_cwd と等価)
+  # - env = WSLENV=TERM: ConPTY 経由で wsl.exe を起動する構成では、Windows 側
+  #   プロセスの env は WSL のシェルに届かない。TERM も例外ではなく、何もしないと
+  #   WSL 側の既定である xterm-256color になる。実測:
+  #     TERM=probe wsl.exe -d Gentoo-systemd -- sh -c 'echo $TERM'  → xterm-256color
+  #     TERM=probe WSLENV=TERM wsl.exe ... 同上                      → probe
+  #   WSLENV は wsl.exe 自身の env から読まれるので、ghostty の env オプションで
+  #   注入すれば Windows 側のユーザー環境変数 (setx) を触らずに伝播できる。これで
+  #   xterm-ghostty が WSL に届き、下で ~/.terminfo に置いている terminfo が実際に
+  #   引かれる (同期出力・styled underline 等)。modules/zsh の shell integration も
+  #   この TERM を判定条件にしている。
+  #   GHOSTTY_RESOURCES_DIR / TERMINFO は載せない。どちらも Windows パスで、WSL から
+  #   読むと 9p 経由になる。統合スクリプトは modules/zsh が Nix ストアから source する。
+  #   env は継承した env を上書きする (Surface.zig の env_override → Exec.zig の
+  #   env.put) ので、この WSLENV は Windows 側から引き継いだ値を置き換える。現状
+  #   HKCU / HKLM に永続 WSLENV は無く (reg query で確認)、実際に消えるのは Windows
+  #   Terminal 経由で起動したときの WT_SESSION:WT_PROFILE_ID: だけ。noctty のタブから
+  #   見れば親ではない別セッションを指す値なので実害は無い。
+  #   ghostty の env に追記構文は無く、同じキーを 2 回書いても後勝ちで上書きになる
+  #   (Config.zig の env の doc)。他に WSL へ伝播したい変数が増えたら、この 1 行に
+  #   コロン区切りで列挙して足すこと。
   windowsSettings = settings // {
     command = "direct:wsl.exe -d Gentoo-systemd --cd ~";
+    env = [ "WSLENV=TERM" ];
     font-family = windowsFontFamily;
   };
 
@@ -91,37 +112,50 @@ let
   #   ならない (docs/windows.md#shells: `wsl.exe --status` が健全と報告しても起動が
   #   失敗しうるため、暗黙の既定にしない設計)。
   #   "direct:" プレフィックスは src/config/command.zig で対応済み。
-  # - working-directory は指定しない。--cd ~ で WSL 側のホームに入るため不要。
+  # - working-directory は指定しない。Windows では probableCliEnvironment() が常に
+  #   false を返すため (Config.zig:4846-4849)、finalize が既定で .home を選び、
+  #   command が WSL 起動のときは .home のまま残る (:4361-4368)。結果として
+  #   prepareCommandWithLookup (windows_shell.zig:391-395) が target_cwd = "~" を選び、
+  #   prepareWslDirect が --cd ~ を注入する (command に書いた --cd ~ 自体は無条件に
+  #   除去されるので、効いているのはこの経路)。`noctty.com +show-config` で
+  #   working-directory = home と表示されることを確認済み。
   #   (ghostinthewslSettings の working-directory はブリッジ固有の回避策であり、
   #   ConPTY 経由の noctty に POSIX パスを渡しても意味がない)
+  # - **単一インスタンス転送はこの既定を上書きする。config 側では防げない**。
+  #   single-instance も probableCliEnvironment() 由来で既定 true になるため
+  #   (Config.zig:4415-4420)、既に起動している状態での 2 回目以降の launch は
+  #   collectStartupForwardArguments (apprt/win32.zig:1804-1830) が
+  #   --working-directory=<起動プロセスの Windows cwd> を先頭に自動挿入して既存
+  #   インスタンスへ転送し、受け手はそれを設定として loadIter する。ランチャ
+  #   (ショートカット) の「作業フォルダー」が zig-out\bin だと、新規ウィンドウが
+  #   /mnt/c/.../zig-out/bin で開く。
+  #   対処はランチャ側で --working-directory=home を渡すこと。値が home / inherit の
+  #   ときだけ normalizeForwardedStartupArg (:1758-1766) が素通しし、同時に
+  #   working_directory_seen が立って cwd の自動挿入が止まる。
   # - 同梱 ConPTY はここでは設定できない。config オプションが無く、conpty.dll と
   #   OpenConsole.exe を exe の隣に置くかどうかで決まる (src/pty.zig の loadBundled)。
   #   配置は install-noctty-conpty (hosts/wsl-gentoo.nix) が行う。
-  # - *-inherit-working-directory: 新規ウィンドウ/タブ/split が「起動プロセスの
-  #   Windows cwd」を引き継いでしまうため 3 つとも無効化する。
-  #   継承の可否は文脈ごとに別オプションで決まる
-  #   (src/apprt/surface.zig:757-763 の shouldInheritWorkingDirectory:
-  #    .window/.tab/.split → window-/tab-/split-inherit-working-directory)。
-  #   既定はいずれも true (Config.zig:1981/1986/1991) なので、タブだけ直したい
-  #   場合でも tab- を明示する必要がある。
-  #   noctty は WSL 直起動を prepareCommand (src/config/windows_shell.zig:257-280) で
-  #   書き換える: ユーザーが書いた --cd と裸の ~ を prepareWslDirect が無条件に除去し
-  #   (:712-721)、代わりに解決済み cwd を --cd として注入する (:735-740)。
-  #   解決順は「継承/明示 cwd > working-directory = home」なので、この設定が既定の
-  #   true のままだと command の --cd ~ は常に無視される。
-  #   初回タブは cwd 未確定で --cd ~ になるが、その際 safeCurrentDirectoryWithCurrent
-  #   (:230-241) が起動プロセスの Windows cwd を端末の pwd として採用する
-  #   ("using inherited windows cwd")。zig-out\bin から起動していると新規タブが
-  #   それを継承して /mnt/c/.../zig-out/bin で zsh が立ち上がり、blocked な .envrc に
-  #   direnv が反応して p10k instant prompt 警告を誘発する。
-  #   WSL 側には Ghostty の shell integration が届かず OSC 7 が来ないので
-  #   (ghostinthewsl と同じ制約)、cwd 継承はそもそも正しく機能しない。無効化して
-  #   常に working-directory = home (= wsl.exe --cd ~) を使わせる。
-  nocttySettings = windowsSettings // {
-    window-inherit-working-directory = false;
-    tab-inherit-working-directory = false;
-    split-inherit-working-directory = false;
-  };
+  # - *-inherit-working-directory は指定しない (既定の true のまま)。新規ウィンドウ /
+  #   タブ / split は直前のサーフェスの cwd を引き継ぐ。継承の可否は文脈ごとに別
+  #   オプションで決まる (src/apprt/surface.zig の shouldInheritWorkingDirectory:
+  #   .window/.tab/.split → window-/tab-/split-inherit-working-directory)。既定は
+  #   いずれも true (Config.zig:1981/1986/1991) なので、片方だけ変えたい場合は明示が要る。
+  #
+  #   かつては 3 つとも false にしていた。noctty は WSL 直起動を prepareWslDirect で
+  #   書き換え、ユーザーが書いた --cd を除去して解決済み cwd を --cd として注入する。
+  #   解決順は「継承/明示 cwd > working-directory = home」なので、継承が有効だと
+  #   継承 cwd が勝つ。当時は OSC 7 が WSL 側から届かず、代わりに
+  #   safeCurrentDirectoryWithCurrent が起動プロセスの Windows cwd を端末の pwd として
+  #   採用していた ("using inherited windows cwd")。zig-out\bin から起動していると
+  #   新規タブがそれを継承して /mnt/c/.../zig-out/bin で zsh が立ち上がり、blocked な
+  #   .envrc に direnv が反応して p10k instant prompt 警告を誘発していた。
+  #
+  #   modules/zsh の shell integration 手動ロード + env = WSLENV=TERM で OSC 7 が
+  #   WSL 側から届くようになり、この前提が解消した。noctty 側の受け口も
+  #   osc7PathToLocal / isWslPath が POSIX パスを WSL 形式のまま保持して後続の WSL
+  #   シェルへ継承するので、本来の「直前の cwd を引き継ぐ」挙動が成立する。
+  #   親サーフェスが無い初回ウィンドウは working-directory = home (= --cd ~) になる。
+  nocttySettings = windowsSettings;
 
   # home-manager の programs.ghostty が内部で使っているのと同じフォーマッタ
   # (listsAsDuplicateKeys = true で keybind = ... 行を複数行に展開)
@@ -143,8 +177,11 @@ in
 
   # xterm-ghostty の terminfo を ~/.terminfo に配置する。
   #
-  # wsl-gentoo は端末が Windows 側で動く (Ghostty Windows port / GhostInTheWSL) ため
-  # WSL 側に ghostty パッケージを入れておらず、TERM=xterm-ghostty だけが渡ってくる。
+  # wsl-gentoo は端末が Windows 側で動く (noctty / Ghostty Windows port /
+  # GhostInTheWSL) ため WSL 側に ghostty パッケージを入れておらず、
+  # TERM=xterm-ghostty だけが渡ってくる。ConPTY 経由の noctty / Windows port では
+  # それも自動では渡らないので、上の env = WSLENV=TERM で明示的に伝播させている
+  # (GhostInTheWSL はブリッジが Linux 側プロセスの env を直接組むので不要)。
   # terminfo が無いと zsh/readline が行編集・履歴表示を崩すので、terminfo だけを
   # 独立 output (クロージャ 4.9 KiB、ghostty 本体を引き込まない) から供給する。
   #

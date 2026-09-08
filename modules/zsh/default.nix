@@ -188,6 +188,36 @@
 
         # Powerlevel10k theme
         [[ ! -f ${./.p10k.zsh} ]] || source ${./.p10k.zsh}
+
+        # Ghostty shell integration (OSC 133 / OSC 7)
+        #
+        # noctty / GhostInTheWSL / Ghostty Windows port はいずれも Windows 側の
+        # プロセスとして動くため、Ghostty が自動注入に使う GHOSTTY_RESOURCES_DIR と
+        # GHOSTTY_SHELL_FEATURES が WSL 側のシェルに届かない (ConPTY 経由では TERM
+        # すら自動では渡らない。TERM だけは modules/ghostty の env = WSLENV=TERM で
+        # 明示的に伝播させており、この判定条件が成立するのはそのため)。noctty 自身も
+        # src/config/windows_shell.zig の shellIntegrationDiagnostic で
+        # 「WSL は Linux シェル側で有効化せよ」と案内しているので手動でロードする。
+        #
+        # feature フラグ非依存で得られるもの:
+        # - OSC 133 (semantic prompt) — Ctrl+Shift+PageUp/Down の jump_to_prompt,
+        #   Ctrl+三連クリックでのコマンド出力選択, プロンプト上での終了確認スキップ,
+        #   リサイズ時に reflow ではなく redraw
+        # - OSC 7 (cwd 報告)
+        #
+        # title feature は有効にしない。上の chpwd フックが送る "%m:%2~" 形式を
+        # noctty のタブラベル (compactHostLabel) が前提にしているのに対し、
+        # ghostty の title feature は "…/%3~" 形式でホスト名を落とすため競合する。
+        #
+        # Linux ネイティブの ghostty では自動注入が効くので、GHOSTTY_RESOURCES_DIR が
+        # ある場合はそちらのスクリプトを使い、GHOSTTY_SHELL_FEATURES も上書きしない
+        # (スクリプト側に再入ガードがあるため二重初期化にはならない)。
+        if [[ "$TERM" == xterm-ghostty ]]; then
+          export GHOSTTY_SHELL_FEATURES="''${GHOSTTY_SHELL_FEATURES:-cursor}"
+          _ghostty_integration="''${GHOSTTY_RESOURCES_DIR:-${pkgs.ghostty}/share/ghostty}/shell-integration/zsh/ghostty-integration"
+          [[ -r "$_ghostty_integration" ]] && source "$_ghostty_integration"
+          unset _ghostty_integration
+        fi
       ''
     ];
 
