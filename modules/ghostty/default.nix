@@ -68,6 +68,14 @@ let
   #   この TERM を判定条件にしている。
   #   GHOSTTY_RESOURCES_DIR / TERMINFO は載せない。どちらも Windows パスで、WSL から
   #   読むと 9p 経由になる。統合スクリプトは modules/zsh が Nix ストアから source する。
+  #   env は継承した env を上書きする (Surface.zig の env_override → Exec.zig の
+  #   env.put) ので、この WSLENV は Windows 側から引き継いだ値を置き換える。現状
+  #   HKCU / HKLM に永続 WSLENV は無く (reg query で確認)、実際に消えるのは Windows
+  #   Terminal 経由で起動したときの WT_SESSION:WT_PROFILE_ID: だけ。noctty のタブから
+  #   見れば親ではない別セッションを指す値なので実害は無い。
+  #   ghostty の env に追記構文は無く、同じキーを 2 回書いても後勝ちで上書きになる
+  #   (Config.zig の env の doc)。他に WSL へ伝播したい変数が増えたら、この 1 行に
+  #   コロン区切りで列挙して足すこと。
   windowsSettings = settings // {
     command = "direct:wsl.exe -d Gentoo-systemd --cd ~";
     env = [ "WSLENV=TERM" ];
