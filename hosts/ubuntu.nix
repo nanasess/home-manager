@@ -44,7 +44,15 @@ in
   programs.ghostty = {
     enable = true;
     package = config.lib.nixGL.wrap pkgs.ghostty;
-    settings = ghostty.settings;
+    # shell-integration = none で ZDOTDIR 差し替えによる自動注入を止める。注入される
+    # のは Nix ストアの素のスクリプトで、powerlevel10k と組み合わせるとプロンプトに
+    # `}` が漏れる (modules/zsh の ghosttyZshIntegration のコメント参照)。代わりに
+    # パッチ済みスクリプトを .zshrc から明示ロードする経路へ統一する。Windows 側の
+    # 実装 (noctty 等) は元々 WSL のシェルに自動注入できないので、この設定が要るのは
+    # Linux ネイティブ側だけ。
+    settings = ghostty.settings // {
+      shell-integration = "none";
+    };
   };
 
   home.file.".local/share/applications/com.mitchellh.ghostty.desktop".text = ''

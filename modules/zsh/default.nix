@@ -1,5 +1,40 @@
 { config, pkgs, lib, ... }:
 
+let
+  # Ghostty の zsh shell integration から「複数行 PS1 への OSC 133 継続マーク挿入」を
+  # 取り除いたコピー。
+  #
+  # 上流の _ghostty_precmd は PS1 に改行があると
+  #   mark2=$'%{\e]133;A;k=s\a%}'
+  #   PS1=${PS1//$'\n'/$'\n'${mark2}}
+  # で改行の直後にマークを差し込む。これは「PS1 の改行が素のリテラルである」前提の
+  # 実装で、powerlevel10k では成立しない。p10k の PS1 は 2 行目へ移る改行を
+  # パラメータ展開の内側に持つ (${${_p9k__g+\n}:-\n} の形) ため、差し込まれた mark2 の
+  # `%}` の `}` が展開の閉じ括弧として先に食われ、余った `}` がプロンプトへリテラル
+  # 出力される。最小再現 (zsh -f):
+  #   setopt prompt_subst
+  #   P=$'${${g+\n}:-\n}END'
+  #   P=${P//$'\n'/$'\n'$'%{\e]133;A;k=s\a%}'}
+  #   print -r -- "${(V)${(e)P}}"   # → \n%{<OSC>%:-\n%{<OSC>%}}END  ← `}` が残る
+  # 実機では新規タブの 1 個目のプロンプト行頭に `}}` が出る。2 回目以降は p10k が PS1 を
+  # 作り直して ps1_changed=1 になり、上流自身が挿入をスキップするため出ない
+  # (= 「新規タブのときだけ出る」ように見える)。
+  #
+  # ps1_changed の初期値を 1 にすると、その「テーマが PS1 を作り直した」経路を常に通る。
+  # ps1_changed はこの分岐からしか読まれないので他への副作用は無い。PS1 先頭の mark1
+  # (133;A;cl=line) と markB、preexec の 133;C、precmd の 133;D、PS2 側のマークはそのまま
+  # 残るので、jump_to_prompt / コマンド出力の選択 / プロンプト上での終了確認スキップは
+  # 効く。失うのは「リサイズ時に複数行プロンプトの継続行を再描画する」ヒントだけ。
+  #
+  # --replace-fail なので、上流がこの行を変えたらビルドが落ちて気づける。
+  ghosttyZshIntegration =
+    pkgs.runCommand "ghostty-integration-no-ps1-newline-mark" { } ''
+      substitute \
+        ${pkgs.ghostty}/share/ghostty/shell-integration/zsh/ghostty-integration \
+        $out \
+        --replace-fail 'builtin local ps1_changed=0' 'builtin local ps1_changed=1'
+    '';
+in
 {
   programs.zsh = {
     enable = true;
@@ -209,14 +244,14 @@
         # noctty のタブラベル (compactHostLabel) が前提にしているのに対し、
         # ghostty の title feature は "…/%3~" 形式でホスト名を落とすため競合する。
         #
-        # Linux ネイティブの ghostty では自動注入が効くので、GHOSTTY_RESOURCES_DIR が
-        # ある場合はそちらのスクリプトを使い、GHOSTTY_SHELL_FEATURES も上書きしない
-        # (スクリプト側に再入ガードがあるため二重初期化にはならない)。
+        # Linux ネイティブの ghostty も同じスクリプトを手動ロードする。あちらは ZDOTDIR
+        # 差し替えによる自動注入を持つが、注入されるのは Nix ストアの素のスクリプトで、
+        # p10k と組み合わせるとプロンプトに `}` が漏れる (let の ghosttyZshIntegration の
+        # コメント参照)。自動注入を hosts/ubuntu.nix の shell-integration = none で止め、
+        # 全ホストでパッチ済みスクリプトに一本化している。
         if [[ "$TERM" == xterm-ghostty ]]; then
           export GHOSTTY_SHELL_FEATURES="''${GHOSTTY_SHELL_FEATURES:-cursor}"
-          _ghostty_integration="''${GHOSTTY_RESOURCES_DIR:-${pkgs.ghostty}/share/ghostty}/shell-integration/zsh/ghostty-integration"
-          [[ -r "$_ghostty_integration" ]] && source "$_ghostty_integration"
-          unset _ghostty_integration
+          source ${ghosttyZshIntegration}
         fi
       ''
     ];
