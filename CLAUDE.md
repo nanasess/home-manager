@@ -72,12 +72,7 @@ modules/
     early-init.el       -- Emacs 早期初期化設定
     elpaca.lock         -- elpaca パッケージロックファイル
     init.d/             -- OS/環境別の追加設定
-    site-lisp/          -- 自作 Elisp
-  locale-eaw/
-    default.nix        -- locale-eaw モジュール（localedef + LOCPATH 設定）
-    UTF-8-EAW-CONSOLE.gz -- East Asian Ambiguous 文字幅修正済み charmap
-    eaw-console-wezterm.lua -- WezTerm cell_widths 設定
-    eaw-console.el     -- Emacs char-width-table 設定
+    site-lisp/          -- 自作 Elisp + eaw-console.el（Emacs GUI 限定の EAW 文字幅設定）
   wezterm/
     wezterm.lua        -- WezTerm 設定（WSL → Windows 側にコピー）
   ghostty/
@@ -116,7 +111,7 @@ docs/                  -- 領域別の詳細ドキュメント（下記「詳細
 | Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
 | Ghostty 設定 | 共有 Nix attrset + renderer | `programs.ghostty.settings` (Linux native) と `%LOCALAPPDATA%\ghostty\config.ghostty` (Windows port) を同一 attrset から生成 |
-| East Asian Ambiguous 文字幅 | locale-eaw EAW-CONSOLE | glibc wcwidth + WezTerm cell_widths + Emacs char-width-table を統一 |
+| East Asian Ambiguous 文字幅 | Emacs GUI のみ locale-eaw `eaw-console.el` | ターミナル (noctty / Ghostty 系) は Ambiguous を幅 1 に固定していて変更不可。glibc / ターミナル側は素の幅 1 に統一し、独立レンダラの Emacs GUI だけ幅 2 を維持。Emacs tty フレームは `use-default-char-width-table` で幅 1 に戻す (既定は罫線まで幅 2 になる) |
 | Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` に書き出し、`/etc/portage/` から個別にシンボリックリンク |
 | システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
 | SKK 辞書サーバ (yaskkserv2) | Nix ビルド (`pkgs/yaskkserv2.nix`) + systemd ユーザーサービス (`modules/yaskkserv2.nix`) | nixpkgs / apt に無いため上流を `buildRustPackage`。全ホスト同一バイナリ + ユーザーパス辞書 (`~/.local/share/yaskkserv2/all`) で sudo 不要・共通化 |
@@ -153,7 +148,7 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 
 | ドキュメント | 内容 | 主な対象 |
 |---|---|---|
-| [docs/locale-eaw.md](docs/locale-eaw.md) | East Asian Ambiguous 文字幅を glibc / WezTerm / Emacs で統一する仕組みと注意点 | `modules/locale-eaw/` |
+| [docs/eaw-width.md](docs/eaw-width.md) | East Asian Ambiguous 文字幅の方針 (ターミナル系は幅 1、Emacs GUI のみ幅 2)、noctty が幅 1 固定である理由 | `modules/emacs/site-lisp/eaw-console.el` |
 | [docs/wezterm.md](docs/wezterm.md) | WezTerm 設定を WSL 側から Windows 側へコピーする経路 | `modules/wezterm/` |
 | [docs/bluetooth-audio.md](docs/bluetooth-audio.md) | 接続不安定 (マルチポイント / discovery 枯渇 / WiFi 2.4GHz) の切り分け、A2DP と HFP の排他、自動切替の無効化 | `modules/bluetooth-audio/` (ubuntu) |
 | [docs/nix-desktop-integration.md](docs/nix-desktop-integration.md) | nixpkgs の GUI アプリがランチャー/アイコンに出ない `XDG_DATA_DIRS` 問題と対処 | `hosts/ubuntu.nix`, 各 GUI モジュール |
