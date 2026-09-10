@@ -184,10 +184,17 @@
 (setq default-process-coding-system '(utf-8 . utf-8))
 (setenv "LANG" "ja_JP.UTF-8")
 
-;; locale-eaw EAW-CONSOLE: East Asian Ambiguous 文字の幅を適切に設定
-;; set-language-environment が char-width-table をリセットするため、その後に読み込む
+;; locale-eaw EAW-CONSOLE: East Asian Ambiguous 文字 (△→○●■□▲ 等) を全角幅で扱う
 ;; https://github.com/hamano/locale-eaw
-(load (expand-file-name (locate-user-emacs-file "site-lisp/eaw-console")) t t)
+;;
+;; GUI フレーム (WSLg) 限定で適用する。char-width-table はプロセスグローバルなので
+;; フレームごとには切り替えられず、TUI (emacs -nw) で有効にすると Emacs だけが幅 2 を
+;; 前提に描画してしまう。ターミナル側 (noctty / Ghostty 系) は uucode のテーブルで
+;; Ambiguous を幅 1 に固定しており設定で変更できないため、カーソル位置がずれる。
+;; daemon 起動時は初期化時点で display-graphic-p が nil になるので daemonp も見る。
+;; set-language-environment が char-width-table をリセットするため、その後に読み込む
+(when (or (daemonp) (display-graphic-p))
+  (load (expand-file-name (locate-user-emacs-file "site-lisp/eaw-console")) t t))
 
 ;; Ubuntu (GNOME + Wayland) では ibus が常駐しており、入力ソースに ibus-skk が
 ;; 選ばれた状態だと Emacs にプリエディットが送り込まれて nskk が使えなくなる。

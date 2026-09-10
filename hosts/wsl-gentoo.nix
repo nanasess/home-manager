@@ -83,7 +83,6 @@ in
   # WezTerm 設定を Windows 側にコピー
   home.activation.weztermConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     install -Dm644 ${../modules/wezterm/wezterm.lua} /mnt/c/Users/${config.home.username}/.wezterm.lua
-    install -Dm644 ${../modules/locale-eaw/eaw-console-wezterm.lua} /mnt/c/Users/${config.home.username}/.eaw-console-wezterm.lua
   '';
 
   # UDEV Gothic JPDOC / NF フォントを Windows 側にコピー

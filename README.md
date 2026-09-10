@@ -122,12 +122,7 @@ modules/
     early-init.el       -- Emacs 早期初期化設定
     elpaca.lock         -- elpaca パッケージロックファイル
     init.d/             -- OS/環境別の追加設定
-    site-lisp/          -- 自作 Elisp
-  locale-eaw/
-    default.nix         -- locale-eaw モジュール（localedef + LOCPATH 設定）
-    UTF-8-EAW-CONSOLE.gz -- East Asian Ambiguous 文字幅修正済み charmap
-    eaw-console-wezterm.lua -- WezTerm cell_widths 設定
-    eaw-console.el      -- Emacs char-width-table 設定
+    site-lisp/          -- 自作 Elisp + eaw-console.el（Emacs GUI 限定の EAW 文字幅設定）
   wezterm/
     wezterm.lua         -- WezTerm 設定（WSL → Windows 側にコピー）
   portage.nix           -- Portage 設定（WSL Gentoo 用、~/.config/portage/ に書き出し）
@@ -291,20 +286,20 @@ GitHub Actions (`.github/workflows/check.yml`) が push / PR 時に以下を実�
 - **emacs** -- `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
 - **build** -- 各ホストの `activationPackage` ビルド（ubuntu-latest）
 
-## East Asian Ambiguous 文字幅 (locale-eaw)
+## East Asian Ambiguous 文字幅 (EAW)
 
-glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcwidth()` が 2→1 に変更され、日本語環境で半角表示される問題に対処している。
+glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcwidth()` が 2→1 に変更された問題への方針。
 
-[locale-eaw](https://github.com/hamano/locale-eaw) EAW-CONSOLE を使い、glibc / WezTerm / Emacs の全レイヤーで文字幅を統一する。
+メインターミナルの noctty (Ghostty の Windows port fork) は Ambiguous を**幅 1 に固定**しており設定で変更できないため、**ターミナル系はすべて幅 1 に統一**し、独立したレンダラである **Emacs GUI だけ幅 2** を維持している。
 
-| レイヤー | 設定 | 効果 |
-|---------|------|------|
-| glibc (`wcwidth`) | `localedef` + `LOCPATH` でカスタムロケール適用 | zsh 等のカーソル位置が正確に |
-| WezTerm | `cell_widths` (eaw-console-wezterm.lua) | ターミナル描画幅が一致 |
-| Emacs | `eaw-console.el` で `char-width-table` 設定 | Emacs 内部の文字幅が一致 |
-| フォント | UDEV Gothic JPDOC をプライマリフォント | 全角グリフで描画 |
+| レイヤー | 幅 | 設定 |
+|---------|----|------|
+| ターミナル (noctty / Ghostty 系) | 1 | uucode のテーブル (変更不可) |
+| glibc (`wcwidth`) / zsh / tmux | 1 | 素の `ja_JP.utf8` を使う (`LOCPATH` の上書きは撤去) |
+| Emacs GUI (WSLg) | 2 | `modules/emacs/site-lisp/eaw-console.el` + UDEV Gothic JPDOC |
+| Emacs TUI (`emacs -nw`) | 1 | `eaw-console.el` を読み込まない |
 
-罫線 (─│) は半角のまま維持されるため、TUI アプリやプロンプトの表示は崩れない。
+以前は locale-eaw EAW-CONSOLE で全レイヤーを幅 2 に揃えていたが、WezTerm から noctty へ移行した際に撤去した。詳細は [docs/eaw-width.md](docs/eaw-width.md) 参照。
 
 ## TODO: 移行元リポジトリの統合
 

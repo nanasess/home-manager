@@ -36,7 +36,7 @@ in
 {
   home.file.".emacs.d/init.el".source = ./init.el;
   home.file.".emacs.d/early-init.el".source = ./early-init.el;
-  home.file.".emacs.d/site-lisp/eaw-console.el".source = ../locale-eaw/eaw-console.el;
+  home.file.".emacs.d/site-lisp/eaw-console.el".source = ./site-lisp/eaw-console.el;
   home.file.".emacs.d/tree-sitter".source = treesitGrammars;
 
   # lsp-bridge の Python ランタイム依存を uv で隔離管理する。
