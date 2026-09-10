@@ -12,7 +12,7 @@ glibc 2.39+ で `wcwidth()` が East Asian Ambiguous 文字 (△→○●■□�
 | glibc `wcwidth()` (zsh / readline / tmux) | 1 | 素の `ja_JP.utf8` (`/usr/lib/locale`) をそのまま使う |
 | Claude Code TUI | 1 | Node.js の標準 Unicode 幅テーブル |
 | Emacs GUI (WSLg) | 2 | `modules/emacs/site-lisp/eaw-console.el` (locale-eaw 由来) |
-| Emacs TUI (`emacs -nw`) | 1 | 上記を読み込まない (`init.el` で GUI 限定に分岐) |
+| Emacs TUI (`emacs -nw` / `emacsclient -t`) | 1 | `use-default-char-width-table` で Emacs 既定のテーブルに戻す |
 
 以前は [locale-eaw](https://github.com/hamano/locale-eaw) EAW-CONSOLE を使い、glibc (`LOCPATH` + カスタムロケール) / WezTerm (`cell_widths`) / Emacs (`char-width-table`) の 3 レイヤーを幅 2 に揃えていた (#64)。メインターミナルを WezTerm から noctty (Ghostty の Windows port fork) に移した時点でこの前提が崩れたため、#71 でターミナル側の 2 レイヤーを撤去した。
 
@@ -28,18 +28,27 @@ Ghostty 系は文字幅の単一情報源として `uucode` を使い、Ambiguou
 
 実測 (glibc 2.43 / Gentoo):
 
-```
+```text
 LOCPATH あり (旧構成): △→○●■□▲ = 2,  ─│ = 1,  あ = 2   ← ターミナルとずれる
 LOCPATH なし (現構成): △→○●■□▲ = 1,  ─│ = 1,  あ = 2   ← ターミナルと一致
 ```
 
-## Emacs だけ幅 2 を維持している理由
+## Emacs GUI だけ幅 2 を維持している理由
 
 Emacs GUI は WSLg 上の独立したレンダラで、ターミナルのセルとは無関係に自前で文字幅を決める。日本語文書の可読性 (△○● が細くならない) を取れるので幅 2 のまま維持している。
 
+**前提**: Emacs は `wcwidth()` を見ない。日本語の言語環境では CJK 用の `char-width-table` を使い、Ambiguous を**罫線 (`─│`) まで含めてすべて幅 2** にする。`eaw-console.el` はこのうち罫線だけを幅 1 に戻す (EAW-CONSOLE 方式) ものであって、「読み込まなければ幅 1 になる」わけではない。実測 (Emacs 31.1, `LANG=ja_JP.UTF-8`):
+
+```text
+既定 (何もしない):              △→○●■ = 2,  ─│ = 2,  あ = 2
+eaw-console.el を読む:          △→○●■ = 2,  ─│ = 1,  あ = 2
+(use-default-char-width-table): △→○●■ = 1,  ─│ = 1,  あ = 2   ← noctty と一致
+```
+
 設計上の注意点:
 
-- **GUI 限定**: `char-width-table` はプロセスグローバルでフレームごとに切り替えられない。`emacs -nw` を noctty 上で動かすと Emacs だけ幅 2 でカーソルがずれるため、`init.el` は `(when (or (daemonp) (display-graphic-p)) ...)` で GUI (と daemon) のときだけ `eaw-console.el` を読み込む。daemon は初期化時点で `display-graphic-p` が nil になるので `daemonp` も見る必要がある。
+- **フレーム種別で切り替える**: `char-width-table` はプロセスグローバルでフレームごとに切り替えられない。`init.el` の `my/apply-char-width-table` が、GUI フレームなら `eaw-console.el` を読み込み、tty フレームなら `use-default-char-width-table` で既定 (Ambiguous = 幅 1) に戻す。tty で何もしないと罫線まで幅 2 になり、端末とのずれはむしろ大きくなる。
+- **daemon**: 初期化時点では `display-graphic-p` が nil なので、フォント設定 (`my/set-font-linux`) と同じく `after-make-frame-functions` に回す。GUI と tty のフレームが同居する場合は後から作ったフレームの方針で上書きされる (プロセスグローバルなので避けられない)。
 - **読み込み順**: `set-language-environment "Japanese"` が `char-width-table` をリセットするため、`eaw-console.el` はその後に読み込む。
 - **フォント**: `set-fontset-font` はフォールバック機構で、プライマリフォントにグリフがあれば無視される。UDEV Gothic NF は △→ に半角グリフを持つので、全角グリフを持つ **UDEV Gothic JPDOC をプライマリフォントにする**必要がある (`init.el` の `my/set-font-linux`)。
 

@@ -111,7 +111,7 @@ docs/                  -- 領域別の詳細ドキュメント（下記「詳細
 | Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | WezTerm 設定 | home-manager → activation copy | WSL 側から Windows 側 (`/mnt/c/Users/nanasess/`) にコピー |
 | Ghostty 設定 | 共有 Nix attrset + renderer | `programs.ghostty.settings` (Linux native) と `%LOCALAPPDATA%\ghostty\config.ghostty` (Windows port) を同一 attrset から生成 |
-| East Asian Ambiguous 文字幅 | Emacs GUI のみ locale-eaw `eaw-console.el` | ターミナル (noctty / Ghostty 系) は Ambiguous を幅 1 に固定していて変更不可。glibc / ターミナル側は素の幅 1 に統一し、独立レンダラの Emacs GUI だけ幅 2 を維持 |
+| East Asian Ambiguous 文字幅 | Emacs GUI のみ locale-eaw `eaw-console.el` | ターミナル (noctty / Ghostty 系) は Ambiguous を幅 1 に固定していて変更不可。glibc / ターミナル側は素の幅 1 に統一し、独立レンダラの Emacs GUI だけ幅 2 を維持。Emacs tty フレームは `use-default-char-width-table` で幅 1 に戻す (既定は罫線まで幅 2 になる) |
 | Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` に書き出し、`/etc/portage/` から個別にシンボリックリンク |
 | システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
 | SKK 辞書サーバ (yaskkserv2) | Nix ビルド (`pkgs/yaskkserv2.nix`) + systemd ユーザーサービス (`modules/yaskkserv2.nix`) | nixpkgs / apt に無いため上流を `buildRustPackage`。全ホスト同一バイナリ + ユーザーパス辞書 (`~/.local/share/yaskkserv2/all`) で sudo 不要・共通化 |

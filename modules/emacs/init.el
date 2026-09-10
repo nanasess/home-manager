@@ -184,17 +184,33 @@
 (setq default-process-coding-system '(utf-8 . utf-8))
 (setenv "LANG" "ja_JP.UTF-8")
 
-;; locale-eaw EAW-CONSOLE: East Asian Ambiguous 文字 (△→○●■□▲ 等) を全角幅で扱う
+;; locale-eaw EAW-CONSOLE: East Asian Ambiguous 文字 (△→○●■□▲ 等) の幅を設定する
 ;; https://github.com/hamano/locale-eaw
 ;;
-;; GUI フレーム (WSLg) 限定で適用する。char-width-table はプロセスグローバルなので
-;; フレームごとには切り替えられず、TUI (emacs -nw) で有効にすると Emacs だけが幅 2 を
-;; 前提に描画してしまう。ターミナル側 (noctty / Ghostty 系) は uucode のテーブルで
-;; Ambiguous を幅 1 に固定しており設定で変更できないため、カーソル位置がずれる。
-;; daemon 起動時は初期化時点で display-graphic-p が nil になるので daemonp も見る。
-;; set-language-environment が char-width-table をリセットするため、その後に読み込む
-(when (or (daemonp) (display-graphic-p))
-  (load (expand-file-name (locate-user-emacs-file "site-lisp/eaw-console")) t t))
+;; Emacs は日本語の言語環境では CJK 用の char-width-table を使い、Ambiguous を
+;; 罫線 (─│) まで含めてすべて幅 2 にする。eaw-console.el はこのうち罫線だけを幅 1 に
+;; 戻したテーブル (EAW-CONSOLE 方式。記号は幅 2 のまま) を設定する。
+;;
+;; GUI フレーム (WSLg) は端末と独立したレンダラなので EAW-CONSOLE を使い、記号を全角で
+;; 読みやすく表示する。tty フレームでは端末のセル幅に合わせる必要があるが、noctty /
+;; Ghostty 系は uucode のテーブルで Ambiguous を幅 1 に固定していて設定でも変えられない
+;; ため、Emacs 既定のテーブル (Ambiguous はすべて幅 1) に戻す。
+;;
+;; char-width-table はプロセスグローバルでフレームごとには切り替えられないので、GUI と
+;; tty のフレームが同居する場合は後から作ったフレームの方針で上書きされる。
+;; daemon 起動直後は display-graphic-p が nil なので my/set-font-linux と同じくフックに回す。
+;; set-language-environment が char-width-table をリセットするため、その後に実行する
+(defun my/apply-char-width-table (&optional frame)
+  "FRAME (既定は選択中のフレーム) に応じて `char-width-table' を設定する。
+GUI フレームでは locale-eaw EAW-CONSOLE (記号は幅 2、罫線は幅 1)、tty フレームでは
+Emacs 既定 (East Asian Ambiguous はすべて幅 1) を使う。"
+  (if (display-graphic-p (or frame (selected-frame)))
+      (load (expand-file-name (locate-user-emacs-file "site-lisp/eaw-console")) t t)
+    (use-default-char-width-table)))
+
+(if (daemonp)
+    (add-hook 'after-make-frame-functions #'my/apply-char-width-table)
+  (my/apply-char-width-table))
 
 ;; Ubuntu (GNOME + Wayland) では ibus が常駐しており、入力ソースに ibus-skk が
 ;; 選ばれた状態だと Emacs にプリエディットが送り込まれて nskk が使えなくなる。

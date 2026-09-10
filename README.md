@@ -297,7 +297,7 @@ glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcw
 | ターミナル (noctty / Ghostty 系) | 1 | uucode のテーブル (変更不可) |
 | glibc (`wcwidth`) / zsh / tmux | 1 | 素の `ja_JP.utf8` を使う (`LOCPATH` の上書きは撤去) |
 | Emacs GUI (WSLg) | 2 | `modules/emacs/site-lisp/eaw-console.el` + UDEV Gothic JPDOC |
-| Emacs TUI (`emacs -nw`) | 1 | `eaw-console.el` を読み込まない |
+| Emacs TUI (`emacs -nw` / `emacsclient -t`) | 1 | `use-default-char-width-table` で Emacs 既定のテーブルに戻す |
 
 以前は locale-eaw EAW-CONSOLE で全レイヤーを幅 2 に揃えていたが、WezTerm から noctty へ移行した際に撤去した。詳細は [docs/eaw-width.md](docs/eaw-width.md) 参照。
 
