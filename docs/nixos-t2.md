@@ -385,6 +385,8 @@ home-manager は NixOS モジュールとして読み込み `useUserPackages = t
   (issue #151 コメント)。原因は `canTouchEfiVariables = true` で GRUB を
   `EFI/NixOS-boot-efi/` に入れたため `BOOTX64.EFI` が Ubuntu shim のままだったこと。
   `efiInstallAsRemovable = true` に変更し、「NVRAM の整理」を手順化した
-  (「ディスク構成とブート」参照)。切り替え後の実機での再起動確認は未検証。
+  (「ディスク構成とブート」参照)。`switch --install-bootloader` → NVRAM の整理 → 再起動で、
+  Option なし / Option キー「EFI Boot」の両方で NixOS GRUB が出ることを確認済み
+  (BootOrder: 0002 NixOS, 0000 Ubuntu, 0080 macOS)。
 - 自宅ルータ (F660A) が EDNS0 に FORMERR を返し名前解決不能 →
   `networking.resolvconf.dnsExtensionMechanism = false` (`configuration.nix`)。
