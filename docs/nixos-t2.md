@@ -84,6 +84,23 @@ p4  NixOS      (LABEL=nixos) root。/boot は root 内
   `LABEL=nixos` で root を作れば UUID の差し替えが要らない。
   `nixos-generate-config --show-hardware-config` の出力とは必ず突き合わせること。
 - `boot.loader.grub.useOSProber = true` で Ubuntu / macOS もメニューに出す。
+- GRUB は `boot.loader.grub.efiInstallAsRemovable = true` でリムーバブルパス
+  `EFI/BOOT/BOOTX64.EFI` に置く。**Apple の Startup Manager (Option キー) は UEFI の
+  `Boot####` エントリを列挙せず、ESP の `EFI/BOOT/BOOTX64.EFI` だけを「EFI Boot」として
+  出す** (t2linux wiki の NixOS ページが GRUB 向けに示す構成と同じ)。
+  `canTouchEfiVariables` は `efiInstallAsRemovable` と排他 (nixpkgs の assertion) なので
+  既定の false のままで、NixOS は NVRAM (`efibootmgr`) を管理しない。
+  - 初回インストール (2026-09-14) は `canTouchEfiVariables = true` で行ったため
+    `EFI/NixOS-boot-efi/grubx64.efi` + NVRAM `Boot0001` が作られ、`BOOTX64.EFI` は
+    Ubuntu の shim のままだった。Option キー → 「EFI Boot」で Ubuntu の shim → `fbx64.efi`
+    (fallback) が起動し、**BootOrder を Ubuntu 先頭に書き戻す**ため、以後 Option なしでも
+    Ubuntu (GRUB は hidden / timeout 0 でメニューなし) が上がって NixOS に入れなくなった。
+    詳細は issue #151 のコメント。
+  - Ubuntu の shim は `EFI/ubuntu/shimx64.efi` に残る。Ubuntu 側で
+    `grub2/force_efi_extra_removable` を true にすると apt 更新で `BOOTX64.EFI` が
+    Ubuntu shim に戻るので触らない (現状 false、`debconf-show grub-efi-amd64` で確認)。
+  - Ubuntu の fallback で BootOrder が戻ってしまった場合は、下記「NVRAM の整理」の
+    `efibootmgr -c` を再度行う。Ubuntu へは GRUB メニューから入れば fallback は走らない。
 
 ## インストール手順 (ランブック)
 
@@ -236,8 +253,14 @@ chmod 0600 /mnt/etc/NetworkManager/system-connections/*
 (`copying path '/nix/store/...-linux-t2-6.18.46' from 'https://cache.soopy.moe'`)。
 自前ビルドに入ってしまった場合は Ctrl-C して substituter の指定を見直す。
 
-`reboot` → Option キーで内蔵ディスクを選ぶか、そのまま起動すれば GRUB が出る。
-GRUB メニューに Ubuntu / macOS が出ていることも確認 (`useOSProber`)。
+`reboot` → Option キーで「EFI Boot」を選ぶか、そのまま起動すれば NixOS の GRUB が出る
+(`efiInstallAsRemovable` で `EFI/BOOT/BOOTX64.EFI` が NixOS GRUB になっているため。
+Ubuntu の shim が `BOOTX64.EFI` に残っている状態だと「EFI Boot」は Ubuntu に入る。
+「ディスク構成とブート」参照)。GRUB メニューに Ubuntu / macOS が出ていることも確認
+(`useOSProber`)。
+
+`nixos-install` は NVRAM を触らないので、Option なしの既定起動も NixOS にしたければ
+起動後に「NVRAM の整理」の `efibootmgr -c` を行う。
 
 ### 8. 起動後 (NixOS 上)
 
@@ -279,10 +302,31 @@ pkill -x ibus-engine-skk              # skkserv 起動前に立ち上がった i
                                       # 落とすと次回 IME 切替時に ibus-daemon が再起動して接続し直す
 ```
 
+### NVRAM の整理 (初回インストール後に 1 回、NixOS 上)
+
+初回インストールを `canTouchEfiVariables = true` で行った実機向け。`efiInstallAsRemovable`
+に切り替えた `nixos-rebuild switch` で `BOOTX64.EFI` は NixOS GRUB になるが、NVRAM の
+旧エントリと `EFI/NixOS-boot-efi/` は残る。NixOS は以後 NVRAM を管理しないので手で直す。
+
+```bash
+sudo efibootmgr -v                     # Boot0000 Ubuntu / Boot0001 NixOS-boot-efi / Boot0080 macOS を確認
+sudo efibootmgr -B -b 0001             # 旧 NixOS-boot-efi エントリを削除
+sudo rm -r /boot/efi/EFI/NixOS-boot-efi   # 古い grubx64.efi が /boot/grub のモジュールと乖離するのを防ぐ
+sudo efibootmgr -c -d /dev/nvme0n1 -p 1 -L NixOS -l '\EFI\BOOT\BOOTX64.EFI'   # Option なし起動も NixOS へ
+sudo efibootmgr -v                     # BootOrder の先頭が NixOS であること
+```
+
+Ubuntu の fallback (`fbx64.efi`) が走って BootOrder が Ubuntu 先頭に戻ったときも同じ
+`efibootmgr -c` で直す。**設定変更なしの即時復旧** は `sudo efibootmgr -o <NixOS>,0000,0080`
+→ Option を押さずに `reboot`。それでも Ubuntu が上がるなら Ubuntu GRUB 起動の瞬間に Esc →
+`c` → `set root=(hd0,gpt1)` / `chainloader /EFI/BOOT/BOOTX64.EFI` / `boot`
+(旧構成なら `/EFI/NixOS-boot-efi/grubx64.efi`)。
+
 ### ロールバック
 
-- Ubuntu に戻る: GRUB メニューの Ubuntu エントリ、または Option キー起動で `EFI Boot`
-  (Ubuntu の shim は `\EFI\ubuntu\shimx64.efi` のまま残る)
+- Ubuntu に戻る: GRUB メニューの Ubuntu エントリ (Ubuntu の shim は
+  `\EFI\ubuntu\shimx64.efi` のまま残る)。Option キーの「EFI Boot」は NixOS GRUB
+  (`BOOTX64.EFI`) であって Ubuntu ではない
 - ESP を壊した: live USB から
   `dd if=/ubuntu/home/nanasess/t2-backup/esp-p1.img of=/dev/nvme0n1p1 bs=4M conv=fsync`
 - p3 の縮小に失敗した: 別媒体の退避物から復旧するしかない (Ubuntu の再インストール)。
@@ -323,4 +367,13 @@ home-manager は NixOS モジュールとして読み込み `useUserPackages = t
 
 ### 実機検証
 
-(インストール後に埋める。issue #151 のチェックリスト参照)
+(issue #151 のチェックリストに沿って埋める)
+
+- 2026-09-14 インストール完了。世代 2〜5 まで NixOS 上で `nixos-rebuild switch` できている。
+- 2026-09-14 **Option キー → 「EFI Boot」で Ubuntu が起動し GRUB メニューが出ない**
+  (issue #151 コメント)。原因は `canTouchEfiVariables = true` で GRUB を
+  `EFI/NixOS-boot-efi/` に入れたため `BOOTX64.EFI` が Ubuntu shim のままだったこと。
+  `efiInstallAsRemovable = true` に変更し、「NVRAM の整理」を手順化した
+  (「ディスク構成とブート」参照)。切り替え後の実機での再起動確認は未検証。
+- 自宅ルータ (F660A) が EDNS0 に FORMERR を返し名前解決不能 →
+  `networking.resolvconf.dnsExtensionMechanism = false` (`configuration.nix`)。
