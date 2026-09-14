@@ -35,9 +35,16 @@ nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
 # Ubuntu の設定をビルド
 nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage'
 
+# k-2 (NixOS, T2 Mac) のシステム設定を評価 / ビルド
+# toplevel は linux-t2 カーネルと Apple 復旧イメージ (KVM 必須) を抱えるので、
+# 他ホストでは評価 + home-manager 部分のビルドまでに留める (docs/nixos-t2.md)
+nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
+nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'
+
 # 設定を適用
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 home-manager switch --flake '.#nanasess@ubuntu'
+sudo nixos-rebuild switch --flake '.#k-2'   # NixOS ホスト (home-manager も同時に適用)
 
 # Nix ファイルのフォーマット
 nix fmt
@@ -57,11 +64,15 @@ home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
 ### ディレクトリ構成
 
 ```text
-flake.nix              -- エントリポイント（inputs と homeConfigurations）
+flake.nix              -- エントリポイント（inputs、homeConfigurations、nixosConfigurations）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
   wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm / Ghostty コピー、1Password CLI、WSLg X11/Wayland）
-  ubuntu.nix           -- Ubuntu 固有設定（Ghostty、Walker、OneDrive）
+  ubuntu.nix           -- Ubuntu 固有設定（Ghostty (nixGL)、apt 差分チェック、GNOME 拡張）
+  k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu からの移行先 (docs/nixos-t2.md)
+    configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager + l2tp、1Password、ibus）
+    hardware-configuration.nix -- ディスク (LABEL 参照) / カーネルモジュール
+    home.nix           -- ユーザー環境（hosts/ubuntu.nix の NixOS 版）
 modules/
   zsh/
     default.nix        -- Zsh モジュール（プラグイン、エイリアス、補完、1Password 連携）
@@ -83,12 +94,16 @@ modules/
   ghostty/
     default.nix        -- Ghostty 共有設定（Linux native / Windows port (PR #12167) 両対応、_module.args で公開）
   bluetooth-audio/
-    default.nix        -- Bluetooth オーディオ（HFP 自動切替の無効化 + pavucontrol。ubuntu 用）
-    51-disable-headset-autoswitch.lua -- WirePlumber の自動プロファイル切替を無効化
+    default.nix        -- Bluetooth オーディオ（HFP 自動切替の無効化 + pavucontrol。GNOME ホスト共通）
+    51-disable-headset-autoswitch.lua -- WirePlumber 0.4 (ubuntu) の自動プロファイル切替を無効化
+    51-disable-headset-autoswitch.conf -- 同 0.5 以降 (NixOS) 用
   ibus-skk/
-    default.nix        -- IBus SKK エンジン（Nix ビルドの 1.4.4 + IBUS_COMPONENT_PATH。ubuntu 用）
+    default.nix        -- ibus-skk の辞書設定 (dconf、ホスト共通)
+    ubuntu.nix         -- IBus SKK エンジン登録（Nix ビルドの 1.4.4 + IBUS_COMPONENT_PATH。ubuntu 用）
+  walker/
+    default.nix        -- Walker / Elephant ランチャー（systemd ユーザーサービス + GNOME キーバインド。GNOME ホスト共通）
   xremap/
-    default.nix        -- キーリマッパー（Chrome のタブ移動を Ctrl+H / Ctrl+L に。ubuntu 用）
+    default.nix        -- キーリマッパー（Chrome のタブ移動を Ctrl+H / Ctrl+L に。GNOME ホスト共通）
   portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
   onedrive.nix         -- OneDrive 設定（WSL Gentoo 用）
   yaskkserv2.nix       -- SKK 辞書サーバ（systemd ユーザーサービス。wsl-gentoo / ubuntu 共通）
@@ -104,6 +119,15 @@ docs/                  -- 領域別の詳細ドキュメント（下記「詳細
 
 1. `hosts/<hostname>.nix` を作成（ホスト固有の設定）
 2. `flake.nix` の `homeConfigurations` にエントリを追加（`modules = [ ./home.nix ./hosts/<hostname>.nix ./modules/emacs ./modules/zsh ]`）
+
+NixOS ホストは `hosts/<hostname>/{configuration,hardware-configuration,home}.nix` を作り、
+`flake.nix` の `nixosConfigurations` に `nixpkgs.lib.nixosSystem` で追加する。home-manager は
+NixOS モジュールとして読み込み `useUserPackages = true` にする (`useGlobalPkgs` は `home.nix` の
+`nixpkgs.config` と衝突するので使わない)。GNOME ホスト共通の home-manager モジュールは
+`flake.nix` の `gnomeHomeModules` にまとめてある。
+
+home-manager モジュール内で Nix プロファイルのパスが要るときは `config.home.profileDirectory`
+を使う。`~/.nix-profile` を直書きすると NixOS (`/etc/profiles/per-user/<user>`) で壊れる。
 
 ### 管理方針
 
@@ -146,6 +170,7 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 - **check** — `nix flake check` + WezTerm Lua 構文チェック
 - **emacs** — `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
 - **build** — 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest）
+- **nixos** — `nixosConfigurations.k-2` の toplevel 評価 + home-manager 部分のビルド（カーネルとファームウェアは CI で作らない）
 
 ## 詳細ドキュメント (`docs/`)
 
@@ -160,3 +185,4 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/ibus-skk.md](docs/ibus-skk.md) | apt 版 1.4.3 のバグ、`IBUS_COMPONENT_PATH` によるエンジン登録、反映手順 | `pkgs/ibus-skk.nix`, `modules/ibus-skk/` (ubuntu) |
 | [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、XKB レイヤとの関係、GNOME Wayland でのアプリ判定、root 作業 | `modules/xremap/` (ubuntu) |
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | Claude Code への画像貼り付け。`Ctrl+V` が正解な理由、WSLg の BMP 問題と `wl-paste` shim、切り分け手順 | `hosts/wsl-gentoo.nix` (wsl-gentoo) |
+| [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |

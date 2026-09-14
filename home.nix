@@ -104,8 +104,8 @@
       init.defaultBranch = "main";
       pull.rebase = true;
       commit.verbose = true;
-      "credential \"https://github.com\"".helper = "!${config.home.homeDirectory}/.nix-profile/bin/gh auth git-credential";
-      "credential \"https://gist.github.com\"".helper = "!${config.home.homeDirectory}/.nix-profile/bin/gh auth git-credential";
+      "credential \"https://github.com\"".helper = "!${config.home.profileDirectory}/bin/gh auth git-credential";
+      "credential \"https://gist.github.com\"".helper = "!${config.home.profileDirectory}/bin/gh auth git-credential";
     };
   };
 

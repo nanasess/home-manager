@@ -22,6 +22,10 @@ libskk 側は 1.0.5 の時点で正しく動作する（`SelectStateHandler` が
 
 ## IBus のコンポーネント探索は XDG を一切見ない
 
+(Ubuntu の話。NixOS (k-2) は `i18n.inputMethod.ibus.engines` に `pkgs/ibus-skk.nix` を
+渡すだけで、`ibus-with-plugins` が `IBUS_COMPONENT_PATH` を束ねてくれる。`meta.isIbusEngine`
+がその型チェックの印。辞書設定の dconf は `modules/ibus-skk/default.nix` で両ホスト共通。)
+
 `ibus_registry_load()` の実装:
 
 ```c

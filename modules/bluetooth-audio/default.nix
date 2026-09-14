@@ -29,8 +29,9 @@
 # に記憶して再接続時に復元する。過去に HFP を選んでいると自動切替を止めても HFP が
 # 蘇るため、導入時に当該行を削除した (削除すると優先度による選択にフォールバックする)。
 #
-# 注意 2: WirePlumber 0.4 系の Lua 設定形式。0.5 以降は .conf ベースの新形式に
-# なり本ファイルは無視されるため、Ubuntu 側の wireplumber を上げるときは要追従。
+# 注意 2: WirePlumber は 0.4 系 (Ubuntu 24.04) が Lua 設定、0.5 以降 (NixOS
+# unstable) が .conf 設定で、互いに相手の形式を無視する。両方を置いておき、
+# 動いているバージョンが自分の形式だけを読む。
 #
 # 適用範囲: ユーザー空間のみ (sudo 不要)。ロールバックは flake.nix の modules から
 # 本モジュールを外して home-manager switch するだけ。
@@ -39,6 +40,10 @@
   # 同名ファイルは上位が下位を隠す。50 番の既定より後に読ませたいので 51 を付ける。
   xdg.configFile."wireplumber/policy.lua.d/51-disable-headset-autoswitch.lua".source =
     ./51-disable-headset-autoswitch.lua;
+
+  # 0.5 以降は wireplumber.conf.d/*.conf を読む (上の注意 2)。
+  xdg.configFile."wireplumber/wireplumber.conf.d/51-disable-headset-autoswitch.conf".source =
+    ./51-disable-headset-autoswitch.conf;
 
   # プロファイルを手動で切り替える GUI。GNOME Settings (46) にはプロファイル
   # 選択 UI がなく、A2DP 中はイヤホンのマイクがソース一覧にも出ないため、

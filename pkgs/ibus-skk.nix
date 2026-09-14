@@ -71,5 +71,8 @@ stdenv.mkDerivation rec {
     homepage = "https://github.com/ueno/ibus-skk";
     license = licenses.gpl2Plus;
     platforms = platforms.linux;
+    # NixOS の i18n.inputMethod.ibus.engines は meta.isIbusEngine を型チェックに使う
+    # (nixos/modules/i18n/input-method/ibus.nix)。nixpkgs の ibus-engines.* と同じ印。
+    isIbusEngine = true;
   };
 }

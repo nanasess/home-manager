@@ -59,3 +59,21 @@ jobs:
 
       - name: Build activation package
         run: nix build '.#homeConfigurations."${{ matrix.config }}".activationPackage'
+
+  # NixOS ホストは toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージ
+  # (KVM が要る) を抱えるので、CI では評価と home-manager 側のビルドまでに留める。
+  nixos:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: DeterminateSystems/nix-installer-action@v16
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Evaluate NixOS toplevel
+        run: nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
+
+      - name: Build home-manager generation
+        run: nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'

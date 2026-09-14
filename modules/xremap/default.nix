@@ -37,6 +37,9 @@ in
   #
   # ■ 前提となる root 権限の設定 (home-manager では宣言できない)
   #
+  # NixOS (hosts/k-2) では hardware.uinput.enable と users.users.<name>.extraGroups
+  # (input / uinput) で宣言済みなので、以下は Ubuntu での手順。
+  #
   #   sudo gpasswd -a nanasess input
   #   echo 'KERNEL=="uinput", GROUP="input", TAG+="uaccess", MODE:="0660", OPTIONS+="static_node=uinput"' \
   #     | sudo tee /etc/udev/rules.d/99-input.rules
@@ -123,14 +126,11 @@ in
 
   dconf.settings = {
     "org/gnome/shell" = {
-      # このキーは配列まるごと置換なので、Ubuntu 既定の拡張も明示的に併記する。
-      # 抜かすと ding (デスクトップアイコン) / dock / tiling-assistant が無効になる。
-      enabled-extensions = [
-        "ding@rastersoft.com"
-        "ubuntu-dock@ubuntu.com"
-        "tiling-assistant@ubuntu.com"
-        extensionUuid
-      ];
+      # このキーは配列まるごと置換される。ホスト既定の拡張 (Ubuntu の ding / dock /
+      # tiling-assistant 等) は各 hosts/*.nix 側で同じキーに併記すること。
+      # home-manager の gvariant 型は配列同士を連結してマージするので、ここでは
+      # xremap 拡張だけを宣言する。
+      enabled-extensions = [ extensionUuid ];
     };
   };
 
