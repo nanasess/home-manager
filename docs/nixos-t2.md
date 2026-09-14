@@ -119,10 +119,12 @@ sha256 `29ec02ed3a1e35efd72089b9df339c00cf9a93e8474646e700d60d2a49683194`。
 
 ```bash
 lsblk -d -o NAME,SIZE,MODEL,TRAN          # USB メモリのデバイス名を確認 (sdX)
-sudo dd if=~/Downloads/nixos-t2-iso-minimal-v6.18.35.iso of=/dev/sdX bs=4M status=progress conv=fsync
+sudo dd if=/home/nanasess/Downloads/nixos-t2-iso-minimal-v6.18.35.iso of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
 `of=` を間違えると内蔵 NVMe を壊すので、`TRAN` が `usb` の行であることを確認してから打つ。
+`if=` は絶対パスで書く: zsh は `=` の後ろの `~` を展開しない (`MAGIC_EQUAL_SUBST` が
+無効) ため、`if=~/...` は「そのようなファイルはない」で失敗する。
 
 ### 3. live USB で起動
 
