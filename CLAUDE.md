@@ -73,6 +73,7 @@ hosts/
     configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager + l2tp、1Password、ibus）
     hardware-configuration.nix -- ディスク (LABEL 参照) / カーネルモジュール
     home.nix           -- ユーザー環境（hosts/ubuntu.nix の NixOS 版）
+    scripts/backup-before-install.sh -- インストール前の退避（ファームウェア / ESP イメージ / システム情報）
 modules/
   zsh/
     default.nix        -- Zsh モジュール（プラグイン、エイリアス、補完、1Password 連携）
