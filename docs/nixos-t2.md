@@ -307,6 +307,8 @@ pkill -x ibus-engine-skk              # skkserv 起動前に立ち上がった i
 初回インストールを `canTouchEfiVariables = true` で行った実機向け。`efiInstallAsRemovable`
 に切り替えた `nixos-rebuild switch` で `BOOTX64.EFI` は NixOS GRUB になるが、NVRAM の
 旧エントリと `EFI/NixOS-boot-efi/` は残る。NixOS は以後 NVRAM を管理しないので手で直す。
+`efibootmgr` は `configuration.nix` の `systemPackages` に入れてある (入る前の世代なら
+`nix shell nixpkgs#efibootmgr` で取ってから `sudo` に絶対パスで渡す)。
 
 ```bash
 sudo efibootmgr -v                     # Boot0000 Ubuntu / Boot0001 NixOS-boot-efi / Boot0080 macOS を確認

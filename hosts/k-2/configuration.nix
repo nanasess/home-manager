@@ -204,6 +204,9 @@ in
     gnome-tweaks
     vim
     git
+    # NVRAM の整理 (docs/nixos-t2.md)。efiInstallAsRemovable で NixOS は NVRAM を
+    # 管理しないため、Ubuntu の fallback で BootOrder が戻ったときに手で直す。
+    efibootmgr
   ];
 
   nixpkgs.config.allowUnfreePredicate = pkg:
