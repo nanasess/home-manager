@@ -85,25 +85,175 @@ p4  NixOS      (LABEL=nixos) root。/boot は root 内
   `nixos-generate-config --show-hardware-config` の出力とは必ず突き合わせること。
 - `boot.loader.grub.useOSProber = true` で Ubuntu / macOS もメニューに出す。
 
-## インストール手順
+## インストール手順 (ランブック)
 
-1. **退避**: `/lib/firmware/brcm` を USB へ。ESP (`p1`) を `dd` でイメージ退避。
-2. **ISO**: [t2linux/nixos-t2-iso](https://github.com/t2linux/nixos-t2-iso) の
-   `nixos-t2-iso-minimal.iso` (純正 ISO は apple-bce が無く内蔵キーボードが効かない)。
-   USB-C メモリに書き込み、Option キー起動。
-3. **パーティション**: live 環境から Ubuntu (`p3`) を `e2fsck -f` → `resize2fs` で縮小し、
-   空き領域に `p4` を作成、`mkfs.ext4 -L nixos`。
-4. **インストール**:
+インストーラ環境では Claude Code が使えないので、上から順に打てる形で書いてある。
+値はすべて 2026-09-14 時点の実機から採取したもの (`hosts/k-2/scripts/backup-before-install.sh`
+の `info/` と照合できる)。**パーティション番号や MiB 値は打つ前に `parted print` で必ず再確認する。**
+
+### 0. 前提
+
+- Ubuntu が起動している = T2 の Secure Boot 緩和と外部起動許可は済んでいる
+- 必要な物: USB-C メモリ 1 本 (ISO 用、2GB 以上)。退避先は Ubuntu の `$HOME` + 別媒体
+- PR #152 が main にマージ済み (live 環境で `git clone` する)
+
+### 1. 退避 (Ubuntu 上)
+
+```bash
+cd ~/.config/home-manager
+# Ubuntu 側 (p3 は残すので live USB から読める) と、別媒体の 2 箇所へ
+sudo hosts/k-2/scripts/backup-before-install.sh ~/t2-backup --nm-connections
+sudo hosts/k-2/scripts/backup-before-install.sh /media/nanasess/<USB>/t2-backup --nm-connections
+```
+
+`--nm-connections` は WiFi / VPN の接続プロファイル (PSK・パスワード入り) を含むので、
+退避先は自分しか読めない場所に限る。NixOS 側では `/etc/NetworkManager/system-connections/`
+に 0600 でコピーすれば同じ接続が使える (L2TP も同じ NetworkManager-l2tp なので互換)。
+
+### 2. インストール USB の作成 (Ubuntu 上)
+
+ISO は `~/Downloads/nixos-t2-iso-minimal-v6.18.35.iso` に取得済み
+(t2linux/nixos-t2-iso v6.18.35、2026-06-23 リリース、1,424,670,720 bytes、
+sha256 `29ec02ed3a1e35efd72089b9df339c00cf9a93e8474646e700d60d2a49683194`。
+上流は checksum を配布していないので、この値は手元で取ったもの)。
+
+```bash
+lsblk -d -o NAME,SIZE,MODEL,TRAN          # USB メモリのデバイス名を確認 (sdX)
+sudo dd if=~/Downloads/nixos-t2-iso-minimal-v6.18.35.iso of=/dev/sdX bs=4M status=progress conv=fsync
+```
+
+`of=` を間違えると内蔵 NVMe を壊すので、`TRAN` が `usb` の行であることを確認してから打つ。
+
+### 3. live USB で起動
+
+1. 再起動して Option (⌥) キーを押し続け、`EFI Boot` (USB) を選ぶ
+2. `nixos` ユーザーで自動ログインされる。以降は `sudo -i` で root
+3. Ubuntu パーティションを読み取り専用でマウントして退避物を取り出す:
    ```bash
-   mount /dev/disk/by-label/nixos /mnt
-   mkdir -p /mnt/boot/efi && mount /dev/disk/by-label/EFI /mnt/boot/efi
-   git clone https://github.com/nanasess/home-manager /mnt/etc/nixos-src   # 任意の場所でよい
-   nixos-install --flake '/mnt/etc/nixos-src#k-2' \
-     --option extra-substituters https://cache.soopy.moe \
-     --option extra-trusted-public-keys cache.soopy.moe-1:0RZVsQeR+GOh0VQI9rvnHz55nVXkFardDqfm4+afjPo=
+   sudo -i
+   mkdir -p /ubuntu && mount -o ro /dev/disk/by-label/Ubuntu /ubuntu
    ```
-5. 再起動後、`nixos-generate-config --show-hardware-config` と
-   `hosts/k-2/hardware-configuration.nix` を突き合わせる。
+
+### 4. live 環境で WiFi を使う
+
+ISO には Apple のファームウェアが入っていない。退避した `brcm/` を置いてドライバを再ロードする:
+
+```bash
+mkdir -p /lib/firmware/brcm
+cp /ubuntu/home/nanasess/t2-backup/brcm/* /lib/firmware/brcm/
+modprobe -r brcmfmac_wcc brcmfmac; modprobe brcmfmac
+dmesg | grep brcmf_fw_alloc_request    # "using brcm/brcmfmac4364b3-pcie" が出ればよい
+
+nmcli device wifi list
+nmcli device wifi connect "<SSID>" password "<パスフレーズ>"   # または nmtui
+ping -c 3 cache.nixos.org
+```
+
+(ISO のベース `installation-device.nix` は NetworkManager を有効にしている
+(nixpkgs 26.11 時点)。t2linux wiki の `wpa_cli` の記述は古い ISO 向け。
+代替: iPhone の USB テザリング、または ISO 同梱の `get-apple-firmware` で
+macOS パーティションから直接抽出する Method 4。)
+
+### 5. Ubuntu (p3) の縮小と NixOS 用パーティション (p4) の作成
+
+現在のレイアウト (512B セクタ換算、`parted unit MiB` と一致):
+
+| # | 開始 | 終了 | サイズ | 内容 |
+|---|---|---|---|---|
+| p1 | 0.02 MiB | 300 MiB | 300 MiB | EFI (`LABEL=EFI`) |
+| p2 | 300 MiB | 287022 MiB | 280 GiB | macOS APFS |
+| p3 | 287023 MiB | 954204 MiB (末尾) | 651.5 GiB | Ubuntu ext4 (`LABEL=Ubuntu`、使用 180 GiB) |
+
+(ディスクは論理セクタ 4096B だが、上の値は `parted unit MiB` / `/sys/block/.../start`
+(512B 換算) から算出したもの。)
+
+Ubuntu を **300 GiB** (287023 → 594223 MiB) に縮め、残り約 351 GiB を NixOS にする。
+
+```bash
+umount /ubuntu                              # 3 でマウントしていれば外す
+e2fsck -f -n /dev/nvme0n1p3                 # まず読み取り専用で健全性確認
+e2fsck -f /dev/nvme0n1p3                    # 実修復 (resize2fs の前提)
+resize2fs /dev/nvme0n1p3 298G               # FS を目標より小さめに縮める (G = GiB)
+parted /dev/nvme0n1 unit MiB print          # p3 の開始が 287023MiB であることを確認
+parted /dev/nvme0n1 resizepart 3 594223MiB  # 確認には Yes
+parted -s /dev/nvme0n1 mkpart nixos ext4 594223MiB 100%
+parted /dev/nvme0n1 unit MiB print          # p3 = 287023〜594223MiB、p4 = 594223MiB〜末尾
+resize2fs /dev/nvme0n1p3                    # サイズ省略 = パーティションいっぱいまで再拡張
+e2fsck -f -n /dev/nvme0n1p3                 # 縮小後の Ubuntu が健全か再確認
+mkfs.ext4 -L nixos /dev/nvme0n1p4
+```
+
+順番を間違えない: **ファイルシステム (resize2fs) → パーティション (resizepart)** の順。
+逆にすると Ubuntu のデータが切り落とされる。FS を 298G と小さめにしてから
+パーティションを縮め、最後にサイズ省略の `resize2fs` で合わせるのは、parted の
+終端の丸め (1 セクタ) で FS がパーティションからはみ出す事故を避けるため。
+
+### 6. マウントとハードウェア定義の照合
+
+```bash
+mount /dev/disk/by-label/nixos /mnt
+mkdir -p /mnt/boot/efi && mount /dev/disk/by-label/EFI /mnt/boot/efi
+mkdir -p /mnt/home/nanasess/.config
+git clone https://github.com/nanasess/home-manager.git /mnt/home/nanasess/.config/home-manager
+cd /mnt/home/nanasess/.config/home-manager
+
+nixos-generate-config --root /mnt --show-hardware-config > /tmp/hw.nix
+diff /tmp/hw.nix hosts/k-2/hardware-configuration.nix
+```
+
+差分の見どころは `boot.initrd.availableKernelModules` と `fileSystems` の by-uuid。
+ラベル参照 (`/dev/disk/by-label/nixos`, `EFI`) で動くようにしてあるので、UUID への
+置き換えは不要。モジュールに不足があればここで `hardware-configuration.nix` を直す
+(コミットは NixOS 起動後でよい。git は tracked でないファイルを flake から見ないので
+新規ファイルを足したときは `git add` が要る)。
+
+### 7. nixos-install
+
+```bash
+nixos-install --root /mnt \
+  --flake /mnt/home/nanasess/.config/home-manager#k-2 \
+  --option extra-substituters https://cache.soopy.moe \
+  --option extra-trusted-public-keys cache.soopy.moe-1:0RZVsQeR+GOh0VQI9rvnHz55nVXkFardDqfm4+afjPo=
+# 最後に root のパスワードを聞かれる
+
+nixos-enter --root /mnt -c 'passwd nanasess'          # ユーザーのパスワード
+nixos-enter --root /mnt -c 'chown -R nanasess:users /home/nanasess'
+
+# NetworkManager の接続プロファイルを持ち込む (任意。秘密情報を含むので 0600)
+install -d -m 0700 /mnt/etc/NetworkManager/system-connections
+cp /ubuntu/home/nanasess/t2-backup/nm-connections/*.nmconnection /mnt/etc/NetworkManager/system-connections/
+chmod 0600 /mnt/etc/NetworkManager/system-connections/*
+```
+
+カーネルの取得元が `cache.soopy.moe` になっていることをログで確認する
+(`copying path '/nix/store/...-linux-t2-6.18.46' from 'https://cache.soopy.moe'`)。
+自前ビルドに入ってしまった場合は Ctrl-C して substituter の指定を見直す。
+
+`reboot` → Option キーで内蔵ディスクを選ぶか、そのまま起動すれば GRUB が出る。
+GRUB メニューに Ubuntu / macOS が出ていることも確認 (`useOSProber`)。
+
+### 8. 起動後 (NixOS 上)
+
+```bash
+cd ~/.config/home-manager
+git status                        # 6 で hardware-configuration.nix を直していれば差分がある
+cat /sys/power/mem_sleep          # [deep] か
+dmesg | grep -E 'brcmfmac|apple-bce|hci0'
+nmcli device wifi list
+```
+
+以降は issue #151 のチェックリストに沿って検証し、結果を本ドキュメントの「実機検証」に記録する。
+初回に手動で要るもの: 1Password のサインイン (SSH agent / commit 署名)、`gh auth login`、
+Chrome の 1Password 拡張 (`custom_allowed_browsers` が効いているか)。
+
+### ロールバック
+
+- Ubuntu に戻る: GRUB メニューの Ubuntu エントリ、または Option キー起動で `EFI Boot`
+  (Ubuntu の shim は `\EFI\ubuntu\shimx64.efi` のまま残る)
+- ESP を壊した: live USB から
+  `dd if=/ubuntu/home/nanasess/t2-backup/esp-p1.img of=/dev/nvme0n1p1 bs=4M conv=fsync`
+- p3 の縮小に失敗した: 別媒体の退避物から復旧するしかない (Ubuntu の再インストール)。
+  縮小前の `e2fsck -f -n` を省かないこと
 
 ## Ubuntu 版との差分 (home-manager 側)
 
