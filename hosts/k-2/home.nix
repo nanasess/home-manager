@@ -36,5 +36,10 @@
     "org/gnome/desktop/input-sources" = {
       xkb-options = [ "ctrl:nocaps" "altwin:swap_lalt_lwin" ];
     };
+    # トラックパッドはタップではなく押し込みでクリックする。GNOME 50 の
+    # gsettings-desktop-schemas は tap-to-click の既定が true なので明示的に切る。
+    "org/gnome/desktop/peripherals/touchpad" = {
+      tap-to-click = false;
+    };
   };
 }
