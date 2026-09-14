@@ -280,6 +280,21 @@ Claude Code のネイティブインストール (`curl -fsSL https://claude.ai/
 executables" が出たら `NIX_LD` / `NIX_LD_LIBRARY_PATH` が入る前の古いシェル)、
 OneDrive の認可と SKK 辞書のビルド (下記)。
 
+XDG ユーザーディレクトリは `xdg.userDirs` (`hosts/k-2/home.nix`) で英語名に固定してある
+(`user-dirs.conf` の `enabled=False` でログイン時の `xdg-user-dirs-update` による再生成も止める)。
+この設定が入る前にログインしていた環境 (初回インストール時) は ja_JP.UTF-8 の
+`xdg-user-dirs-update` が `~/ダウンロード` 等を作っているので、中身を英語側へ移して消す:
+
+```bash
+for pair in ダウンロード:Downloads ドキュメント:Documents デスクトップ:Desktop 音楽:Music 画像:Pictures 公開:Public テンプレート:Templates ビデオ:Videos; do
+  ja=$HOME/${pair%%:*}; en=$HOME/${pair##*:}
+  [ -d "$ja" ] && { mkdir -p "$en"; find "$ja" -mindepth 1 -maxdepth 1 -exec mv -t "$en" {} +; rmdir "$ja"; }
+done
+```
+
+GNOME (Nautilus のサイドバー、Chrome の保存先) は `~/.config/user-dirs.dirs` を読むので
+再ログインで英語側を指す。
+
 OneDrive (`modules/onedrive.nix`) は認可前だと `--monitor` サービスがブラウザ認可を 10 分待って
 失敗し続けるだけなので、先にサービスを止めて対話的に認可する。yaskkserv2 の配信辞書は
 OneDrive 上の `SKK-JISYO.all.utf8` から作るため、辞書が無い間は skkserv が即終了し

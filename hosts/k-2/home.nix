@@ -29,6 +29,17 @@
     nodejs
   ];
 
+  # XDG ユーザーディレクトリを英語名に固定する。ja_JP.UTF-8 だと初回ログインの
+  # xdg-user-dirs-update が ~/ダウンロード 等を作るので、user-dirs.dirs を宣言し
+  # user-dirs.conf (enabled=False) で以後のログイン時の再生成 (再ローカライズ) を止める。
+  # 既存の日本語ディレクトリは移さない (中身を手で移す。docs/nixos-t2.md)。
+  xdg.userDirs = {
+    enable = true;
+    createDirectories = true;
+    # home-manager 独自の XDG_PROJECTS_DIR (~/Projects) は使わない (~/git-repos がある)。
+    projects = null;
+  };
+
   dconf.settings = {
     # Caps Lock を Ctrl、⌘ と Alt を入れ替え。modules/xremap の modmap
     # (capslock → leftctrl) はこの xkb-options を前提にしている。
