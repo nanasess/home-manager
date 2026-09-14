@@ -254,7 +254,30 @@ nmcli device wifi list
 Chrome の 1Password 拡張 (`custom_allowed_browsers` が効いているか)、
 Claude Code のネイティブインストール (`curl -fsSL https://claude.ai/install.sh | bash`。
 汎用 ELF なので `programs.nix-ld` で動かす。stub-ld の "cannot run dynamically linked
-executables" が出たら `NIX_LD` / `NIX_LD_LIBRARY_PATH` が入る前の古いシェル)。
+executables" が出たら `NIX_LD` / `NIX_LD_LIBRARY_PATH` が入る前の古いシェル)、
+OneDrive の認可と SKK 辞書のビルド (下記)。
+
+OneDrive (`modules/onedrive.nix`) は認可前だと `--monitor` サービスがブラウザ認可を 10 分待って
+失敗し続けるだけなので、先にサービスを止めて対話的に認可する。yaskkserv2 の配信辞書は
+OneDrive 上の `SKK-JISYO.all.utf8` から作るため、辞書が無い間は skkserv が即終了し
+ibus-skk / nskk とも漢字変換ができない (README.md「SKK 辞書サーバ」節)。
+
+```bash
+systemctl --user stop onedrive
+onedrive                              # ブラウザで認可。127.0.0.1:53100 に戻らなければ redirect URI を貼る
+# 辞書 (emacs/ddskk) だけ先に取る。sync_list 全体 (howm 3000 ファイル超) を待つと 429 で長引く。
+# 初回は「--resync が必要」と言われるので付ける (ローカル状態が無いので失われるものは無い)
+onedrive --sync --resync --resync-auth --single-directory emacs/ddskk --download-only
+systemctl --user start onedrive         # 残り (howm 等) は monitor サービスに任せる
+mkdir -p ~/.local/share/yaskkserv2
+yaskkserv2_make_dictionary \
+  --dictionary-filename ~/.local/share/yaskkserv2/all \
+  --utf8 "$HOME/OneDrive - Skirnir Inc/emacs/ddskk/SKK-JISYO.all.utf8"
+systemctl --user restart yaskkserv2
+ss -ltn | grep 1178                   # listen していれば OK
+pkill -x ibus-engine-skk              # skkserv 起動前に立ち上がった ibus-skk は接続失敗を保持する。
+                                      # 落とすと次回 IME 切替時に ibus-daemon が再起動して接続し直す
+```
 
 ### ロールバック
 
