@@ -125,71 +125,10 @@ in
     # GTK の長年のバグ (X11 接続喪失時に daemon ごとクラッシュ / GNOME #85715) を
     # 回避し、HiDPI スケーリングと IME 連携も Wayland ネイティブになる。
     emacs31-pgtk
-    walker
-    elephant
-    libqalculate
     # GNOME のUIフォント設定 (gsettings: Adwaita Sans) の実体。未導入だと
     # pgtk Emacs の GTK メニュー/ツールバー/タイトルバーが豆腐になる。
     adwaita-fonts
   ];
-
-  home.file.".local/bin/walker-wrapper" = {
-    executable = true;
-    text = ''
-      #!/bin/bash
-      export PATH="${config.home.homeDirectory}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
-      exec walker "$@"
-    '';
-  };
-
-  systemd.user.services.elephant = {
-    Unit = {
-      Description = "Elephant data provider service (Walker backend)";
-      After = [ "graphical-session.target" ];
-      PartOf = [ "graphical-session.target" ];
-    };
-    Service = {
-      Type = "simple";
-      ExecStart = "${pkgs.elephant}/bin/elephant";
-      Restart = "on-failure";
-      RestartSec = 5;
-    };
-    Install = {
-      WantedBy = [ "graphical-session.target" ];
-    };
-  };
-
-  systemd.user.services.walker = {
-    Unit = {
-      Description = "Walker application launcher (gapplication service)";
-      After = [ "graphical-session.target" "elephant.service" ];
-      Requires = [ "elephant.service" ];
-      PartOf = [ "graphical-session.target" ];
-    };
-    Service = {
-      Type = "simple";
-      # walker は起動時に `which("elephant")` で elephant を検出する。
-      # systemd ユーザーサービスの PATH には ~/.nix-profile/bin が含まれない
-      # ため、elephant の bin を明示的に PATH に追加する。
-      Environment = [ "PATH=${pkgs.elephant}/bin:/usr/local/bin:/usr/bin:/bin" ];
-      ExecStart = "${pkgs.walker}/bin/walker --gapplication-service";
-      Restart = "on-failure";
-      RestartSec = 5;
-    };
-    Install = {
-      WantedBy = [ "graphical-session.target" ];
-    };
-  };
-
-  xdg.configFile."walker/config.toml".source = ./walker/config.toml;
-
-  # Walker v2.x の旧 themes ファイル (v0.x の単一ファイル形式) はスキーマ非互換のため
-  # activation 時に削除する。v2.x はサブディレクトリ形式 (themes/<name>/style.css 等) を使用。
-  home.activation.cleanupLegacyWalkerThemes = config.lib.dag.entryBefore [ "checkLinkTargets" ] ''
-    rm -f "${config.xdg.configHome}/walker/themes/default.css" \
-          "${config.xdg.configHome}/walker/themes/default.toml" \
-          "${config.xdg.configHome}/walker/themes/default_window.toml"
-  '';
 
   home.activation.disableGnomeTerminalBell = config.lib.dag.entryAfter [ "writeBoundary" ] ''
     profile_uuid=$(${pkgs.glib}/bin/gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
@@ -200,30 +139,14 @@ in
   '';
 
   dconf.settings = {
-    # ibus-skk の辞書設定。yaskkserv2 (skkserv) を辞書サーバとして参照する。
-    # エンジン本体は modules/ibus-skk (Nix ビルドの 1.4.4) が提供する。エンジン名 skk は
-    # apt 版と同一なのでこの dconf パス (desktop/ibus/engine/skk) はそのまま引き継がれる。
-    # encoding=UTF-8 が必須: yaskkserv2 は --midashi-utf8 で UTF-8 通信専用のため。
-    # ibus-skk (libskk) の既定は EUC-JP で、省略すると見出し語が化けて変換不能になる
-    # (ueno/ibus-skk src/engine.vala が encoding= を Skk.SkkServ へ渡す)。
-    # このコメントを消して encoding を外すと ibus-skk の漢字変換が壊れる。
-    "desktop/ibus/engine/skk" = {
-      dictionaries = [
-        "file=${config.home.homeDirectory}/.config/ibus-skk/user.dict,mode=readwrite,type=file"
-        "host=127.0.0.1,port=1178,type=server,encoding=UTF-8"
+    "org/gnome/shell" = {
+      # Ubuntu 既定の拡張。modules/xremap が同じキーに xremap 拡張を足すため、
+      # ここを抜かすと ding (デスクトップアイコン) / dock / tiling-assistant が無効になる。
+      enabled-extensions = [
+        "ding@rastersoft.com"
+        "ubuntu-dock@ubuntu.com"
+        "tiling-assistant@ubuntu.com"
       ];
-    };
-
-    "org/gnome/settings-daemon/plugins/media-keys" = {
-      custom-keybindings = [
-        "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/"
-      ];
-    };
-
-    "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" = {
-      name = "Walker";
-      command = "${config.home.homeDirectory}/.local/bin/walker-wrapper";
-      binding = "<Control><Shift>semicolon";
     };
   };
 }

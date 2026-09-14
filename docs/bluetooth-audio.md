@@ -1,6 +1,6 @@
 # Bluetooth オーディオ (T2 Mac + Bose QC Earbuds)
 
-設定: `modules/bluetooth-audio/`（`nanasess@ubuntu` のみ）。2026-08-12 / 08-13 の実機調査に基づく。
+設定: `modules/bluetooth-audio/`（`nanasess@ubuntu` と NixOS `k-2`。WirePlumber 0.4 / 0.5 の両形式を置いている）。2026-08-12 / 08-13 の実機調査に基づく。
 
 接続不安定の原因は実際に 3 種類あった。いずれも「電波が弱い」「混線」ではなく、**単一コントローラ（Bluetooth / WiFi ワンチップ・アンテナ共用）の奪い合い**である。切り分けは下記 3 節の順で行う。
 

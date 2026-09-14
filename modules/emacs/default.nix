@@ -69,7 +69,7 @@ in
     executable = true;
     text = ''
       #!/bin/bash
-      export PATH="${config.home.homeDirectory}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      export PATH="${config.home.profileDirectory}/bin:/nix/var/nix/profiles/default/bin:$PATH"
       export GTK_IM_MODULE=none
       export XMODIFIERS=@im=none
       exec emacs "$@"
@@ -80,7 +80,7 @@ in
     executable = true;
     text = ''
       #!/bin/bash
-      export PATH="${config.home.homeDirectory}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      export PATH="${config.home.profileDirectory}/bin:/nix/var/nix/profiles/default/bin:$PATH"
       export GTK_IM_MODULE=none
       export XMODIFIERS=@im=none
       if [ -n "$*" ]; then
@@ -106,7 +106,7 @@ in
       StartupNotify=true
       StartupWMClass=Emacs
       Keywords=Text;Editor;
-      TryExec=${config.home.homeDirectory}/.nix-profile/bin/emacs
+      TryExec=${config.home.profileDirectory}/bin/emacs
     '';
   };
 

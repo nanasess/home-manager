@@ -1,6 +1,6 @@
 # ibus-skk (SKK 入力メソッド)
 
-設定: `pkgs/ibus-skk.nix` + `modules/ibus-skk/`（`nanasess@ubuntu` のみ）。apt 版 1.4.3 を Nix ビルドの 1.4.4 で置き換えている。
+設定: `pkgs/ibus-skk.nix` + `modules/ibus-skk/`（`nanasess@ubuntu` と NixOS `k-2`。エンジン登録経路はホストごとに異なる、後述）。Ubuntu では apt 版 1.4.3 を Nix ビルドの 1.4.4 で置き換えている。
 
 ## apt 版 1.4.3 は ▼変換中に母音を打つと確定文字列が消える
 
@@ -21,6 +21,10 @@
 libskk 側は 1.0.5 の時点で正しく動作する（`SelectStateHandler` が `candidates.select()` → `state.reset()` → `return false` し、`Context.process_key_event_internal` のループが `NoneStateHandler` で同じキーを再処理する）。切り分けには `gir1.2-skk-1.0` を展開して python から `Skk.Context` を直接叩くのが早い。
 
 ## IBus のコンポーネント探索は XDG を一切見ない
+
+(Ubuntu の話。NixOS (k-2) は `i18n.inputMethod.ibus.engines` に `pkgs/ibus-skk.nix` を
+渡すだけで、`ibus-with-plugins` が `IBUS_COMPONENT_PATH` を束ねてくれる。`meta.isIbusEngine`
+がその型チェックの印。辞書設定の dconf は `modules/ibus-skk/default.nix` で両ホスト共通。)
 
 `ibus_registry_load()` の実装:
 

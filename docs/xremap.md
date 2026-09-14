@@ -1,6 +1,6 @@
 # Chrome のタブ移動キーバインド (xremap)
 
-設定: `modules/xremap/`（`nanasess@ubuntu` のみ）。Chrome にフォーカスがある時だけキーを置換する。
+設定: `modules/xremap/`（`nanasess@ubuntu` と NixOS `k-2`。権限周りはホストごとに異なる、後述）。Chrome にフォーカスがある時だけキーを置換する。
 
 | キー | Chrome での動作 |
 |---|---|
@@ -54,7 +54,10 @@ xremap は「フォーカス中アプリ」を知らないと `application.only`
 - WMClass の実測は `busctl --user call org.gnome.Shell /com/k0kubun/Xremap com.k0kubun.Xremap WMClasses`。GNOME Wayland では `xremap --list-windows` は使えない
 - キー名は `parse_key()` が大文字化して `KEY_` を補うので `pageup` / `pagedown` でよい
 
-## 権限設定は root 作業として残る
+## 権限設定は root 作業として残る (Ubuntu)
+
+NixOS (k-2) では `hardware.uinput.enable` と `users.users.nanasess.extraGroups` の
+`input` / `uinput` で宣言している (`hosts/k-2/configuration.nix`) ので、以下は Ubuntu の話。
 
 home-manager では宣言できない。`/dev/uinput` は既定で `root:root 0600`、`uinput` モジュールも未ロード。
 
