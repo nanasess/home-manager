@@ -145,6 +145,13 @@ in
   # 設定本体は modules/zsh (home-manager)。
   programs.zsh.enable = true;
 
+  # Claude Code はネイティブインストーラー (~/.local/bin/claude、bun 製の汎用 ELF) を
+  # 他ホストと同じ経路 (自己更新あり) で使う。NixOS 既定の stub-ld は汎用 ELF を
+  # 「動かない理由」のメッセージで止めるだけなので、nix-ld で実行可能にする
+  # (既定ライブラリに stdenv.cc.cc / zlib / openssl 等が入る)。
+  # nixpkgs の claude-code (autoPatchelf 版) は flake update 待ちになるため採らない。
+  programs.nix-ld.enable = true;
+
   # 1Password。SSH agent (~/.1password/agent.sock) と commit 署名 (op-ssh-sign) は
   # home.nix / hosts/k-2/home.nix から参照する。
   programs._1password.enable = true;

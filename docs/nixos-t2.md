@@ -251,7 +251,10 @@ nmcli device wifi list
 
 以降は issue #151 のチェックリストに沿って検証し、結果を本ドキュメントの「実機検証」に記録する。
 初回に手動で要るもの: 1Password のサインイン (SSH agent / commit 署名)、`gh auth login`、
-Chrome の 1Password 拡張 (`custom_allowed_browsers` が効いているか)。
+Chrome の 1Password 拡張 (`custom_allowed_browsers` が効いているか)、
+Claude Code のネイティブインストール (`curl -fsSL https://claude.ai/install.sh | bash`。
+汎用 ELF なので `programs.nix-ld` で動かす。stub-ld の "cannot run dynamically linked
+executables" が出たら `NIX_LD` / `NIX_LD_LIBRARY_PATH` が入る前の古いシェル)。
 
 ### ロールバック
 

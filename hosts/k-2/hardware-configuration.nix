@@ -12,7 +12,7 @@
 
   # apple-bce (内蔵キーボード / トラックパッド) は nixos-hardware の apple-t2 が
   # initrd.kernelModules に足す。ここは NVMe とストレージ周りのみ。
-  boot.initrd.availableKernelModules = [ "xhci_pci" "nvme" "usb_storage" "sd_mod" ];
+  boot.initrd.availableKernelModules = [ "xhci_pci" "nvme" "usbhid" "usb_storage" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
