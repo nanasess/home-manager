@@ -62,14 +62,26 @@ in
   # ESP (300MB) は macOS と共用で小さいため、systemd-boot のように世代ごとに
   # カーネル + initrd を ESP に積む方式は採らない。GRUB を ESP に置き、カーネルは
   # root 側の /boot から読ませる (Ubuntu と同じ構成)。
+  #
+  # GRUB はリムーバブルパス EFI/BOOT/BOOTX64.EFI に置く (efiInstallAsRemovable)。
+  # Apple の Startup Manager (Option キー) は UEFI の Boot#### エントリを列挙せず、
+  # ESP の EFI/BOOT/BOOTX64.EFI だけを「EFI Boot」として出す。初回インストールは
+  # canTouchEfiVariables = true で EFI/NixOS-boot-efi/grubx64.efi + NVRAM エントリを
+  # 作っていたため、「EFI Boot」= Ubuntu の shim のままで、shim の fallback が
+  # BootOrder を Ubuntu 先頭に書き戻して NixOS に入れなくなった (issue #151)。
+  # canTouchEfiVariables は efiInstallAsRemovable と排他 (nixpkgs の assertion) なので
+  # 既定の false のままにし、NVRAM は NixOS では管理しない。NVRAM 側の掃除と
+  # NixOS エントリの追加は docs/nixos-t2.md の手順で 1 回だけ手動で行う。
+  # 注意: install-grub.pl は efiInstallAsRemovable / canTouchEfiVariables を
+  # /boot/grub/state の比較に含めないため、この 2 つだけ変えても switch は grub-install を
+  # 再実行しない。切り替え時は nixos-rebuild switch --install-bootloader で強制する。
+  # Ubuntu の shim は EFI/ubuntu/ に残り、GRUB メニューの Ubuntu エントリから戻れる。
   boot.loader = {
-    efi = {
-      canTouchEfiVariables = true;
-      efiSysMountPoint = "/boot/efi";
-    };
+    efi.efiSysMountPoint = "/boot/efi";
     grub = {
       enable = true;
       efiSupport = true;
+      efiInstallAsRemovable = true;
       device = "nodev";
       # 併存する Ubuntu / macOS をメニューに出す (ロールバック経路)。
       useOSProber = true;
@@ -89,6 +101,11 @@ in
     # (NixOS/nixpkgs#64965) も処理される。Ubuntu の network-manager-l2tp(-gnome) 相当。
     plugins = [ pkgs.networkmanager-l2tp ];
   };
+  # 自宅ルータ (F660A, DHCP の第 1 ネームサーバ) は EDNS0 クエリに FORMERR を返す。
+  # 既定の resolv.conf には options edns0 が入り、glibc は FORMERR を回答として受け取り
+  # 次のサーバへ回らないため名前解決ができなくなる (dig +edns=0 @192.168.100.1 で再現)。
+  # edns0 を出さなければ通常のクエリで応答する。
+  networking.resolvconf.dnsExtensionMechanism = false;
 
   # ---------------------------------------------------------------------------
   # ロケール / 入力
@@ -169,6 +186,17 @@ in
     mode = "0755";
   };
 
+  # Chrome の 1Password 拡張を企業ポリシー (ExtensionInstallForcelist) で強制導入する。
+  # programs.chromium は Chromium 用モジュールだが /etc/opt/chrome/policies/managed/
+  # にも同じポリシーを書くので Google Chrome に効く (Chromium 本体は入らない)。
+  # 拡張とデスクトップアプリの接続承認 (初回のみ) は 1Password 側の認証フローなので残る。
+  programs.chromium = {
+    enable = true;
+    extensions = [
+      "aeblfdkhhhdcdjpifhhbdiojplfjncoa" # 1Password – Password Manager
+    ];
+  };
+
   # GUI アプリは home-manager の pkgs (home.nix の allowUnfreePredicate) と分けて
   # システム側で管理する。unfree の許可はこのファイルの nixpkgs.config に集約。
   environment.systemPackages = with pkgs; [
@@ -179,6 +207,9 @@ in
     gnome-tweaks
     vim
     git
+    # NVRAM の整理 (docs/nixos-t2.md)。efiInstallAsRemovable で NixOS は NVRAM を
+    # 管理しないため、Ubuntu の fallback で BootOrder が戻ったときに手で直す。
+    efibootmgr
   ];
 
   nixpkgs.config.allowUnfreePredicate = pkg:
