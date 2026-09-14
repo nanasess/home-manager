@@ -1,6 +1,6 @@
 # Chrome のタブ移動キーバインド (xremap)
 
-設定: `modules/xremap/`（`nanasess@ubuntu` のみ）。Chrome にフォーカスがある時だけキーを置換する。
+設定: `modules/xremap/`（`nanasess@ubuntu` と NixOS `k-2`。権限周りはホストごとに異なる、後述）。Chrome にフォーカスがある時だけキーを置換する。
 
 | キー | Chrome での動作 |
 |---|---|

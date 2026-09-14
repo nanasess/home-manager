@@ -1,6 +1,6 @@
 # ibus-skk (SKK 入力メソッド)
 
-設定: `pkgs/ibus-skk.nix` + `modules/ibus-skk/`（`nanasess@ubuntu` のみ）。apt 版 1.4.3 を Nix ビルドの 1.4.4 で置き換えている。
+設定: `pkgs/ibus-skk.nix` + `modules/ibus-skk/`（`nanasess@ubuntu` と NixOS `k-2`。エンジン登録経路はホストごとに異なる、後述）。Ubuntu では apt 版 1.4.3 を Nix ビルドの 1.4.4 で置き換えている。
 
 ## apt 版 1.4.3 は ▼変換中に母音を打つと確定文字列が消える
 
