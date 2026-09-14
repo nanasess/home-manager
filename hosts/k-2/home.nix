@@ -16,6 +16,24 @@
   # git config が変わるため、安定パスで参照する。
   programs.git.signing.signer = "/run/current-system/sw/bin/op-ssh-sign";
 
+  # 1Password の設定画面にある「ログイン時に起動」は Linux では
+  # /usr/share/applications/1password.desktop を ~/.config/autostart/ にコピーする実装
+  # (op-startup/src/linux.rs) で、NixOS にはそのパスが無いため黙って失敗する
+  # (settings.json に app.startAtLogin も残らない)。代わりに autostart エントリを
+  # 宣言する。--silent はウィンドウを出さずに常駐 (SSH agent / ブラウザ連携用)。
+  # k-2 の GNOME にはトレイ拡張が無いのでアイコンは出ない。ウィンドウはランチャーから
+  # 起動すると既存インスタンスにフォーカスする。設定画面のトグルは OFF 表示のまま。
+  xdg.configFile."autostart/1password.desktop".text = ''
+    [Desktop Entry]
+    Type=Application
+    Name=1Password
+    Exec=1password --silent %U
+    Icon=1password
+    StartupWMClass=1Password
+    Terminal=false
+    X-GNOME-Autostart-enabled=true
+  '';
+
   programs.ghostty = {
     enable = true;
     settings = ghostty.settings;

@@ -280,6 +280,12 @@ Claude Code のネイティブインストール (`curl -fsSL https://claude.ai/
 executables" が出たら `NIX_LD` / `NIX_LD_LIBRARY_PATH` が入る前の古いシェル)、
 OneDrive の認可と SKK 辞書のビルド (下記)。
 
+1Password の自動起動は `hosts/k-2/home.nix` の `xdg.configFile."autostart/1password.desktop"`
+で宣言してある。1Password 設定画面の「ログイン時に起動」トグルは Linux では
+`/usr/share/applications/1password.desktop` を `~/.config/autostart/` にコピーする実装
+(`op-startup/src/linux.rs`) なので、そのパスが無い NixOS では黙って失敗する
+(`settings.json` に `app.startAtLogin` も書かれない)。トグルは OFF 表示のままで正常。
+
 XDG ユーザーディレクトリは `xdg.userDirs` (`hosts/k-2/home.nix`) で英語名に固定してある
 (`user-dirs.conf` の `enabled=False` でログイン時の `xdg-user-dirs-update` による再生成も止める)。
 この設定が入る前にログインしていた環境 (初回インストール時) は ja_JP.UTF-8 の
