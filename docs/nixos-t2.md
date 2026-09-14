@@ -107,8 +107,13 @@ sudo hosts/k-2/scripts/backup-before-install.sh /media/nanasess/<USB>/t2-backup 
 ```
 
 `--nm-connections` は WiFi / VPN の接続プロファイル (PSK・パスワード入り) を含むので、
-退避先は自分しか読めない場所に限る。NixOS 側では `/etc/NetworkManager/system-connections/`
-に 0600 でコピーすれば同じ接続が使える (L2TP も同じ NetworkManager-l2tp なので互換)。
+退避先は自分しか読めない場所に限る。Ubuntu 24.04 の NetworkManager は netplan
+バックエンドで、実体は `/etc/netplan/90-NM-*.yaml`、keyfile 形式は
+`/run/NetworkManager/system-connections/` に生成される (`/etc/NetworkManager/system-connections/`
+は空)。スクリプトは keyfile を `nm-connections/keyfile/` に、netplan の YAML を
+`nm-connections/netplan/` に取る。NixOS 側では keyfile を
+`/etc/NetworkManager/system-connections/` に 0600 でコピーすれば同じ接続が使える
+(L2TP も同じ NetworkManager-l2tp なので互換。`docker0` / `br-*` / `lo` は不要)。
 
 ### 2. インストール USB の作成 (Ubuntu 上)
 
@@ -223,7 +228,7 @@ nixos-enter --root /mnt -c 'chown -R nanasess:users /home/nanasess'
 
 # NetworkManager の接続プロファイルを持ち込む (任意。秘密情報を含むので 0600)
 install -d -m 0700 /mnt/etc/NetworkManager/system-connections
-cp /ubuntu/home/nanasess/t2-backup/nm-connections/*.nmconnection /mnt/etc/NetworkManager/system-connections/
+cp /ubuntu/home/nanasess/t2-backup/nm-connections/keyfile/netplan-NM-*.nmconnection /mnt/etc/NetworkManager/system-connections/
 chmod 0600 /mnt/etc/NetworkManager/system-connections/*
 ```
 

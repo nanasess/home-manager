@@ -10,7 +10,10 @@
 #   info/              lsblk / blkid / parted / efibootmgr / fstab / apt の一覧 (照合用)
 #   nm-connections/    --nm-connections 指定時のみ。NetworkManager の接続プロファイル
 #                      (WiFi / L2TP VPN)。**PSK やパスワードを含む** ので、退避先は
-#                      自分しか読めない場所に限る (public な場所・リポジトリに置かない)
+#                      自分しか読めない場所に限る (public な場所・リポジトリに置かない)。
+#                      Ubuntu 24.04 の NM は netplan バックエンドで、実体は
+#                      /etc/netplan/90-NM-*.yaml、NixOS で使える keyfile 形式は
+#                      /run/NetworkManager/system-connections/ に生成される。両方を取る
 #
 # 退避先は 2 箇所を推奨: Ubuntu の $HOME 配下 (Ubuntu パーティションは残すので live USB
 # から p3 をマウントすれば読める) と、USB メモリなど別媒体 (p3 の縮小に失敗した場合の保険)。
@@ -53,9 +56,18 @@ journalctl -k -b --no-pager | grep -E 'brcmfmac|Bluetooth: hci0' > "$DEST/info/k
 
 if [ "$WITH_NM" -eq 1 ]; then
   echo "== 4/4 NetworkManager 接続プロファイル (秘密情報を含む) =="
-  install -d -m 0700 "$DEST/nm-connections"
-  cp -a /etc/NetworkManager/system-connections/. "$DEST/nm-connections/"
-  chmod 0600 "$DEST/nm-connections"/*
+  rm -rf "$DEST/nm-connections"
+  install -d -m 0700 "$DEST/nm-connections/keyfile" "$DEST/nm-connections/netplan"
+  # keyfile 形式 (NixOS の /etc/NetworkManager/system-connections/ にそのまま置ける)。
+  # netplan バックエンドでは /run に生成されるので、/etc と /run の両方を見る。
+  for d in /etc/NetworkManager/system-connections /run/NetworkManager/system-connections; do
+    [ -d "$d" ] || continue
+    find "$d" -maxdepth 1 -type f -name '*.nmconnection' -exec cp -a {} "$DEST/nm-connections/keyfile/" \;
+  done
+  # netplan の元ファイル (参照用)。
+  find /etc/netplan -maxdepth 1 -type f -name '*.yaml' -exec cp -a {} "$DEST/nm-connections/netplan/" \; 2>/dev/null || true
+  find "$DEST/nm-connections" -type f -exec chmod 0600 {} +
+  echo "  keyfile: $(find "$DEST/nm-connections/keyfile" -type f | wc -l) files, netplan: $(find "$DEST/nm-connections/netplan" -type f | wc -l) files"
 else
   echo "== 4/4 NetworkManager 接続プロファイルはスキップ (--nm-connections で退避) =="
 fi
