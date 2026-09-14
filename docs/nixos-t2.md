@@ -305,17 +305,26 @@ pkill -x ibus-engine-skk              # skkserv 起動前に立ち上がった i
 ### NVRAM の整理 (初回インストール後に 1 回、NixOS 上)
 
 初回インストールを `canTouchEfiVariables = true` で行った実機向け。`efiInstallAsRemovable`
-に切り替えた `nixos-rebuild switch` で `BOOTX64.EFI` は NixOS GRUB になるが、NVRAM の
-旧エントリと `EFI/NixOS-boot-efi/` は残る。NixOS は以後 NVRAM を管理しないので手で直す。
+に切り替えたら **`nixos-rebuild switch --install-bootloader`** で `grub-install` を強制する。
+nixpkgs の `install-grub.pl` は `/boot/grub/state` との差分 (devices / efiTarget /
+efiSysMountPoint / extraGrubInstallArgs / grub のストアパス) があるときだけ `grub-install` を
+走らせ、`efiInstallAsRemovable` / `canTouchEfiVariables` は比較に含まれないため、素の
+`switch` では `BOOTX64.EFI` が Ubuntu shim のまま残る (2026-09-14 に実機で確認)。
+置換後も NVRAM の旧エントリと `EFI/NixOS-boot-efi/` は残る。NixOS は以後 NVRAM を管理しないので手で直す。
 `efibootmgr` は `configuration.nix` の `systemPackages` に入れてある (入る前の世代なら
 `nix shell nixpkgs#efibootmgr` で取ってから `sudo` に絶対パスで渡す)。
 
 ```bash
+sudo ls -la /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/ubuntu/shimx64.efi
+                                       # BOOTX64.EFI が switch 時刻 / shim と別サイズ = NixOS GRUB に置換済み。
+                                       # 966,664 bytes (2026-03-05) のままなら shim なので先に進まない
 sudo efibootmgr -v                     # Boot0000 Ubuntu / Boot0001 NixOS-boot-efi / Boot0080 macOS を確認
-sudo efibootmgr -B -b 0001             # 旧 NixOS-boot-efi エントリを削除
+                                       # (0082 / FFFF は Apple が作る macOS の重複エントリ。触らない)
+sudo efibootmgr -c -d /dev/nvme0n1 -p 1 -L NixOS -l '\EFI\BOOT\BOOTX64.EFI'   # 新エントリ (0002)。BootOrder 先頭に入り、Option なし起動も NixOS へ
+sudo efibootmgr -v                     # BootOrder: 0002,0001,0000,0080
+sudo efibootmgr -B -b 0001             # 旧 NixOS-boot-efi エントリを削除 (新エントリを先に作り、常に NixOS への経路を残す)
 sudo rm -r /boot/efi/EFI/NixOS-boot-efi   # 古い grubx64.efi が /boot/grub のモジュールと乖離するのを防ぐ
-sudo efibootmgr -c -d /dev/nvme0n1 -p 1 -L NixOS -l '\EFI\BOOT\BOOTX64.EFI'   # Option なし起動も NixOS へ
-sudo efibootmgr -v                     # BootOrder の先頭が NixOS であること
+sudo efibootmgr -v                     # BootOrder: 0002,0000,0080
 ```
 
 Ubuntu の fallback (`fbx64.efi`) が走って BootOrder が Ubuntu 先頭に戻ったときも同じ

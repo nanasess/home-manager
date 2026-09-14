@@ -72,6 +72,9 @@ in
   # canTouchEfiVariables は efiInstallAsRemovable と排他 (nixpkgs の assertion) なので
   # 既定の false のままにし、NVRAM は NixOS では管理しない。NVRAM 側の掃除と
   # NixOS エントリの追加は docs/nixos-t2.md の手順で 1 回だけ手動で行う。
+  # 注意: install-grub.pl は efiInstallAsRemovable / canTouchEfiVariables を
+  # /boot/grub/state の比較に含めないため、この 2 つだけ変えても switch は grub-install を
+  # 再実行しない。切り替え時は nixos-rebuild switch --install-bootloader で強制する。
   # Ubuntu の shim は EFI/ubuntu/ に残り、GRUB メニューの Ubuntu エントリから戻れる。
   boot.loader = {
     efi.efiSysMountPoint = "/boot/efi";
