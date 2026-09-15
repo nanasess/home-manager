@@ -45,6 +45,10 @@
     # Ubuntu で apt から入れていた開発ツール。
     dotnet-sdk_10
     nodejs
+    # EcAuth の E2ETests (pnpm + Playwright) 用。packageManager フィールドの pnpm@10.x は
+    # pnpm 10 自身が自動解決する (corepack 不要)。ブラウザは configuration.nix の
+    # nix-ld ライブラリで公式バイナリを動かす。
+    pnpm_10
   ];
 
   # XDG ユーザーディレクトリを英語名に固定する。ja_JP.UTF-8 だと初回ログインの

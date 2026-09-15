@@ -192,6 +192,45 @@ in
   # nixpkgs の claude-code (autoPatchelf 版) は flake update 待ちになるため採らない。
   programs.nix-ld.enable = true;
 
+  # Playwright が公式配布する Chromium (~/.cache/ms-playwright、`playwright install`) を
+  # nix-ld で動かすための実行時ライブラリ。EcAuth (E2ETests) は @playwright/test 1.63
+  # を要求するが nixpkgs の playwright-driver は 1.61 でブラウザのリビジョンが合わず
+  # (chromium-1243 vs 1228)、宣言的に追従すると更新のたびに hash 更新が要る。
+  # 代わりにライブラリ集合だけ用意して公式バイナリを使う (`playwright install-deps` 相当)。
+  # 集合は nixpkgs の pkgs/development/web/playwright/chromium.nix の buildInputs と同じ。
+  # 既定の基本ライブラリ (上記) はモジュール側の定義とリストとしてマージされる。
+  # 検証: E2ETests/tests-examples/demo-todo-app.spec.ts 24 passed (2026-09-15)。
+  programs.nix-ld.libraries = with pkgs; [
+    alsa-lib
+    at-spi2-atk
+    at-spi2-core
+    atk
+    cairo
+    cups
+    dbus
+    expat
+    fontconfig
+    freetype
+    glib
+    gobject-introspection
+    libGL
+    libgbm
+    libgcc
+    libx11
+    libxcb
+    libxcomposite
+    libxdamage
+    libxext
+    libxfixes
+    libxkbcommon
+    libxrandr
+    nspr
+    nss
+    pango
+    pciutils
+    vulkan-loader
+  ];
+
   # 1Password。SSH agent (~/.1password/agent.sock) と commit 署名 (op-ssh-sign) は
   # home.nix / hosts/k-2/home.nix から参照する。
   programs._1password.enable = true;
