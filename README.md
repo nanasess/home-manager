@@ -88,21 +88,43 @@ python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",1178),2); s.s
 
 ### mise PHP のセットアップ
 
+mise の php プラグイン (`jdx/vfox-php`) は PHP をソースからビルドする。ビルド依存は
+ホストごとに入手経路が異なる:
+
+| ホスト | ビルド依存の入手 |
+|---|---|
+| wsl-gentoo | portage (`hosts/wsl-gentoo.nix` の `mise PHP ビルド依存`)。`mise install php@8.5` をそのまま実行 |
+| k-2 (NixOS) | `nix develop .#php-build` (`shells/php-build.nix`)。FHS 前提のツールチェーンが無いので devShell 経由で実行する |
+
 ```bash
-# PHP インストール
-mise install php@8.3
+# PHP インストール (k-2)。--profile で GC root を作り、リンク先ライブラリが
+# nix-collect-garbage で消えないようにする (RPATH に /nix/store が焼き込まれる)
+nix develop '.#php-build' --profile ~/.local/state/nix/profiles/php-build \
+  -c mise install php@8.5
+
+# PHP インストール (wsl-gentoo)
+mise install php@8.5
 
 # カスタム設定（memory_limit 等）
-echo "memory_limit=1G" > ~/.local/share/mise/installs/php/8.3.30/conf.d/custom.ini
+echo "memory_limit=1G" > ~/.local/share/mise/installs/php/8.5.9/conf.d/custom.ini
 
-# PECL 拡張の追加
+# PECL 拡張の追加 (k-2 では devShell 内で実行する)
 pecl install redis
-echo "extension=redis.so" > ~/.local/share/mise/installs/php/8.3.30/conf.d/redis.ini
+echo "extension=redis.so" > ~/.local/share/mise/installs/php/8.5.9/conf.d/redis.ini
 
 # 確認
 php -m | grep redis
 php -r 'echo ini_get("memory_limit")."\n";'
 ```
+
+k-2 の注意点:
+
+- `flake.lock` 更新でライブラリが変わっても、プロファイルの古い世代が残っている間は
+  既存の PHP は動く。`nix profile wipe-history --profile ~/.local/state/nix/profiles/php-build`
+  や `nix-collect-garbage -d` の後に `error while loading shared libraries` が出たら
+  `mise install php@8.5 --force` で再ビルドする。
+- gettext / readline / gmp は `configure` が `/usr` 直下しか探さないため、devShell が
+  `PHP_EXTRA_CONFIGURE_OPTIONS` でストアパスを渡している (詳細は `shells/php-build.nix`)。
 
 ## ディレクトリ構成
 
