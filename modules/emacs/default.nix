@@ -65,10 +65,13 @@ in
   # (GNOME Shell が text-input-v3 で直接繋ぐため)。そちらは init.el の
   # my/pgtk-disable-im-context が pgtk-use-im-context で無効化している。
   # ここの 2 行は X11 (WSLg / XWayland) 経由で起動した場合の保険として残す。
+  # shebang は pkgs.runtimeShell (store パスの bash)。NixOS には /bin/bash が無く
+  # (/bin/sh と /usr/bin/env のみ)、#!/bin/bash だと .desktop 経由の起動が
+  # "bad interpreter" で失敗する。
   home.file.".local/bin/emacs-wrapper" = lib.mkIf pkgs.stdenv.isLinux {
     executable = true;
     text = ''
-      #!/bin/bash
+      #!${pkgs.runtimeShell}
       export PATH="${config.home.profileDirectory}/bin:/nix/var/nix/profiles/default/bin:$PATH"
       export GTK_IM_MODULE=none
       export XMODIFIERS=@im=none
@@ -79,7 +82,7 @@ in
   home.file.".local/bin/emacsclient-wrapper" = lib.mkIf pkgs.stdenv.isLinux {
     executable = true;
     text = ''
-      #!/bin/bash
+      #!${pkgs.runtimeShell}
       export PATH="${config.home.profileDirectory}/bin:/nix/var/nix/profiles/default/bin:$PATH"
       export GTK_IM_MODULE=none
       export XMODIFIERS=@im=none
