@@ -90,6 +90,27 @@ interface (`ipheth`, `enp0s20f0u4c4i2` のような名前) が現れない。`se
 切り分けは `cat /sys/bus/usb/devices/<bus-port>/bConfigurationValue` (1 のままなら
 usbmuxd が動いていない) と `systemctl is-active usbmuxd`。
 
+### L2TP/IPsec VPN (nm-l2tp)
+
+`networking.networkmanager.plugins = [ pkgs.networkmanager-l2tp ]` だけでは接続直後に
+切断される。nm-l2tp は接続のたびに自前の strongSwan (charon) と xl2tpd を起動するが、
+そのための土台を NixOS 側は用意していない (`services.strongswan` は使わない)。
+`configuration.nix` で次の 2 つを補う。
+
+| 症状 (`journalctl -u NetworkManager`) | 原因 | 対処 |
+|---|---|---|
+| `failed to connect: 'Could not write /etc/ipsec.d/ipsec.nm-l2tp.secrets'` | nixpkgs の NM モジュールは `/etc/ipsec.secrets` に `include ipsec.d/ipsec.nm-l2tp.secrets` を書く (nixpkgs#64965) が、`/etc/ipsec.d` 自体は誰も作らない | `systemd.tmpfiles.rules = [ "d /etc/ipsec.d 0755 root root -" ]` |
+| `charon has quit: integrity test of libstrongswan failed` (exit 64) → `Could not establish IPsec connection.` | strongSwan 6.0 は `/etc/strongswan.conf` が無いと `library_init()` を中断する (`no files found matching '/etc/strongswan.conf'`)。starter は exit 64 を一律「integrity test failed」と表示するので紛らわしい (nixpkgs 版は `--enable-integrity-test` なし) | `environment.etc."strongswan.conf".text = ""` (既定値のままの空ファイル) |
+
+切り分けは charon を直接叩くのが早い (非 root でも `library_init()` までは進む):
+
+```bash
+$(nix build --no-link --print-out-paths '.#nixosConfigurations.k-2.pkgs.strongswan')/libexec/ipsec/charon
+```
+
+接続後の pppd の `Failed to create /etc/ppp/resolv.conf` は無害 (DNS は nm-l2tp の pppd
+プラグイン経由で NetworkManager に渡り、`/etc/resolv.conf` の先頭に入る)。
+
 ## ディスク構成とブート
 
 ```
@@ -439,3 +460,7 @@ home-manager は NixOS モジュールとして読み込み `useUserPackages = t
   (BootOrder: 0002 NixOS, 0000 Ubuntu, 0080 macOS)。
 - 自宅ルータ (F660A) が EDNS0 に FORMERR を返し名前解決不能 →
   `networking.resolvconf.dnsExtensionMechanism = false` (`configuration.nix`)。
+- 2026-09-15 **L2TP/IPsec VPN が接続直後に切断される**。`/etc/ipsec.d` 欠落と
+  `/etc/strongswan.conf` 欠落の 2 段構え (「L2TP/IPsec VPN (nm-l2tp)」参照)。両方を
+  `configuration.nix` で補い、IKE → L2TP → PPP (EAP/MS-CHAPv2) まで通って `ppp0` に
+  アドレスと VPN 側 DNS が入ることを確認済み。
