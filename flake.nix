@@ -70,6 +70,12 @@
               # /etc/profiles/per-user/<user> にパッケージを置く。home.nix 側の
               # パス参照は config.home.profileDirectory を使うこと (~/.nix-profile 直書き不可)。
               home-manager.useUserPackages = true;
+              # home-manager 管理下に入れるパスに通常ファイルが既にあると activation が
+              # 「would be clobbered」で中断し、その世代のリンクが全て入らない
+              # (home-manager-nanasess.service の失敗は nixos-rebuild では見落としやすい)。
+              # k-2 では xdg-user-dirs-update が作った ~/.config/user-dirs.dirs で実際に
+              # 起きた (PR #160)。既存ファイルを <name>.hm-backup に退避して続行させる。
+              home-manager.backupFileExtension = "hm-backup";
               # useGlobalPkgs は使わない: home.nix の nixpkgs.config (allowUnfreePredicate)
               # が無効化されて評価エラーになるため。
               home-manager.users.nanasess.imports = gnomeHomeModules ++ [

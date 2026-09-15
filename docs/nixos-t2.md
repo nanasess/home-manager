@@ -280,10 +280,23 @@ Claude Code のネイティブインストール (`curl -fsSL https://claude.ai/
 executables" が出たら `NIX_LD` / `NIX_LD_LIBRARY_PATH` が入る前の古いシェル)、
 OneDrive の認可と SKK 辞書のビルド (下記)。
 
+1Password の自動起動は `hosts/k-2/home.nix` の `xdg.configFile."autostart/1password.desktop"`
+で宣言してある。1Password 設定画面の「ログイン時に起動」トグルは Linux では
+`/usr/share/applications/1password.desktop` を `~/.config/autostart/` にコピーする実装
+(`op-startup/src/linux.rs`) なので、そのパスが無い NixOS では黙って失敗する
+(`settings.json` に `app.startAtLogin` も書かれない)。トグルは OFF 表示のままで正常。
+
 XDG ユーザーディレクトリは `xdg.userDirs` (`hosts/k-2/home.nix`) で英語名に固定してある
 (`user-dirs.conf` の `enabled=False` でログイン時の `xdg-user-dirs-update` による再生成も止める)。
 この設定が入る前にログインしていた環境 (初回インストール時) は ja_JP.UTF-8 の
 `xdg-user-dirs-update` が `~/ダウンロード` 等を作っているので、中身を英語側へ移して消す:
+
+同じ `xdg-user-dirs-update` が作った通常ファイル `~/.config/user-dirs.dirs` は home-manager の
+管理対象と衝突し、`home-manager-nanasess.service` が `Existing file ... would be clobbered`
+で失敗してその世代のリンクが全て入らない (autostart エントリ等も含む)。`nixos-rebuild switch`
+はシステム側が成功すると見落としやすいので、`systemctl status home-manager-nanasess` を確認する。
+`flake.nix` の `home-manager.backupFileExtension = "hm-backup"` で既存ファイルを退避して
+続行するようにしてある (`user-dirs.dirs.hm-backup` は消してよい)。
 
 ```bash
 for pair in ダウンロード:Downloads ドキュメント:Documents デスクトップ:Desktop 音楽:Music 画像:Pictures 公開:Public テンプレート:Templates ビデオ:Videos; do
