@@ -106,6 +106,7 @@ modules/
 pkgs/
   yaskkserv2.nix       -- yaskkserv2 の自作 Nix derivation（buildRustPackage、nixpkgs 未収録のため）
   ibus-skk.nix         -- ibus-skk 1.4.4 の自作 Nix derivation（nixpkgs 未収録 + apt は 1.4.3 で停滞）
+  chatgpt/             -- ChatGPT デスクトップアプリ (Linux 版) の deb 再パッケージ（nixpkgs の chatgpt は Darwin 専用。source.nix + update.sh でバージョン固定 / 追従）
 shells/
   php-build.nix        -- mise php プラグイン (ソースビルド) 用 devShell（NixOS には FHS のツールチェーンが無いため）
 docs/                  -- 領域別の詳細ドキュメント（下記「詳細ドキュメント」参照）
@@ -143,12 +144,34 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 | システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
 | SKK 辞書サーバ (yaskkserv2) | Nix ビルド (`pkgs/yaskkserv2.nix`) + systemd ユーザーサービス (`modules/yaskkserv2.nix`) | nixpkgs / apt に無いため上流を `buildRustPackage`。全ホスト同一バイナリ + ユーザーパス辞書 (`~/.local/share/yaskkserv2/all`) で sudo 不要・共通化 |
 | IBus SKK エンジン | Nix ビルド (`pkgs/ibus-skk.nix`) + `IBUS_COMPONENT_PATH` (`modules/ibus-skk/`) | apt / nixpkgs とも 1.4.4 未提供。apt 版 1.4.3 は変換確定が壊れる（`docs/ibus-skk.md`）。IBus は `XDG_DATA_DIRS` を見ないため `systemd.user.sessionVariables` でエンジンを登録する |
+| ChatGPT デスクトップアプリ | Nix ビルド (`pkgs/chatgpt/`) + `hosts/k-2/configuration.nix` の systemPackages | nixpkgs の `chatgpt` は Darwin 専用。OpenAI 公式 deb (Electron) を dpkg 展開 + autoPatchelf で包む。`latest` URL は中身が変わるので apt pool のバージョン付き URL + SHA256 に固定し、`pkgs/chatgpt/update.sh` が Packages インデックスから `source.nix` を更新。同梱プラグインの `~/.codex/.tmp/` へのコピーが Nix ストアの 555 モードを写して EACCES になるため app.asar を展開 → chmod 挿入 → 再パックしている（詳細は `default.nix` のコメント）。Codex ランタイム (`~/.codex/`) はアプリが自己更新する管理外状態 |
 | キーリマップ (xremap) | Nix (`xremap` gnome variant) + systemd ユーザーサービス (`modules/xremap/`) | Chrome にキーバインド変更機能が無いため evdev/uinput レベルで置換。アプリ判定に GNOME Shell 拡張が要る。`input` グループ / udev ルールのみ root 作業として残る |
 | Bluetooth オーディオ | home-manager (xdg.configFile) + pavucontrol | WirePlumber の HFP 自動切替を無効化し、A2DP (ステレオ) / HFP (マイク) は pavucontrol で手動切替。プロファイルの記憶 (`~/.local/state/wireplumber/`) はランタイム状態のため管理外 |
 | クリップボード画像 (WSL) | `wl-paste` shim (`hosts/wsl-gentoo.nix`) | WSLg が `image/bmp` しか出さず Claude Code が扱えないため、`image/png` を追加広告して ImageMagick で変換（`docs/clipboard-image-paste.md`） |
 | PHP (mise) | mise php プラグイン (ソースビルド) + ビルド依存はホスト別 | wsl-gentoo は portage、k-2 は `nix develop .#php-build` (`shells/php-build.nix`)。gettext / readline / gmp の `configure` は `/usr` 直下しか探さないので devShell が `PHP_EXTRA_CONFIGURE_OPTIONS` でストアパスを渡す。RPATH に `/nix/store` が焼き込まれるため `--profile` で GC root を作る (README「mise PHP のセットアップ」) |
 
 **プラットフォーム非依存化の判断基準**: portage / apt など特定ホストのパッケージマネージャに依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で wsl-gentoo (旧 portage) と ubuntu を統一した先例 (PR #110)。
+
+### ChatGPT デスクトップアプリの更新手順
+
+「chatgpt を更新しておいて」と指示されたら、以下を一連で実行して PR まで作る。
+上流 (OpenAI の apt リポジトリ) は月に数回更新され、Nix 側は `pkgs/chatgpt/source.nix` の
+version / hash を差し替えるだけで追従できる。
+
+1. **source.nix を更新**: main を最新にした状態で `./pkgs/chatgpt/update.sh`。apt の Packages インデックスから `Package: chatgpt` の最新スタンザを読んで `source.nix` を書き換え、バージョンを表示する (deb 本体は落とさない)。`git diff pkgs/chatgpt/source.nix` が空なら既に最新なのでその旨を報告して終了する。
+2. **ブランチを切る**: `git checkout -b chore/chatgpt-<新バージョン>` (手順 1 の変更は作業ツリーに残ったまま新ブランチに持ち越される)。
+3. **ビルド**: `nix build .#chatgpt` (400MB 弱の deb を取得するので数分かかる)。失敗したら原因は次のどちらか:
+   - `substituteInPlace ... --replace-fail` で止まった → 上流が `fs.cp` でプラグインをコピーする箇所を変えた。`asar extract` で新しい `main-*.js` を取り出し、`verbatimSymlinks` 付近を `grep` して置換パターンを合わせる (`default.nix` の該当コメント参照)。パッチの目的は「コピー直後に宛先を `chmod -R u+w` する」ことなので、それが満たせれば形は変えてよい。
+   - `auto-patchelf could not satisfy dependency` → 新しい共有ライブラリ依存が増えた。NEEDED を見て `buildInputs` に足す。Qt や musl のような環境依存でしか使わないものは `autoPatchelfIgnoreMissingDeps` に追加する。
+4. **起動確認** (k-2 上で作業しているとき): `./result/bin/chatgpt > /tmp/chatgpt.log 2>&1 &` で 20 秒ほど走らせ、ログに `window ready-to-show` と `plugin_marketplace_folder_write_succeeded` があり `EACCES` が無いことを確認して `pkill -x ChatGPT` で止める (`pkill -f` はシェル自身を巻き込むので使わない)。401 / `Unauthorized` は未ログインなだけで正常。k-2 以外では省略し、未検証と報告する。
+5. **flake 検証**: `nix flake check` と `nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'`。
+6. **コミット / PR**: `chore(chatgpt): <旧> → <新> に更新` でコミットし、PR 本文に手順 3〜5 の結果を書く。`result` シンボリックリンクはコミットしない。CI はポーリングせず、PR URL を報告して終える。
+7. **適用はユーザーが行う**: `sudo nixos-rebuild switch --flake .#k-2`。ロールバックは `source.nix` の revert または `nixos-rebuild switch --rollback`。
+
+補足: アプリは `~/.codex/` 配下の Codex ランタイムを自分でダウンロードして自己更新するので、
+Nix 側の更新はあくまで Electron 本体 (deb) の追従。in-app updater は apt 前提のため NixOS では
+効かない。ライブラリ依存の全体像 (Electron が dlopen するもの含む) は
+`pkgs/chatgpt/default.nix` のコメントにまとめてある。
 
 ### 移行元リポジトリ (TODO)
 
