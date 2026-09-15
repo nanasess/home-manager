@@ -347,6 +347,14 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
 ;;;; ============================================================
 ;;;; Scroll settings
 ;;;; ============================================================
+;; mwheel の既定は C-<wheel> / C-M-<wheel> でフォントを拡大縮小する
+;; (`mouse-wheel-text-scale' / `mouse-wheel-global-text-scale')。
+;; トラックパッドだと Ctrl を押したままの僅かなスクロールで発火して扱いづらいので外す。
+;; フォントサイズの変更は組み込みの `text-scale-adjust' (C-x C-+ / C-x C-- / C-x C-0、
+;; 以後 + - 0 で連続操作) と `global-text-scale-adjust' (C-x C-M-+ 等) を使う。
+;; `setopt' で :set (`mouse-wheel-change-button') が走り、既存の束縛も張り替わる。
+(setopt mouse-wheel-scroll-amount '(1 ((shift) . hscroll) ((meta) . nil)))
+
 (use-package ultra-scroll
   :ensure (:host github :repo "jdtsmith/ultra-scroll" :branch "main")
   :init
