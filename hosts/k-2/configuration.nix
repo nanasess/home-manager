@@ -108,6 +108,17 @@ in
     # アダプタは別 MAC なので従来どおり接続時に自動接続される。
     unmanaged = [ "mac:ac:de:48:00:11:22" ];
   };
+  # nm-l2tp は接続のたびに PSK を /etc/ipsec.d/ipsec.nm-l2tp.secrets へ書き出す
+  # (nixpkgs の NM モジュールが /etc/ipsec.secrets にその include を入れるのはこのため)。
+  # ところが /etc/ipsec.d 自体は誰も作らず、接続直後に
+  # "failed to connect: 'Could not write /etc/ipsec.d/ipsec.nm-l2tp.secrets'" で切断される。
+  systemd.tmpfiles.rules = [ "d /etc/ipsec.d 0755 root root -" ];
+  # strongSwan 6.0 は /etc/strongswan.conf が無いと library_init() が
+  # "no files found matching '/etc/strongswan.conf'" で失敗し、starter はそれを
+  # "charon has quit: integrity test of libstrongswan failed" (exit 64) と報告する。
+  # services.strongswan は使わない (nm-l2tp が接続ごとに自前の charon を起動する) ので、
+  # 既定値のままの空ファイルだけ置く。
+  environment.etc."strongswan.conf".text = "";
   # iPhone の USB テザリング。iPhone は挿しただけでは USB 構成 1 (PTP のみ) に留まり、
   # テザリング用のイーサネット interface (ipheth) が現れない。usbmuxd の udev ルールが
   # 構成を切り替えて初めて ipheth が bind し、NetworkManager に有線接続として見える。
