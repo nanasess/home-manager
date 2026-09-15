@@ -33,13 +33,18 @@ CI 任せにせず、ローカルで実行できるものは実行する。
 nix flake check
 nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage' --no-link --print-out-paths
 nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage' --no-link
+# k-2 (NixOS): 評価 + home-manager 部分。toplevel の丸ごとビルドは k-2 実機で行う
+# (linux-t2 カーネルは cache.soopy.moe から取る。README「NixOS (k-2) の更新」のキャッシュ確認を先に)
+nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
+nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage' --no-link
 ```
 
 CI の build matrix (`.github/workflows/check.yml`) と `flake.nix` の `homeConfigurations` が
 一致しているとは限らない。**PR 本文に検証状況を書く前に workflow を読んで確認する**こと。
 
 - 時間がかかるのでバックグラウンド実行を推奨。
-- 対象は `x86_64-linux` の 2 ホストのみ (macOS 設定は削除済み)。ローカルで全ホスト検証できる。
+- 対象は `x86_64-linux` のみ (macOS 設定は削除済み)。homeConfigurations 2 ホストはどこでも検証できる。
+  k-2 の toplevel (カーネル / ファームウェア) はキャッシュとホスト制約があるので実機で確認する。
 
 ### `nix flake check` が上流の破壊的変更で落ちた場合
 
