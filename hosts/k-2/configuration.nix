@@ -108,6 +108,11 @@ in
     # アダプタは別 MAC なので従来どおり接続時に自動接続される。
     unmanaged = [ "mac:ac:de:48:00:11:22" ];
   };
+  # iPhone の USB テザリング。iPhone は挿しただけでは USB 構成 1 (PTP のみ) に留まり、
+  # テザリング用のイーサネット interface (ipheth) が現れない。usbmuxd の udev ルールが
+  # 構成を切り替えて初めて ipheth が bind し、NetworkManager に有線接続として見える。
+  # Ubuntu Desktop は usbmuxd を同梱していたので意識せず動いていた。
+  services.usbmuxd.enable = true;
   # 自宅ルータ (F660A, DHCP の第 1 ネームサーバ) は EDNS0 クエリに FORMERR を返す。
   # 既定の resolv.conf には options edns0 が入り、glibc は FORMERR を回答として受け取り
   # 次のサーバへ回らないため名前解決ができなくなる (dig +edns=0 @192.168.100.1 で再現)。
