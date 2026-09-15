@@ -152,6 +152,27 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 
 **プラットフォーム非依存化の判断基準**: portage / apt など特定ホストのパッケージマネージャに依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で wsl-gentoo (旧 portage) と ubuntu を統一した先例 (PR #110)。
 
+### ChatGPT デスクトップアプリの更新手順
+
+「chatgpt を更新しておいて」と指示されたら、以下を一連で実行して PR まで作る。
+上流 (OpenAI の apt リポジトリ) は月に数回更新され、Nix 側は `pkgs/chatgpt/source.nix` の
+version / hash を差し替えるだけで追従できる。
+
+1. **source.nix を更新**: main を最新にした状態で `./pkgs/chatgpt/update.sh`。apt の Packages インデックスから `Package: chatgpt` の最新スタンザを読んで `source.nix` を書き換え、バージョンを表示する (deb 本体は落とさない)。`git diff pkgs/chatgpt/source.nix` が空なら既に最新なのでその旨を報告して終了する。
+2. **ブランチを切る**: `git checkout -b chore/chatgpt-<新バージョン>` (手順 1 の変更は作業ツリーに残ったまま新ブランチに持ち越される)。
+3. **ビルド**: `nix build .#chatgpt` (400MB 弱の deb を取得するので数分かかる)。失敗したら原因は次のどちらか:
+   - `substituteInPlace ... --replace-fail` で止まった → 上流が `fs.cp` でプラグインをコピーする箇所を変えた。`asar extract` で新しい `main-*.js` を取り出し、`verbatimSymlinks` 付近を `grep` して置換パターンを合わせる (`default.nix` の該当コメント参照)。パッチの目的は「コピー直後に宛先を `chmod -R u+w` する」ことなので、それが満たせれば形は変えてよい。
+   - `auto-patchelf could not satisfy dependency` → 新しい共有ライブラリ依存が増えた。NEEDED を見て `buildInputs` に足す。Qt や musl のような環境依存でしか使わないものは `autoPatchelfIgnoreMissingDeps` に追加する。
+4. **起動確認** (k-2 上で作業しているとき): `./result/bin/chatgpt > /tmp/chatgpt.log 2>&1 &` で 20 秒ほど走らせ、ログに `window ready-to-show` と `plugin_marketplace_folder_write_succeeded` があり `EACCES` が無いことを確認して `pkill -x ChatGPT` で止める (`pkill -f` はシェル自身を巻き込むので使わない)。401 / `Unauthorized` は未ログインなだけで正常。k-2 以外では省略し、未検証と報告する。
+5. **flake 検証**: `nix flake check` と `nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'`。
+6. **コミット / PR**: `chore(chatgpt): <旧> → <新> に更新` でコミットし、PR 本文に手順 3〜5 の結果を書く。`result` シンボリックリンクはコミットしない。CI はポーリングせず、PR URL を報告して終える。
+7. **適用はユーザーが行う**: `sudo nixos-rebuild switch --flake .#k-2`。ロールバックは `source.nix` の revert または `nixos-rebuild switch --rollback`。
+
+補足: アプリは `~/.codex/` 配下の Codex ランタイムを自分でダウンロードして自己更新するので、
+Nix 側の更新はあくまで Electron 本体 (deb) の追従。in-app updater は apt 前提のため NixOS では
+効かない。ライブラリ依存の全体像 (Electron が dlopen するもの含む) は
+`pkgs/chatgpt/default.nix` のコメントにまとめてある。
+
 ### 移行元リポジトリ (TODO)
 
 以下のリポジトリからの移行状況。段階的にこのリポジトリへ統合する。
