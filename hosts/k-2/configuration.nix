@@ -11,6 +11,9 @@ let
   # Ubuntu では IBUS_COMPONENT_PATH で登録していたが (modules/ibus-skk/ubuntu.nix)、
   # NixOS は i18n.inputMethod.ibus.engines で ibus 本体ごと束ねるので不要。
   ibus-skk = pkgs.callPackage ../../pkgs/ibus-skk.nix { };
+  # ChatGPT デスクトップアプリ (Linux 版)。nixpkgs の chatgpt は Darwin 専用なので
+  # OpenAI 配布の deb を再パッケージする (pkgs/chatgpt)。更新は pkgs/chatgpt/update.sh。
+  chatgpt = pkgs.callPackage ../../pkgs/chatgpt { };
 in
 {
   imports = [ ./hardware-configuration.nix ];
@@ -226,6 +229,7 @@ in
     google-chrome
     slack
     spotify
+    chatgpt
     dbeaver-bin
     gnome-tweaks
     vim
@@ -244,6 +248,7 @@ in
       # brcm-firmware-<macOS version>-zstd で lib.getName が分解できない) の両方が要る。
       "brcm-firmware"
       "brcm-firmware-ventura-zstd"
+      "chatgpt"
       "google-chrome"
       "slack"
       "spotify"
