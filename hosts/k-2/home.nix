@@ -43,7 +43,7 @@
     # Wayland セッションでは pgtk ビルドを使う (理由は hosts/ubuntu.nix 参照)。
     emacs31-pgtk
     # Ubuntu で apt から入れていた開発ツール。
-    dotnet-sdk_9
+    dotnet-sdk_10
     nodejs
   ];
 
