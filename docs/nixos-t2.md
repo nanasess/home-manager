@@ -69,6 +69,27 @@ logind / sleep.conf の設定は `configuration.nix` の `services.logind.settin
 `systemd.sleep.settings` に移した。8 時間超の長時間サスペンド後に内蔵キーボードが
 戻らない既知の限界 (issue #111) は NixOS でも変わらない見込み。
 
+### T2 内部の仮想イーサネット
+
+T2 チップは apple-bce 経由の内部 USB (Apple T2 Controller / iBridge, `cdc_ncm`) で
+仮想イーサネット `enp230s0f1u1` (MAC `ac:de:48:00:11:22`、T2 Mac 共通の固定値) を
+露出する。外部ポートではないが常時キャリア ON のため、放っておくと NetworkManager が
+「有線接続」として起動直後から DHCP を繰り返す (USB イーサネット未接続なのに有線が
+有効に見える)。Ubuntu (t2linux) は udev で `t2_ncm` にリネームしていたが、NixOS では
+`networking.networkmanager.unmanaged` に MAC 指定して管理対象から外す
+(`configuration.nix`)。`nmcli device status` で `管理無し` になっていれば正常。
+実物の USB イーサネットアダプタは別 MAC なので影響しない (PR #161)。
+
+### iPhone の USB テザリング
+
+iPhone は挿しただけでは USB 構成 1 (PTP のみ) に留まり、テザリング用のイーサネット
+interface (`ipheth`, `enp0s20f0u4c4i2` のような名前) が現れない。`services.usbmuxd.enable`
+で常駐する usbmuxd が usbmux interface を含む構成 (インターネット共有 ON なら 4) に
+切り替えて初めて `ipheth` が bind し、NetworkManager が `有線接続 N` として自動接続する
+(`172.20.10.0/28`)。Ubuntu Desktop は usbmuxd を同梱していたので意識せず動いていた。
+切り分けは `cat /sys/bus/usb/devices/<bus-port>/bConfigurationValue` (1 のままなら
+usbmuxd が動いていない) と `systemctl is-active usbmuxd`。
+
 ## ディスク構成とブート
 
 ```

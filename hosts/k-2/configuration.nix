@@ -100,7 +100,19 @@ in
     # 同梱しており、NixOS モジュール側で /etc/ipsec.secrets の include
     # (NixOS/nixpkgs#64965) も処理される。Ubuntu の network-manager-l2tp(-gnome) 相当。
     plugins = [ pkgs.networkmanager-l2tp ];
+    # T2 チップは apple-bce 経由の内部 USB (Apple T2 Controller / iBridge, cdc_ncm) で
+    # 仮想イーサネット (enp230s0f1u1, MAC ac:de:48:00:11:22) を露出する。外部ポートでは
+    # なく常時キャリア ON のため、放っておくと NetworkManager が起動直後から「有線接続」
+    # として DHCP を試み続ける (USB イーサネットを挿していないのに有線が有効に見える原因)。
+    # MAC は T2 Mac 共通の固定値なので、これで管理対象から外す。実物の USB イーサネット
+    # アダプタは別 MAC なので従来どおり接続時に自動接続される。
+    unmanaged = [ "mac:ac:de:48:00:11:22" ];
   };
+  # iPhone の USB テザリング。iPhone は挿しただけでは USB 構成 1 (PTP のみ) に留まり、
+  # テザリング用のイーサネット interface (ipheth) が現れない。usbmuxd の udev ルールが
+  # 構成を切り替えて初めて ipheth が bind し、NetworkManager に有線接続として見える。
+  # Ubuntu Desktop は usbmuxd を同梱していたので意識せず動いていた。
+  services.usbmuxd.enable = true;
   # 自宅ルータ (F660A, DHCP の第 1 ネームサーバ) は EDNS0 クエリに FORMERR を返す。
   # 既定の resolv.conf には options edns0 が入り、glibc は FORMERR を回答として受け取り
   # 次のサーバへ回らないため名前解決ができなくなる (dig +edns=0 @192.168.100.1 で再現)。

@@ -26,6 +26,12 @@
         "file=${config.home.homeDirectory}/.config/ibus-skk/user.dict,mode=readwrite,type=file"
         "host=127.0.0.1,port=1178,type=server,encoding=UTF-8"
       ];
+      # エンジン起動時の入力モードを latin (半角英数) にする。既定は hiragana。
+      # ibus-skk は gschema を持たず IBus.Config 経由で dconf を直接読む。キー名は
+      # src/preferences.vala の "initial_input_mode" を ibus の dconf バックエンドが
+      # '_' → '-' に変換したもの。値は libskk の Skk.InputMode (int32):
+      #   0=hiragana 1=katakana 2=hankaku-katakana 3=latin 4=wide-latin
+      initial-input-mode = 3;
     };
   };
 }
