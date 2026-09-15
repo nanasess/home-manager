@@ -93,6 +93,13 @@
         yaskkserv2 = nixpkgs.legacyPackages.${system}.callPackage ./pkgs/yaskkserv2.nix { };
       });
 
+      # mise の php プラグイン (ソースビルド) 用のビルド環境。NixOS には FHS 前提の
+      # ツールチェーンが無いので `nix develop .#php-build -c mise install php@8.5` で使う
+      # (README「mise PHP のセットアップ」、shells/php-build.nix)。
+      devShells = forAllSystems (system: {
+        php-build = nixpkgs.legacyPackages.${system}.callPackage ./shells/php-build.nix { };
+      });
+
       formatter = forAllSystems (system:
         nixpkgs.legacyPackages.${system}.nixpkgs-fmt
       );
