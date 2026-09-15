@@ -416,7 +416,11 @@ Nix の設定ファイル (`*.nix`) や dotfiles を編集した後:
 ```bash
 # ビルドの確認
 nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
-nix build '.#nixosConfigurations.k-2.config.system.build.toplevel'     # k-2
+nixos-rebuild build --flake '.#k-2'                                     # k-2 実機のみ (sudo 不要、./result に toplevel)
+# k-2 以外のホストから k-2 の設定を確認するときは評価 + home-manager 部分に留める
+# (toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージを抱える。「開発コマンド」参照)
+nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
+nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'
 
 # 設定を適用
 home-manager switch --flake '.#nanasess@wsl-gentoo'
