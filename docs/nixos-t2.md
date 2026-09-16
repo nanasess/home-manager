@@ -97,7 +97,8 @@ systemctl status tiny-dfr                                  # udev の SYSTEMD_WA
 timeout する。`configuration.nix` の `systemd.services.touchbar-resume` がこれを
 復帰フック (`WantedBy=suspend.target` + `After=suspend.target`) として自動化している。
 復帰直後は VHCI 再構築が非同期なのでデバイスが出るまで待ち、`udevadm settle` で
-上記ルールの timeout (5 秒 × 2) を待ってから触る。
+上記ルールの timeout (5 秒 × 2) を待ってから触る。復帰から Touch Bar 復活まで約 13 秒
+(2026-09-16 実機で確認)。
 
 なお `BUG: scheduling while atomic: irq/133-bce_dma` (`aaudio_cmd_stop_io` →
 `__aaudio_send_cmd_sync`) が音声再生中にも出るが、apple-bce の T2 オーディオ側の
@@ -503,4 +504,6 @@ home-manager は NixOS モジュールとして読み込み `useUserPackages = t
   再現せず)。ただし **Touch Bar は 9/15 の最初の復帰から死んでいた** (毎回の復帰で
   `bConfigurationValue` 切替が timeout、tiny-dfr は panic で停止)。`usbreset` →
   `bConfigurationValue=2` で復旧することを実測し、`touchbar-resume.service` として
-  復帰フックに宣言化 (「サスペンド」参照)。
+  復帰フックに宣言化 (「サスペンド」参照)。適用後の蓋閉じ → 開けで、復帰 12 秒後に
+  フックが `usbreset` → config 2 を打ち、1 秒後に `appletbdrm` + tiny-dfr が上がることを確認済み
+  (復帰から Touch Bar 復活まで約 13 秒。うち 10 秒は udev ルールの timeout 待ち)。
