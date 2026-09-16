@@ -72,3 +72,23 @@ systemctl --user restart org.freedesktop.IBus.session.GNOME.service
 `systemctl --user import-environment IBUS_COMPONENT_PATH` は**使えない**。`systemd.user.sessionVariables` が書き出すのは `environment.d/10-home-manager.conf` だけでシェルには値が入らず、`import-environment` は「クライアント側で設定済みの値」を取り込むコマンドだからである。
 
 `ibus restart` も避ける。D-Bus 経由で daemon に自己 re-exec を要求するもので、re-exec は environ を引き継ぐため新しい値が反映されない (未検証だが、ユニットごと再起動すれば確実に manager 環境を継承する)。
+
+## sudo のパスワード入力中は US 配列に切り替える
+
+SKK をかなモードにしたまま `sudo` を打つとパスワードが仮名に化けるので、
+`modules/ibus-skk/default.nix` の zsh 関数 `sudo` がプロンプトの間だけ IBus の
+グローバルエンジンを `xkb:us::eng` にし、終了後 (Ctrl-C 含む) に元へ戻す。
+
+- `ibus engine xkb:us::eng` は使えない。IBus CLI は xkb エンジンへ切り替えるときに
+  `setxkbmap` を spawn するため、Wayland セッション (setxkbmap 無し) では
+  `Execute setxkbmap failed` で終了コード 1 になる。IBus 自身のバス (`ibus address`) に
+  `gdbus call ... org.freedesktop.IBus.SetGlobalEngine` を投げれば GNOME Shell 配下でも
+  切り替わる (k-2 で確認)。読み取りの `ibus engine` は問題ない。
+- GNOME Shell はエンジンが外部から変わっても入力ソース表示を追従させない
+  (`ibusManager.js` の `_engineChanged` は `_currentEngineName` を更新するだけ)。
+  プロンプトの間だけの一時的な切替なので実害はない。
+- 元に戻すとき skk エンジンは作り直される (`SetGlobalEngine` は旧エンジンを破棄する)。
+  ibus-skk は `initial_input_mode` をコンストラクタでしか読まないので、sudo 前が
+  かなモードでも sudo 後は `initial-input-mode = 3` (latin) に戻る。
+- `sudo -n true` が通る (タイムスタンプ有効) ときはプロンプトが出ないので切り替えない。
+  IBus が無い環境や既に xkb エンジンのときも素通し。

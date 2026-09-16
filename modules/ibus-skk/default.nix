@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 # ibus-skk の辞書設定 (ホスト非依存)。エンジン本体の登録経路はホストごとに異なる:
 #   - Ubuntu: ./ubuntu.nix (Nix ビルドの 1.4.4 を IBUS_COMPONENT_PATH で登録)
 #   - NixOS : hosts/k-2/configuration.nix の i18n.inputMethod.ibus.engines
@@ -34,4 +34,38 @@
       initial-input-mode = 3;
     };
   };
+
+  # sudo のパスワードプロンプトの間だけ IBus を US 配列 (直接入力) に切り替える。
+  # SKK をかな入力モードにしたまま sudo を打つとパスワードが仮名に化けるため。
+  #
+  # - `ibus engine xkb:us::eng` は使えない: xkb エンジンへの切替時に setxkbmap を
+  #   spawn するので Wayland (setxkbmap 無し) では失敗する。IBus 自身のバスに gdbus で
+  #   SetGlobalEngine を投げれば GNOME Shell 配下でも切り替わる (k-2 で確認)。
+  # - 復帰時に skk エンジンは作り直されるため、入力モードは initial-input-mode (latin)
+  #   に戻る。sudo 前がかなモードでも sudo 後は半角英数になる。
+  # - タイムスタンプが有効 (`sudo -n true` 成功) ならプロンプトは出ないので素通し。
+  #   IBus が動いていない環境 (wsl-gentoo 等) も素通し。
+  # - Ctrl-C でプロンプトを抜けても always 節でエンジンを戻す。
+  programs.zsh.initContent = ''
+    sudo() {
+      local ibus_addr prev
+      if command sudo -n true 2>/dev/null \
+         || ! ibus_addr=$(ibus address 2>/dev/null) || [[ -z "$ibus_addr" ]]; then
+        command sudo "$@"
+        return
+      fi
+      prev=$(ibus engine 2>/dev/null)
+      if [[ -z "$prev" || "$prev" == xkb:* ]]; then
+        command sudo "$@"
+        return
+      fi
+      _ibus_set_engine "$ibus_addr" xkb:us::eng
+      { command sudo "$@" } always { _ibus_set_engine "$ibus_addr" "$prev" }
+    }
+    _ibus_set_engine() {
+      ${pkgs.glib.bin}/bin/gdbus call --address "$1" \
+        --dest org.freedesktop.IBus --object-path /org/freedesktop/IBus \
+        --method org.freedesktop.IBus.SetGlobalEngine "$2" >/dev/null 2>&1
+    }
+  '';
 }
