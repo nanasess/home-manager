@@ -265,6 +265,15 @@ linux-t2 は nixpkgs のキャッシュに無く、t2linux コミュニティの
 Hydra が nixpkgs の更新に追随するまでは新しい `flake.lock` に対応するカーネルが無く、
 その状態で `switch` すると **自前ビルド (4 コアで数時間)** になる。
 
+自前ビルドにすら失敗することもある。nixos-hardware の apple-t2 は T2 パッチ集
+(`apple/t2/pkgs/linux-t2/stable.json`) を t2linux/linux-t2-patches の特定 commit に固定して
+いるので、nixpkgs 側の `linux_6_18` だけが進むとパッチが当たらなくなる
+(`4001-asahi-trackpad.patch` が `hid-magicmouse.c` で `Hunk FAILED`、2026-09 の 6.18.46 → 6.18.51 で発生。
+[nixos-hardware#2027](https://github.com/NixOS/nixos-hardware/issues/2027))。
+`nix log` で `linux-config-*.drv` の patchPhase を見れば分かる。この場合は nixos-hardware 側が
+パッチ集を同期するまで nixpkgs を据え置き、`nix flake update home-manager` のように他の input
+だけ更新する (下記)。
+
 ```bash
 # 目的のカーネルがキャッシュにあるか (200 なら有り)
 K=$(nix eval --raw '.#nixosConfigurations.k-2.config.boot.kernelPackages.kernel.outPath')
