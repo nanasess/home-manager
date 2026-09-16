@@ -56,6 +56,60 @@ in
     HandleLidSwitchDocked = "ignore";
   };
 
+  # Touch Bar の復帰フック (issue #151 コメント 2026-09-16)。
+  #
+  # サスペンド中は apple-bce が VHCI ごと USB デバイスを外し、復帰時に再列挙する。
+  # このとき Touch Bar (05ac:8302) は制御転送に応答しない状態で上がってきて、nixpkgs の
+  # 99-touchbar-tiny-dfr.rules が試みる bConfigurationValue 1→0→2 が両方
+  # -ETIMEDOUT になり、デバイスは未構成 (appletbdrm も hid-multitouch も無し)、
+  # tiny-dfr は backlight 消失で panic → BindsTo で stop されたまま、という結果になる
+  # (kernel 6.12.31+ で driver core が device_lock() を外したことによる udev との競合。
+  # t2linux/wiki#635、omarchy discussion #5862)。短いサスペンドでも毎回起きる。
+  #
+  # 実測では USB リセット (USBDEVFS_RESET) を 1 回通した後なら SET_CONFIGURATION が
+  # 通るので、復帰後に「usbreset → bConfigurationValue=2」を打ち直す。config 2 で
+  # Touch Bar Display Touchpad の input が出ると udev の SYSTEMD_WANTS で tiny-dfr が
+  # 起動するが、生き残っていた場合に備えて restart もかける。
+  systemd.services.touchbar-resume = {
+    description = "Re-enumerate the Touch Bar after resume";
+    # suspend.target は systemd-suspend.service の完了 (= 復帰) 後に到達するので、
+    # WantedBy + After でその直後に走る
+    wantedBy = [ "suspend.target" ];
+    after = [ "suspend.target" ];
+    path = [ pkgs.usbutils ];
+    serviceConfig.Type = "oneshot";
+    script = ''
+      # apple-bce の VHCI 再構築は非同期なので、Touch Bar が sysfs に出るまで待つ
+      dev=
+      for _ in $(seq 30); do
+        for d in /sys/bus/usb/devices/[0-9]*-*; do
+          if [ "$(cat "$d/idVendor" 2>/dev/null)" = 05ac ] \
+             && [ "$(cat "$d/idProduct" 2>/dev/null)" = 8302 ]; then
+            dev=$d
+            break 2
+          fi
+        done
+        sleep 1
+      done
+      if [ -z "$dev" ]; then
+        echo "Touch Bar (05ac:8302) not found after resume"
+        exit 0
+      fi
+      # 99-touchbar-tiny-dfr.rules の 1→0→2 (timeout 5s x 2) が終わるのを待ってから触る
+      udevadm settle --timeout=30 || true
+      if [ "$(cat "$dev/bConfigurationValue")" = 2 ]; then
+        echo "Touch Bar already in configuration 2"
+        exit 0
+      fi
+      echo "Touch Bar is stuck (bConfigurationValue='$(cat "$dev/bConfigurationValue")'), resetting"
+      usbreset 05ac:8302
+      sleep 1
+      echo 2 > "$dev/bConfigurationValue"
+      sleep 3
+      systemctl restart tiny-dfr.service
+    '';
+  };
+
   services.thermald.enable = true;
 
   # ---------------------------------------------------------------------------
@@ -276,6 +330,8 @@ in
     # NVRAM の整理 (docs/nixos-t2.md)。efiInstallAsRemovable で NixOS は NVRAM を
     # 管理しないため、Ubuntu の fallback で BootOrder が戻ったときに手で直す。
     efibootmgr
+    # Touch Bar が復帰後に死んだときの手動復旧 (usbreset。docs/nixos-t2.md「サスペンド」)
+    usbutils
   ];
 
   nixpkgs.config.allowUnfreePredicate = pkg:

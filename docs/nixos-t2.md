@@ -66,8 +66,43 @@ Ubuntu と同じ。内蔵カメラ、Touch ID。
 
 Ubuntu では `deep` (S3) で動作していた。`modules/t2-suspend` が sudo で配置していた
 logind / sleep.conf の設定は `configuration.nix` の `services.logind.settings` /
-`systemd.sleep.settings` に移した。8 時間超の長時間サスペンド後に内蔵キーボードが
-戻らない既知の限界 (issue #111) は NixOS でも変わらない見込み。
+`systemd.sleep.settings` に移した。
+
+蓋閉じ → `deep` → 蓋開けの往復は 8 時間 51 分のサスペンドでも正常 (2026-09-16 実測)。
+Ubuntu 時代の「8 時間超で内蔵キーボードが戻らない」(issue #111) は、linux-t2 6.18 の
+in-tree apple-bce が no-state sleep (`apple-bce: suspend: removing VHCI HCD for
+no-state sleep` → `resume: re-adding VHCI HCD`) で VHCI を作り直すため再現しない。
+復帰 2 秒でキーボード / トラックパッド、5 秒で WiFi が戻る。
+
+**Touch Bar だけは毎回の復帰で死ぬ**。復帰後の再列挙で Touch Bar (`05ac:8302`) が
+制御転送に応答しない状態で上がり、nixpkgs 同梱の `99-touchbar-tiny-dfr.rules` が試みる
+`bConfigurationValue` 1→0→2 が両方 `-ETIMEDOUT` (`接続がタイムアウトしました`) になって
+未構成のまま残る。`appletbdrm` / `hid-multitouch` が付かず、tiny-dfr は backlight 消失で
+panic → `BindsTo` により stop されたまま (`Restart=always` は効かない)。kernel 6.12.31+ で
+driver core が `device_lock()` を外したことによる udev との競合
+([t2linux/wiki#635](https://github.com/t2linux/wiki/issues/635)、
+[omarchy discussion #5862](https://github.com/basecamp/omarchy/discussions/5862))。
+1 時間程度の短いサスペンドでも起きる。
+
+復旧は USB リセットを 1 回通してから SET_CONFIGURATION を打ち直せばよい (実測):
+
+```bash
+sudo usbreset 05ac:8302                                    # bce_vhci_reset_device が走る
+echo 2 | sudo tee /sys/bus/usb/devices/1-6/bConfigurationValue
+ls /sys/class/drm | grep card0                             # appletbdrm の card0 が出る
+systemctl status tiny-dfr                                  # udev の SYSTEMD_WANTS で自動起動
+```
+
+`authorized` の 0→1 や `bConfigurationValue` の直書きだけではリセット前と同じく
+timeout する。`configuration.nix` の `systemd.services.touchbar-resume` がこれを
+復帰フック (`WantedBy=suspend.target` + `After=suspend.target`) として自動化している。
+復帰直後は VHCI 再構築が非同期なのでデバイスが出るまで待ち、`udevadm settle` で
+上記ルールの timeout (5 秒 × 2) を待ってから触る。復帰から Touch Bar 復活まで約 13 秒
+(2026-09-16 実機で確認)。
+
+なお `BUG: scheduling while atomic: irq/133-bce_dma` (`aaudio_cmd_stop_io` →
+`__aaudio_send_cmd_sync`) が音声再生中にも出るが、apple-bce の T2 オーディオ側の
+ドライババグでサスペンドとは無関係。実害は確認していない。
 
 ### T2 内部の仮想イーサネット
 
@@ -464,3 +499,11 @@ home-manager は NixOS モジュールとして読み込み `useUserPackages = t
   `/etc/strongswan.conf` 欠落の 2 段構え (「L2TP/IPsec VPN (nm-l2tp)」参照)。両方を
   `configuration.nix` で補い、IKE → L2TP → PPP (EAP/MS-CHAPv2) まで通って `ppp0` に
   アドレスと VPN 側 DNS が入ることを確認済み。
+- 2026-09-16 **蓋閉じ 8 時間 51 分 (23:58 → 08:49) のサスペンドから正常復帰**。
+  `deep` で入り、キーボード / トラックパッド / WiFi / BT とも戻る (issue #111 の 8 時間制限は
+  再現せず)。ただし **Touch Bar は 9/15 の最初の復帰から死んでいた** (毎回の復帰で
+  `bConfigurationValue` 切替が timeout、tiny-dfr は panic で停止)。`usbreset` →
+  `bConfigurationValue=2` で復旧することを実測し、`touchbar-resume.service` として
+  復帰フックに宣言化 (「サスペンド」参照)。適用後の蓋閉じ → 開けで、復帰 12 秒後に
+  フックが `usbreset` → config 2 を打ち、1 秒後に `appletbdrm` + tiny-dfr が上がることを確認済み
+  (復帰から Touch Bar 復活まで約 13 秒。うち 10 秒は udev ルールの timeout 待ち)。

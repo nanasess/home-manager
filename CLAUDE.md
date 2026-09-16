@@ -70,7 +70,7 @@ hosts/
   wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm / Ghostty コピー、1Password CLI、WSLg X11/Wayland）
   ubuntu.nix           -- Ubuntu 固有設定（Ghostty (nixGL)、apt 差分チェック、GNOME 拡張）
   k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu からの移行先 (docs/nixos-t2.md)
-    configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager + l2tp、usbmuxd (iPhone テザリング)、1Password、ibus、nix-ld + Playwright 用ライブラリ）
+    configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager + l2tp、usbmuxd (iPhone テザリング)、1Password、ibus、nix-ld + Playwright 用ライブラリ、蓋閉じ suspend + Touch Bar 復帰フック）
     hardware-configuration.nix -- ディスク (LABEL 参照) / カーネルモジュール
     home.nix           -- ユーザー環境（hosts/ubuntu.nix の NixOS 版）
     scripts/backup-before-install.sh -- インストール前の退避（ファームウェア / ESP イメージ / システム情報）
