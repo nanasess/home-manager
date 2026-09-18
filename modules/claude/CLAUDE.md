@@ -40,6 +40,7 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 | `gh` | GitHub PR / Issue / レビュー操作 (GitHub MCP は使わない、下記参照) |
 | `op` | 1Password CLI (1Password セクション参照) |
 | `playwright-cli` | ブラウザ自動化 (`playwright` Skill 経由) |
+| `symfony` (symfony-cli) | ローカル Web サーバ (`symfony serve`、HTTPS)。EC-CUBE 等のブラウザ検証はこれで起動する (下記「環境固有の制約」参照) |
 | `nix`, `home-manager` | 宣言的環境管理 (`~/.config/home-manager` で運用) |
 | `rg` (ripgrep) | コードベース検索 (`grep` より優先) |
 
@@ -49,6 +50,7 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 - 1Password CLI のセッションはデスクトップアプリ連携 (`op signin` で確立)。SSH エージェントソケットは `~/.1password/agent.sock`。
 - ロケールは `ja_JP.UTF-8`。East Asian Ambiguous 文字 (`△` `○` `■` 等) はターミナル (noctty / Ghostty 系) も glibc も**幅 1 (半角) 扱い**。Emacs GUI だけ `eaw-console.el` + UDEV Gothic JPDOC で幅 2 にしている。
 - AMD Ryzen Zen 3 環境 (`-march=znver3`) を使用 (パフォーマンスチューニングの前提)。
+- **ローカルの Web サーバは symfony-cli (`symfony serve -d --port=<port>`、HTTPS) で起動する。`php -S` は使わない。** EC-CUBE のセッション cookie は SameSite / Secure 属性の制約で http:// ではブラウザに保存されず、管理画面ログインが `POST /admin/login` → 302 → `/admin/login` に戻るループになる。Playwright には `BASE_URL=https://127.0.0.1:<port>` を渡す。CI の `e2e-test.yml` が `php -S` で動くのは CI 専用の `e2e` 環境設定があるためで、ローカルの根拠にしない。何度も指摘済みの規約なので、`php -S` を選んだ時点で規約違反と扱う。
 
 ## 行動規範
 
