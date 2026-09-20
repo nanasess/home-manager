@@ -62,6 +62,21 @@
     projects = null;
   };
 
+  # 文字入力中にトラックパッドを無効化する (libinput の disable-while-typing) ための設定。
+  #
+  # T2 Mac の内蔵キーボード / トラックパッドは apple-bce が USB デバイス (05ac:027e) として
+  # 見せるため、udev がトラックパッドを ID_INPUT_TOUCHPAD_INTEGRATION=external と判定する。
+  # external なトラックパッドに対して libinput は「vid/pid が一致するキーボード」しか DWT の
+  # ペアにしない (libinput src/evdev-mt-touchpad.c tp_want_dwt)。物理キーボードは一致するが
+  # xremap がそれを EVIOCGRAB で占有して既定 1234:5678 の仮想デバイスから打ち直すので、
+  # libinput にはキー入力が一切届かず DWT が機能していなかった。
+  #
+  # 仮想デバイスの vid/pid をトラックパッドに揃えると libinput がペアにする。
+  # 実測 (libinput debug-events --verbose):
+  #   palm: dwt activated with Apple Inc. Apple Internal Keyboard / Trackpad<->xremap
+  # 値は /proc/bus/input/devices の "Apple Internal Keyboard / Trackpad" の I: 行。
+  xremap.outputDeviceId = { vendor = "0x05ac"; product = "0x027e"; };
+
   dconf.settings = {
     # Caps Lock を Ctrl、⌘ と Alt を入れ替え。modules/xremap の modmap
     # (capslock → leftctrl) はこの xkb-options を前提にしている。
