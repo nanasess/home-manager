@@ -174,6 +174,7 @@ modules/
 pkgs/
   yaskkserv2.nix       -- yaskkserv2 の自作 derivation（nixpkgs 未収録）
   ibus-skk.nix         -- ibus-skk 1.4.4 の自作 derivation（nixpkgs 未収録 + apt は 1.4.3 で停滞）
+  mew.nix              -- Mew (Emacs メーラ) の外部コマンド（elisp は elpaca。docs/mew.md）
 shells/
   php-build.nix        -- mise php プラグイン (ソースビルド) 用 devShell（NixOS 用）
 docs/                  -- 領域別の詳細ドキュメント（EAW 文字幅、WezTerm、Bluetooth、ibus-skk、xremap、NixOS T2 等）
@@ -495,6 +496,7 @@ glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcw
 | [docs/ibus-skk.md](docs/ibus-skk.md) | apt 版 1.4.3 のバグ、Nix ビルド 1.4.4 の登録 |
 | [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、GNOME Wayland でのアプリ判定 |
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | WSL から Claude Code への画像貼り付け |
+| [docs/mew.md](docs/mew.md) | Mew (Emacs メーラ) の Gmail XOAUTH2 + 1Password 化。セットアップと初回認可の手順 |
 
 ## TODO: 移行元リポジトリの統合
 

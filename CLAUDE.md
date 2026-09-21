@@ -106,6 +106,7 @@ modules/
 pkgs/
   yaskkserv2.nix       -- yaskkserv2 の自作 Nix derivation（buildRustPackage、nixpkgs 未収録のため）
   ibus-skk.nix         -- ibus-skk 1.4.4 の自作 Nix derivation（nixpkgs 未収録 + apt は 1.4.3 で停滞）
+  mew.nix              -- Mew (Emacs メーラ) の外部コマンド mewl / mewencode / incm / cmew / smew（emacsPackages.mew は elisp のみで bin/ を含まない）
   chatgpt/             -- ChatGPT デスクトップアプリ (Linux 版) の deb 再パッケージ（nixpkgs の chatgpt は Darwin 専用。source.nix + update.sh でバージョン固定 / 追従）
 shells/
   php-build.nix        -- mise php プラグイン (ソースビルド) 用 devShell（NixOS には FHS のツールチェーンが無いため）
@@ -144,6 +145,7 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 | システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
 | SKK 辞書サーバ (yaskkserv2) | Nix ビルド (`pkgs/yaskkserv2.nix`) + systemd ユーザーサービス (`modules/yaskkserv2.nix`) | nixpkgs / apt に無いため上流を `buildRustPackage`。全ホスト同一バイナリ + ユーザーパス辞書 (`~/.local/share/yaskkserv2/all`) で sudo 不要・共通化 |
 | IBus SKK エンジン | Nix ビルド (`pkgs/ibus-skk.nix`) + `IBUS_COMPONENT_PATH` (`modules/ibus-skk/`) | apt / nixpkgs とも 1.4.4 未提供。apt 版 1.4.3 は変換確定が壊れる（`docs/ibus-skk.md`）。IBus は `XDG_DATA_DIRS` を見ないため `systemd.user.sessionVariables` でエンジンを登録する |
+| Mew (Emacs メーラ、Gmail XOAUTH2) | elisp は elpaca (`use-package mew`)、外部コマンドは Nix (`pkgs/mew.nix`)、秘密情報は 1Password (`op://Personal/Mew Gmail XOAUTH2/…` を `M-x mew` 初回に `op read`) | `emacsPackages.mew` は elisp のみで `bin/` を含まず、nixpkgs の `mew` は無関係 (dmenu の Wayland 移植)。OAuth2 トークンは master password 方式 (`~/Mail/.mew-passwd.gpg`) でしか永続化されないため master password も 1Password から供給する（`docs/mew.md`）。elisp と bin は同じ上流コミットに固定する |
 | ChatGPT デスクトップアプリ | Nix ビルド (`pkgs/chatgpt/`) + `hosts/k-2/configuration.nix` の systemPackages | nixpkgs の `chatgpt` は Darwin 専用。OpenAI 公式 deb (Electron) を dpkg 展開 + autoPatchelf で包む。`latest` URL は中身が変わるので apt pool のバージョン付き URL + SHA256 に固定し、`pkgs/chatgpt/update.sh` が Packages インデックスから `source.nix` を更新。同梱プラグインの `~/.codex/.tmp/` へのコピーが Nix ストアの 555 モードを写して EACCES になるため app.asar を展開 → chmod 挿入 → 再パックしている（詳細は `default.nix` のコメント）。Codex ランタイム (`~/.codex/`) はアプリが自己更新する管理外状態 |
 | キーリマップ (xremap) | Nix (`xremap` gnome variant) + systemd ユーザーサービス (`modules/xremap/`) | Chrome にキーバインド変更機能が無いため evdev/uinput レベルで置換。アプリ判定に GNOME Shell 拡張が要る。`input` グループ / udev ルールのみ root 作業として残る |
 | Bluetooth オーディオ | home-manager (xdg.configFile) + pavucontrol | WirePlumber の HFP 自動切替を無効化し、A2DP (ステレオ) / HFP (マイク) は pavucontrol で手動切替。プロファイルの記憶 (`~/.local/state/wireplumber/`) はランタイム状態のため管理外 |
@@ -209,3 +211,4 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、XKB レイヤとの関係、GNOME Wayland でのアプリ判定、root 作業 | `modules/xremap/` (ubuntu) |
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | Claude Code への画像貼り付け。`Ctrl+V` が正解な理由、WSLg の BMP 問題と `wl-paste` shim、切り分け手順 | `hosts/wsl-gentoo.nix` (wsl-gentoo) |
 | [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
+| [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |

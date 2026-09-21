@@ -91,6 +91,7 @@
       packages = forAllSystems (system: {
         ibus-skk = nixpkgs.legacyPackages.${system}.callPackage ./pkgs/ibus-skk.nix { };
         yaskkserv2 = nixpkgs.legacyPackages.${system}.callPackage ./pkgs/yaskkserv2.nix { };
+        mew = nixpkgs.legacyPackages.${system}.callPackage ./pkgs/mew.nix { };
         # unfree なので legacyPackages (allowUnfree 無し) では評価時点で弾かれる。
         # この 1 件だけ許可した nixpkgs を import する。`nix build .#chatgpt` で単体ビルドできる。
         chatgpt =

@@ -58,6 +58,9 @@ in
 
   home.packages = with pkgs; [
     cmigemo
+    # Mew の外部コマンド (mewl / mewencode / incm / cmew / smew)。elisp 側は
+    # init.el の use-package mew (elpaca) で、両者は同じ上流コミットに固定する。
+    (callPackage ../../pkgs/mew.nix { })
   ];
 
   # GTK_IM_MODULE は GTK の IM モジュール選択、XMODIFIERS は X11 の XIM 用。

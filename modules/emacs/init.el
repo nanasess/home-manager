@@ -433,7 +433,7 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
   (setopt whitespace-trailing-regexp  "\\([ \u00A0]+\\)$")
   (setopt whitespace-space-regexp "\\(\u3000+\\)")
   (setopt whitespace-global-modes
-          '(not dired-mode tar-mode magit-log-mode magit-diff-mode))
+          '(not dired-mode tar-mode magit-log-mode magit-diff-mode mew-draft-mode))
   (global-whitespace-mode t)
 
   ;; hl-line
@@ -1417,11 +1417,236 @@ JSON からはグループを特定できないため。"
            :pre-build (("make"))))
 
 ;;;; ============================================================
-;;;; Email (oauth2)
+;;;; Email (Mew)
 ;;;; ============================================================
-(use-package oauth2
-  :ensure (:host github :repo "emacsmirror/oauth2")
-  :defer t)
+;; Gmail (Google Workspace) を XOAUTH2 で読み書きする。
+;; elisp は elpaca (上流 kazu-yamamoto/Mew)、外部コマンド (mewl / mewencode / incm /
+;; cmew / smew) は Nix の pkgs/mew.nix (modules/emacs/default.nix で home.packages に
+;; 入る)。両者は同じコミットに固定してある (elpaca.lock の :ref と pkgs/mew.nix の rev)。
+;;
+;; 秘密情報 (OAuth2 クライアント ID / secret、master password) は 1Password に置き、
+;; `op read' で実行時に解決する。このファイルに残るのは op:// 参照だけなので
+;; 公開リポジトリに置ける。1Password アイテムの作り方や初回認可の手順は docs/mew.md。
+
+(defvar my/op-read-cache (make-hash-table :test #'equal)
+  "`my/op-read' の結果キャッシュ (op:// 参照 → 値)。")
+
+(defun my/op-read (ref)
+  "1Password の REF (op://vault/item/field) を `op read' で解決して返す。
+結果は Emacs セッション内でキャッシュし、1Password の承認ダイアログが
+繰り返し出ないようにする。失敗時は op の stderr を添えて `user-error' を出す
+(1Password が起動していない / ロック中 / アイテムやフィールドが無い等)。"
+  (or (gethash ref my/op-read-cache)
+      (let ((errfile (make-temp-file "op-read-stderr")))
+        (unwind-protect
+            (with-temp-buffer
+              (let ((status (call-process "op" nil (list t errfile) nil
+                                          "read" "--no-newline" ref)))
+                (unless (eq status 0)
+                  (user-error "op read %s に失敗 (exit %s): %s"
+                              ref status
+                              (with-temp-buffer
+                                (insert-file-contents errfile)
+                                (string-trim (buffer-string)))))
+                ;; フィールドが未入力でも op read は exit 0 で空文字を返すので、
+                ;; 空のまま使って認証に失敗する前にここで止める (キャッシュもしない)。
+                (when (string-empty-p (buffer-string))
+                  (user-error "op read %s の値が空です。1Password でフィールドを入力してください" ref))
+                (puthash ref (buffer-string) my/op-read-cache)))
+          (delete-file errfile)))))
+
+(defconst my/mew-op-item "op://Personal/Mew Gmail XOAUTH2"
+  "Mew の秘密情報を置いた 1Password アイテム。
+フィールドは client-id / client-secret (Google Cloud の OAuth クライアント) と
+password (Mew の master password。`~/Mail/.mew-passwd.gpg' の暗号化キー)。")
+
+(defun my/mew-setup-oauth2 ()
+  "OAuth2 クライアント ID / secret を 1Password から取り込む (`mew-init-hook')。
+Emacs 起動時ではなく `M-x mew' の初回に解決するので、起動のたびに 1Password の
+承認が出ることはない。失敗しても hook なので、1Password 側を直してもう一度
+`M-x mew' すればよい。ケースは default 1 つなのでグローバル変数で足りる。"
+  (setq mew-oauth2-client-id (my/op-read (concat my/mew-op-item "/client-id"))
+        mew-oauth2-client-secret (my/op-read (concat my/mew-op-item "/client-secret"))))
+
+(defun my/mew-read-passwd-from-op (orig prompt)
+  "master password のプロンプトには 1Password の値を返し、それ以外は ORIG に委ねる。
+Mew は gpg 2.1+ に対して --pinentry-mode loopback を使うので、パスフレーズは
+必ずこの経路 (`mew-read-passwd') を通り pinentry の GUI は出ない。
+プロトコルのパスワード (IMAP / SMTP) は XOAUTH2 なので聞かれない。"
+  (if (string-match-p "[Mm]aster password" prompt)
+      (my/op-read (concat my/mew-op-item "/password"))
+    (funcall orig prompt)))
+
+(defun my/mew-oauth2-post (url params)
+  "URL に PARAMS (application/x-www-form-urlencoded) を POST し、JSON 応答を
+hash-table で返す (`json-parse-buffer' と同じ形。上流の呼び出し側は
+\\=`(gethash \"access_token\" json)' で読む)。
+上流 mew-oauth2.el は `curl --data PARAMS' を `call-process' で叩くため、client
+secret / refresh token / 認可コードが curl の引数 (/proc/<pid>/cmdline で同一ホストの
+他ユーザーから読める) に載る。Emacs 内蔵の url-http なら本文はプロセス内で完結し、
+TLS も IMAP / SMTP と同じ GnuTLS (mew-ssl-default 'native) に揃う。curl への
+実行時依存も無くなる。"
+  (let ((url-request-method "POST")
+        (url-request-extra-headers
+         '(("Content-Type" . "application/x-www-form-urlencoded")))
+        (url-request-data (encode-coding-string params 'utf-8)))
+    (let ((buf (url-retrieve-synchronously url t t 30)))
+      (unless buf
+        (error "OAuth2 token endpoint に接続できません: %s" url))
+      (unwind-protect
+          (with-current-buffer buf
+            (goto-char url-http-end-of-headers)
+            (json-parse-buffer))
+        (kill-buffer buf)))))
+
+(defun my/mew-oauth2-get-access-token (url client-id client-secret redirect-url code verifier)
+  "`mew-oauth2-get-access-token' の置き換え (curl を使わない)。引数と戻り値は上流と同じ。"
+  (my/mew-oauth2-post
+   url
+   (concat "grant_type=authorization_code"
+           "&code=" code
+           "&code_verifier=" verifier
+           "&client_id=" client-id
+           "&client_secret=" client-secret
+           "&redirect_uri=" (url-hexify-string redirect-url))))
+
+(defun my/mew-oauth2-refresh-access-token (url client-id client-secret refresh-token)
+  "`mew-oauth2-refresh-access-token' の置き換え (curl を使わない)。引数と戻り値は上流と同じ。"
+  (my/mew-oauth2-post
+   url
+   (concat "grant_type=refresh_token"
+           "&client_id=" client-id
+           "&client_secret=" client-secret
+           "&refresh_token=" refresh-token)))
+
+(defun my/mew-oauth2-get-auth-code (url client-id resource-url redirect-url challenge port)
+  "`mew-oauth2-get-auth-code' の置き換え。引数と戻り値は上流と同じ。
+上流の認可 URL には access_type=offline が無く、Google の OAuth クライアントが
+「ウェブ アプリケーション」型だとリフレッシュ トークンが返らない (アクセス
+トークンが切れる約 1 時間ごとにブラウザ認可が再発する。実測: 初回認可後の
+:refresh_token が nil)。access_type=offline でリフレッシュ トークンを要求し、
+prompt=consent で再認可時 (保存済みトークンを失った場合) も必ず発行させる。
+それ以外は上流 (mew-oauth2.el) のコピー。"
+  (let ((url-params
+         (concat
+          url
+          "?response_type=code"
+          "&client_id=" client-id
+          "&scope=" (url-hexify-string resource-url)
+          "&redirect_uri=" (url-hexify-string redirect-url)
+          "&code_challenge=" challenge
+          "&code_challenge_method=S256"
+          "&access_type=offline"
+          "&prompt=consent")))
+    (mew-oauth2-cleanup-redirect-handler port)
+    (condition-case nil
+        (progn
+          (mew-oauth2-setup-redirect-handler port)
+          (browse-url url-params)
+          (mew-rendezvous (null mew-oauth2-code))
+          (mew-oauth2-cleanup-redirect-handler port)
+          mew-oauth2-code)
+      (error "")
+      (quit ""))))
+
+(defun my/mew-browse-url-open-gmail ()
+  "現在のケースのドメインの Gmail (Google Workspace) をブラウザで開く。"
+  (interactive)
+  (browse-url (concat "https://mail.google.com/a/"
+                      (mew-mail-domain (mew-sinfo-get-case)))))
+
+(use-package mew
+  :ensure (:host github :repo "kazu-yamamoto/Mew")
+  :commands (mew mew-send)
+  :hook (mew-init . my/mew-setup-oauth2)
+  :bind (:map mew-message-mode-map
+         ("M-<down-mouse-1>" . mew-browse-url-at-mouse)
+         ("<return>" . mew-browse-url-at-point)
+         :map mew-draft-mode-map
+         ("M-<down-mouse-1>" . mew-browse-url-at-mouse)
+         :map mew-summary-mode-map
+         ("C-c RET" . my/mew-browse-url-open-gmail))
+  :custom
+  ;; アカウントは Gmail 1 本なので default ケースだけ。秘密情報 (oauth2-client-id /
+  ;; oauth2-client-secret) はここには書かず my/mew-setup-oauth2 が入れる。
+  ;; oauth2-redirect-url は Google Cloud 側の OAuth クライアント (デスクトップ アプリ) の
+  ;; ループバック リダイレクトで、Mew がこのポートで認可コードを受け取る。
+  ;; SMTP は 465 (implicit TLS)。旧環境の Smtplog で実績があるのはこちら。
+  (mew-config-alist
+   '((default
+      (proto            "%")
+      (name             "Kentaro Ohkouchi")
+      (user             "ohkouchi")
+      (mail-domain      "skirnir.co.jp")
+      (imap-server      "imap.gmail.com")
+      (imap-user        "ohkouchi@skirnir.co.jp")
+      (imap-ssl         t)
+      (imap-ssl-port    993)
+      (imap-auth-list   ("XOAUTH2"))
+      (imap-trash-folder "%[Gmail]/ゴミ箱")
+      (imap-spam-folder "%[Gmail]/迷惑メール")
+      (imap-delete      nil)
+      (imap-size        0)
+      (imap-header-only t)
+      (smtp-server      "smtp.gmail.com")
+      (smtp-user        "ohkouchi@skirnir.co.jp")
+      (smtp-auth        t)
+      (smtp-ssl         t)
+      (smtp-ssl-port    465)
+      (smtp-auth-list   ("XOAUTH2"))
+      (oauth2-redirect-url  "http://localhost:28080")
+      (oauth2-redirect-port 28080))))
+  ;; TLS は GnuTLS 直結 (Mew 6.10 以降)。stunnel は使わない。
+  (mew-ssl-default 'native)
+  ;; OAuth2 のアクセス / リフレッシュ トークンは Mew のパスワード機構で保存される。
+  ;; 永続化されるのは master password 方式 (~/Mail/.mew-passwd.gpg に gpg 対称暗号) の
+  ;; ときだけで、auth-source 方式はトークン (hash-table) を扱えず毎回ブラウザ認可になる。
+  ;; master password 自体は my/mew-read-passwd-from-op が 1Password から供給する。
+  (mew-use-master-passwd t)
+  (mew-master-passwd-type 'master)
+  ;; summary
+  (mew-use-unread-mark t)
+  (mew-summary-form '(type (5 date) " " (19 from) " " t (30 subj) "|" (20 body)))
+  (mew-addrbook-for-summary 'name)
+  ;; draft は auto-save しない (auto-save-mode に渡す値なので -1 で無効)
+  (mew-draft-mode-auto-save -1)
+  ;; マークが付いていないメッセージだけ自動 refile する
+  (mew-refile-auto-refile-skip-any-mark t)
+  ;; 起動時に自動取得しない
+  (mew-auto-get nil)
+  :init
+  ;; メッセージファイルに .mew を付ける。既存の ~/Mail は 1.mew 形式で保存されて
+  ;; いるので、変えると読めなくなる。
+  (setq mew-use-suffix t)
+  ;; スレッドのインデント文字列。日本語環境では mew-lang-jp.el が defvar で
+  ;; ["┣" "┗" "┃" "　"] に差し替えるが、この環境の文字幅 (docs/eaw-width.md:
+  ;; 罫線は GUI / tty とも幅 1、全角空白 U+3000 は幅 2) では 4 要素の幅が揃わず
+  ;; mew-thread-setup が "All members of mew-thread-indent-strings must have the
+  ;; same length" で M-x mew ごと止まる。幅の方針に依存しない ASCII に固定する
+  ;; (旧 dotfiles の .mew.el と同じ値)。
+  ;; :custom では効かない: mew-lang-jp.el (mew-env.el が require) の defvar が
+  ;; mew-thread.el の defcustom より先に束縛し、defcustom は既存の現在値を優先する
+  ;; (custom-initialize-reset) ため、custom テーマ経由の値は捨てられる。
+  ;; 読み込み前に setq で束縛しておけば defvar / defcustom とも上書きしない。
+  (setq mew-thread-indent-strings [" +" " +" " |" "  "])
+  :config
+  (advice-add 'mew-read-passwd :around #'my/mew-read-passwd-from-op)
+  ;; トークン取得 / 更新を curl から url-http に置き換える (my/mew-oauth2-post 参照)。
+  ;; 上流のシグネチャに合わせた :override なので、Mew を更新したら
+  ;; mew-oauth2.el の両関数の引数が変わっていないか確認すること。
+  (advice-add 'mew-oauth2-get-access-token :override #'my/mew-oauth2-get-access-token)
+  (advice-add 'mew-oauth2-refresh-access-token :override #'my/mew-oauth2-refresh-access-token)
+  ;; 認可 URL に access_type=offline / prompt=consent を足す (my/mew-oauth2-get-auth-code 参照)
+  (advice-add 'mew-oauth2-get-auth-code :override #'my/mew-oauth2-get-auth-code)
+  ;; macOS (NS) では Finder から draft へファイルをドロップして添付できるようにする
+  (when (featurep 'ns)
+    (define-key mew-draft-mode-map [ns-drag-file]
+                (lambda ()
+                  (interactive)
+                  (let ((f (car ns-input-file)))
+                    (setq ns-input-file (cdr ns-input-file))
+                    (dnd-handle-one-url (get-buffer-window) 'copy
+                                        (concat "file://" f)))))))
 
 ;;;; ============================================================
 ;;;; Misc tools
