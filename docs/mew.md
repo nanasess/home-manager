@@ -131,6 +131,13 @@ WSL では `browse-url` が `$BROWSER` (wsl-open) 経由で Windows 側ブラウ
 `mew-use-suffix t` (メッセージファイルに `.mew` を付ける) は **変えてはいけない**。既存の
 `~/Mail` は `1.mew` 形式で保存されており、nil にすると読めなくなる。
 
+`mew-thread-indent-strings` は `mew-lang-jp.el` が日本語環境向けに `defvar` で罫線
+`["┣" "┗" "┃" "　"]` に差し替えるが、[docs/eaw-width.md](eaw-width.md) の方針 (罫線は GUI / tty とも
+幅 1、全角空白 U+3000 は幅 2) では幅が揃わず `mew-thread-setup` がエラーで止まる。旧 `.mew.el` と
+同じ ASCII `[" +" " +" " |" "  "]` に固定してある。use-package の `:custom` では効かない
+(`mew-lang-jp.el` の `defvar` が `mew-thread.el` の `defcustom` より先に束縛し、defcustom は既存の
+現在値を優先する) ので `:init` の `setq` で読み込み前に束縛している。
+
 ## MS365 (Exchange Online) を足す場合
 
 上流マニュアル (Sec 9.13) は Gmail と MS365 を通信確認済みとしている。ケース別キーで書ける:
@@ -172,3 +179,4 @@ Emacs 側は `M-x elpaca-checkout-branches` → `M-x elpaca-pull-all` → `M-x e
 | 認可後にブラウザが `localhost:28080` に繋がらない | Emacs 側でリスナが立っているか (`M-x list-processes` に `oauth2-redirect-handler:28080`)。WSL の `networkingMode` |
 | `Must issue a STARTTLS command first` | `smtp-ssl-port` が 587 になっている。465 に戻す |
 | `M-x mew` で `mewl` が無いと言われる | `home-manager switch` 後に Emacs を再起動したか (`exec-path` は起動時の PATH) |
+| `All members of mew-thread-indent-strings must have the same length` | `mew-lang-jp.el` の罫線インデント `["┣" "┗" "┃" "　"]` が、この環境の文字幅 (罫線 1 / U+3000 2) で揃わない。init.el の `:init` で ASCII に固定してある。`:custom` に移すと効かない (defvar が先に束縛し defcustom は現在値を優先) |

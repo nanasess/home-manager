@@ -1546,6 +1546,17 @@ Mew は gpg 2.1+ に対して --pinentry-mode loopback を使うので、パス�
   ;; メッセージファイルに .mew を付ける。既存の ~/Mail は 1.mew 形式で保存されて
   ;; いるので、変えると読めなくなる。
   (setq mew-use-suffix t)
+  ;; スレッドのインデント文字列。日本語環境では mew-lang-jp.el が defvar で
+  ;; ["┣" "┗" "┃" "　"] に差し替えるが、この環境の文字幅 (docs/eaw-width.md:
+  ;; 罫線は GUI / tty とも幅 1、全角空白 U+3000 は幅 2) では 4 要素の幅が揃わず
+  ;; mew-thread-setup が "All members of mew-thread-indent-strings must have the
+  ;; same length" で M-x mew ごと止まる。幅の方針に依存しない ASCII に固定する
+  ;; (旧 dotfiles の .mew.el と同じ値)。
+  ;; :custom では効かない: mew-lang-jp.el (mew-env.el が require) の defvar が
+  ;; mew-thread.el の defcustom より先に束縛し、defcustom は既存の現在値を優先する
+  ;; (custom-initialize-reset) ため、custom テーマ経由の値は捨てられる。
+  ;; 読み込み前に setq で束縛しておけば defvar / defcustom とも上書きしない。
+  (setq mew-thread-indent-strings [" +" " +" " |" "  "])
   :config
   (advice-add 'mew-read-passwd :around #'my/mew-read-passwd-from-op)
   ;; macOS (NS) では Finder から draft へファイルをドロップして添付できるようにする
