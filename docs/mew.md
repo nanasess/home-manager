@@ -34,6 +34,34 @@ elisp と bin は **同じ上流コミット** に固定する (`modules/emacs/e
   フィールドが未入力でも `op read` は exit 0 で空文字を返すので、`my/op-read` が空を弾く。
 - wsl-gentoo の `op` は `~/.local/bin/op` ラッパー → Windows 側 `op.exe`。Emacs の
   `exec-path` に `~/.local/bin` が入っているので Emacs からも同じ経路で解決できる。
+- k-2 は `programs._1password.enable` (NixOS) が setgid wrapper 付きの `op` を systemPackages に
+  入れる。home-manager 側で `_1password-cli` を足すと wrapper を隠して GUI 連携が壊れるので足さない。
+  ubuntu は apt の `1password-cli` (aptPackages 未宣言、要確認)。
+
+### 認可 URL に access_type=offline / prompt=consent を足す
+
+上流 `mew-oauth2-get-auth-code` の認可 URL には `access_type=offline` が無い。Google はデスクトップ型
+クライアントには黙ってリフレッシュ トークンを返すが、「ウェブ アプリケーション」型には
+`access_type=offline` が無いと返さない。初回導入時 (2026-09-21) の実測では両トークン (IMAP / SMTP) の
+`:refresh_token` が nil で、アクセス トークンの期限 (約 1 時間) ごとにブラウザ認可が再発する状態だった。
+init.el では `mew-oauth2-get-auth-code` を `:override` で置き換え、`&access_type=offline&prompt=consent` を
+足している (`my/mew-oauth2-get-auth-code`、それ以外は上流のコピー)。`prompt=consent` は、保存済み
+トークンを失って再認可するときにも必ずリフレッシュ トークンを発行させるため (Google は 2 回目以降の
+同意ではこれが無いと返さない)。
+
+### トークン取得 / 更新は url-http で行う
+
+上流 `mew-oauth2.el` はトークン取得 (認可コード → アクセス トークン) と更新 (リフレッシュ トークン →
+アクセス トークン) を `curl --data PARAMS` の `call-process` で行う。client secret / refresh token /
+認可コードが curl の**コマンドライン引数**に載るため、同一ホストの他ユーザーが `/proc/<pid>/cmdline`
+から読める (CodeRabbit の指摘、CWE-214)。init.el では `mew-oauth2-get-access-token` /
+`mew-oauth2-refresh-access-token` を `:override` で `url-retrieve-synchronously` 版
+(`my/mew-oauth2-post`) に差し替え、本文をプロセス内に留めている。副作用として `curl` への実行時依存も
+無くなり、TLS は IMAP / SMTP と同じ GnuTLS になる。上流を更新したら両関数のシグネチャが変わっていないか
+確認する (`elisp/mew-oauth2.el`)。
+
+上流へ還元する価値があるのは (1) `access_type=offline` / `prompt=consent` (または追加パラメータ用の変数)、
+(2) curl 引数から秘密情報を外す (`--data @-` で stdin 渡し、または url-http) の 2 点。
 
 ### なぜ master password 方式か
 
@@ -58,7 +86,9 @@ gpg 2.1 以降では Mew が `--pinentry-mode loopback` を使い、読み込み
 <https://console.cloud.google.com/apis/credentials> で「OAuth クライアント ID」を作成する。
 
 - アプリケーションの種類: **デスクトップ アプリ** (ループバック `http://localhost:<port>` への
-  リダイレクトがポート未登録で許可される。Mew は `oauth2-redirect-port` = 28080 で待ち受ける)
+  リダイレクトがポート未登録で許可される。Mew は `oauth2-redirect-port` = 28080 で待ち受ける)。
+  「ウェブ アプリケーション」型でも動くが、承認済みリダイレクト URI に `http://localhost:28080` を
+  登録する必要がある
 - OAuth 同意画面: Google Workspace の組織なら **内部** にすると審査不要
 - スコープ: `https://mail.google.com/` (Mew の `mew-oauth2-resource-url` 既定)
 - クライアント ID とクライアント シークレットを控える
@@ -173,10 +203,11 @@ Emacs 側は `M-x elpaca-checkout-branches` → `M-x elpaca-pull-all` → `M-x e
 
 | 症状 | 見るところ |
 |---|---|
-| `op read … に失敗 (exit 1)` | 1Password (Windows 側 GUI) が起動・ロック解除されているか。`op read "op://Personal/Mew Gmail XOAUTH2/password" \| wc -c` が 32 を返すか |
+| `op read … に失敗 (exit 1)` | 1Password (Windows 側 GUI) が起動・ロック解除されているか。`op read --no-newline "op://Personal/Mew Gmail XOAUTH2/password" \| wc -c` が 32 を返すか |
 | `op read … の値が空です` | 1Password の `client-id` / `client-secret` が未入力 |
 | `Master password is wrong!` | 旧 `.mew-passwd.gpg` が残っている (手順 3)。または 1Password の `password` を変えた |
 | 認可後にブラウザが `localhost:28080` に繋がらない | Emacs 側でリスナが立っているか (`M-x list-processes` に `oauth2-redirect-handler:28080`)。WSL の `networkingMode` |
 | `Must issue a STARTTLS command first` | `smtp-ssl-port` が 587 になっている。465 に戻す |
 | `M-x mew` で `mewl` が無いと言われる | `home-manager switch` 後に Emacs を再起動したか (`exec-path` は起動時の PATH) |
+| 1 時間ごとにブラウザ認可が出る | リフレッシュ トークンが無い。`(gethash :refresh_token (mew-passwd-get-passwd (car (mew-passwd-get-keys))))` が nil なら、認可 URL の override (`my/mew-oauth2-get-auth-code`) が効いているか確認し、`(mew-passwd-set-passwd k nil)` + `(mew-passwd-save)` で消してから再認可する |
 | `All members of mew-thread-indent-strings must have the same length` | `mew-lang-jp.el` の罫線インデント `["┣" "┗" "┃" "　"]` が、この環境の文字幅 (罫線 1 / U+3000 2) で揃わない。init.el の `:init` で ASCII に固定してある。`:custom` に移すと効かない (defvar が先に束縛し defcustom は現在値を優先) |
