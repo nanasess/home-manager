@@ -10,6 +10,7 @@
 |---|---|---|
 | elisp (Mew 本体) | elpaca (`use-package mew`、上流 kazu-yamamoto/Mew) | MELPA の recipe (`elisp/*.el` `etc` `info/*.info*`) を継承。nixpkgs の `emacsPackages.mew` は elisp のみで `bin/` を含まないので使わない |
 | 外部コマンド (`mewl` `mewencode` `incm` `cmew` `smew` `mew-pinentry`) | Nix (`pkgs/mew.nix`、`modules/emacs/default.nix` の `home.packages`) | `bin/` だけを configure + make。`cmew` / `smew` は Ruby + sqlite3 gem 付きの ruby に shebang を差し替える。nixpkgs の `mew` は無関係な dmenu の Wayland 移植 |
+| gpg (master password ファイルの暗号化) | Nix (`gnupg`、`modules/emacs/default.nix` の `home.packages`) | `mew-prog-passwd` の既定 `gpg` と `gpg-connect-agent`。wsl-gentoo (portage) / ubuntu (apt) はシステム側にもあるが、NixOS (k-2) には無いので Nix で揃える |
 | 秘密情報 | 1Password (`op://Personal/Mew Gmail XOAUTH2/…`) | Emacs からは `op read` で実行時に解決 (`my/op-read`)。init.el に残るのは op:// 参照だけ |
 | メール本体 / トークン | `~/Mail` (管理外) | IMAP キャッシュ、下書き、`.mew-passwd.gpg` (OAuth2 トークン) |
 
@@ -209,5 +210,6 @@ Emacs 側は `M-x elpaca-checkout-branches` → `M-x elpaca-pull-all` → `M-x e
 | 認可後にブラウザが `localhost:28080` に繋がらない | Emacs 側でリスナが立っているか (`M-x list-processes` に `oauth2-redirect-handler:28080`)。WSL の `networkingMode` |
 | `Must issue a STARTTLS command first` | `smtp-ssl-port` が 587 になっている。465 に戻す |
 | `M-x mew` で `mewl` が無いと言われる | `home-manager switch` 後に Emacs を再起動したか (`exec-path` は起動時の PATH) |
+| `Searching for program … "gpg"` (`mew-passwd-save`) | `gpg` が PATH に無い。`modules/emacs/default.nix` の `gnupg` が入っているか、`home-manager switch` (NixOS は `nixos-rebuild switch`) 後に Emacs を再起動したか |
 | 1 時間ごとにブラウザ認可が出る | リフレッシュ トークンが無い。`(gethash :refresh_token (mew-passwd-get-passwd (car (mew-passwd-get-keys))))` が nil なら、認可 URL の override (`my/mew-oauth2-get-auth-code`) が効いているか確認し、`(mew-passwd-set-passwd k nil)` + `(mew-passwd-save)` で消してから再認可する |
 | `All members of mew-thread-indent-strings must have the same length` | `mew-lang-jp.el` の罫線インデント `["┣" "┗" "┃" "　"]` が、この環境の文字幅 (罫線 1 / U+3000 2) で揃わない。init.el の `:init` で ASCII に固定してある。`:custom` に移すと効かない (defvar が先に束縛し defcustom は現在値を優先) |
