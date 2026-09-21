@@ -433,7 +433,7 @@ ON/OFF トグルとして働き改行しなかった。skk-j-mode-map には C-j
   (setopt whitespace-trailing-regexp  "\\([ \u00A0]+\\)$")
   (setopt whitespace-space-regexp "\\(\u3000+\\)")
   (setopt whitespace-global-modes
-          '(not dired-mode tar-mode magit-log-mode magit-diff-mode))
+          '(not dired-mode tar-mode magit-log-mode magit-diff-mode mew-draft-mode))
   (global-whitespace-mode t)
 
   ;; hl-line
@@ -1417,11 +1417,146 @@ JSON からはグループを特定できないため。"
            :pre-build (("make"))))
 
 ;;;; ============================================================
-;;;; Email (oauth2)
+;;;; Email (Mew)
 ;;;; ============================================================
-(use-package oauth2
-  :ensure (:host github :repo "emacsmirror/oauth2")
-  :defer t)
+;; Gmail (Google Workspace) を XOAUTH2 で読み書きする。
+;; elisp は elpaca (上流 kazu-yamamoto/Mew)、外部コマンド (mewl / mewencode / incm /
+;; cmew / smew) は Nix の pkgs/mew.nix (modules/emacs/default.nix で home.packages に
+;; 入る)。両者は同じコミットに固定してある (elpaca.lock の :ref と pkgs/mew.nix の rev)。
+;;
+;; 秘密情報 (OAuth2 クライアント ID / secret、master password) は 1Password に置き、
+;; `op read' で実行時に解決する。このファイルに残るのは op:// 参照だけなので
+;; 公開リポジトリに置ける。1Password アイテムの作り方や初回認可の手順は docs/mew.md。
+
+(defvar my/op-read-cache (make-hash-table :test #'equal)
+  "`my/op-read' の結果キャッシュ (op:// 参照 → 値)。")
+
+(defun my/op-read (ref)
+  "1Password の REF (op://vault/item/field) を `op read' で解決して返す。
+結果は Emacs セッション内でキャッシュし、1Password の承認ダイアログが
+繰り返し出ないようにする。失敗時は op の stderr を添えて `user-error' を出す
+(1Password が起動していない / ロック中 / アイテムやフィールドが無い等)。"
+  (or (gethash ref my/op-read-cache)
+      (let ((errfile (make-temp-file "op-read-stderr")))
+        (unwind-protect
+            (with-temp-buffer
+              (let ((status (call-process "op" nil (list t errfile) nil
+                                          "read" "--no-newline" ref)))
+                (unless (eq status 0)
+                  (user-error "op read %s に失敗 (exit %s): %s"
+                              ref status
+                              (with-temp-buffer
+                                (insert-file-contents errfile)
+                                (string-trim (buffer-string)))))
+                ;; フィールドが未入力でも op read は exit 0 で空文字を返すので、
+                ;; 空のまま使って認証に失敗する前にここで止める (キャッシュもしない)。
+                (when (string-empty-p (buffer-string))
+                  (user-error "op read %s の値が空です。1Password でフィールドを入力してください" ref))
+                (puthash ref (buffer-string) my/op-read-cache)))
+          (delete-file errfile)))))
+
+(defconst my/mew-op-item "op://Personal/Mew Gmail XOAUTH2"
+  "Mew の秘密情報を置いた 1Password アイテム。
+フィールドは client-id / client-secret (Google Cloud の OAuth クライアント) と
+password (Mew の master password。`~/Mail/.mew-passwd.gpg' の暗号化キー)。")
+
+(defun my/mew-setup-oauth2 ()
+  "OAuth2 クライアント ID / secret を 1Password から取り込む (`mew-init-hook')。
+Emacs 起動時ではなく `M-x mew' の初回に解決するので、起動のたびに 1Password の
+承認が出ることはない。失敗しても hook なので、1Password 側を直してもう一度
+`M-x mew' すればよい。ケースは default 1 つなのでグローバル変数で足りる。"
+  (setq mew-oauth2-client-id (my/op-read (concat my/mew-op-item "/client-id"))
+        mew-oauth2-client-secret (my/op-read (concat my/mew-op-item "/client-secret"))))
+
+(defun my/mew-read-passwd-from-op (orig prompt)
+  "master password のプロンプトには 1Password の値を返し、それ以外は ORIG に委ねる。
+Mew は gpg 2.1+ に対して --pinentry-mode loopback を使うので、パスフレーズは
+必ずこの経路 (`mew-read-passwd') を通り pinentry の GUI は出ない。
+プロトコルのパスワード (IMAP / SMTP) は XOAUTH2 なので聞かれない。"
+  (if (string-match-p "[Mm]aster password" prompt)
+      (my/op-read (concat my/mew-op-item "/password"))
+    (funcall orig prompt)))
+
+(defun my/mew-browse-url-open-gmail ()
+  "現在のケースのドメインの Gmail (Google Workspace) をブラウザで開く。"
+  (interactive)
+  (browse-url (concat "https://mail.google.com/a/"
+                      (mew-mail-domain (mew-sinfo-get-case)))))
+
+(use-package mew
+  :ensure (:host github :repo "kazu-yamamoto/Mew")
+  :commands (mew mew-send)
+  :hook (mew-init . my/mew-setup-oauth2)
+  :bind (:map mew-message-mode-map
+         ("M-<down-mouse-1>" . mew-browse-url-at-mouse)
+         ("<return>" . mew-browse-url-at-point)
+         :map mew-draft-mode-map
+         ("M-<down-mouse-1>" . mew-browse-url-at-mouse)
+         :map mew-summary-mode-map
+         ("C-c RET" . my/mew-browse-url-open-gmail))
+  :custom
+  ;; アカウントは Gmail 1 本なので default ケースだけ。秘密情報 (oauth2-client-id /
+  ;; oauth2-client-secret) はここには書かず my/mew-setup-oauth2 が入れる。
+  ;; oauth2-redirect-url は Google Cloud 側の OAuth クライアント (デスクトップ アプリ) の
+  ;; ループバック リダイレクトで、Mew がこのポートで認可コードを受け取る。
+  ;; SMTP は 465 (implicit TLS)。旧環境の Smtplog で実績があるのはこちら。
+  (mew-config-alist
+   '((default
+      (proto            "%")
+      (name             "Kentaro Ohkouchi")
+      (user             "ohkouchi")
+      (mail-domain      "skirnir.co.jp")
+      (imap-server      "imap.gmail.com")
+      (imap-user        "ohkouchi@skirnir.co.jp")
+      (imap-ssl         t)
+      (imap-ssl-port    993)
+      (imap-auth-list   ("XOAUTH2"))
+      (imap-trash-folder "%[Gmail]/ゴミ箱")
+      (imap-spam-folder "%[Gmail]/迷惑メール")
+      (imap-delete      nil)
+      (imap-size        0)
+      (imap-header-only t)
+      (smtp-server      "smtp.gmail.com")
+      (smtp-user        "ohkouchi@skirnir.co.jp")
+      (smtp-auth        t)
+      (smtp-ssl         t)
+      (smtp-ssl-port    465)
+      (smtp-auth-list   ("XOAUTH2"))
+      (oauth2-redirect-url  "http://localhost:28080")
+      (oauth2-redirect-port 28080))))
+  ;; TLS は GnuTLS 直結 (Mew 6.10 以降)。stunnel は使わない。
+  (mew-ssl-default 'native)
+  ;; OAuth2 のアクセス / リフレッシュ トークンは Mew のパスワード機構で保存される。
+  ;; 永続化されるのは master password 方式 (~/Mail/.mew-passwd.gpg に gpg 対称暗号) の
+  ;; ときだけで、auth-source 方式はトークン (hash-table) を扱えず毎回ブラウザ認可になる。
+  ;; master password 自体は my/mew-read-passwd-from-op が 1Password から供給する。
+  (mew-use-master-passwd t)
+  (mew-master-passwd-type 'master)
+  ;; summary
+  (mew-use-unread-mark t)
+  (mew-summary-form '(type (5 date) " " (19 from) " " t (30 subj) "|" (20 body)))
+  (mew-addrbook-for-summary 'name)
+  ;; draft は auto-save しない (auto-save-mode に渡す値なので -1 で無効)
+  (mew-draft-mode-auto-save -1)
+  ;; マークが付いていないメッセージだけ自動 refile する
+  (mew-refile-auto-refile-skip-any-mark t)
+  ;; 起動時に自動取得しない
+  (mew-auto-get nil)
+  :init
+  ;; メッセージファイルに .mew を付ける。既存の ~/Mail は 1.mew 形式で保存されて
+  ;; いるので、変えると読めなくなる。
+  (setq mew-use-suffix t)
+  :config
+  (advice-add 'mew-read-passwd :around #'my/mew-read-passwd-from-op)
+  ;; macOS (NS) では Finder から draft へファイルをドロップして添付できるようにする
+  (when (featurep 'ns)
+    (define-key mew-draft-mode-map [ns-drag-file]
+                (lambda ()
+                  (interactive)
+                  (let ((f (car ns-input-file)))
+                    (setq ns-input-file (cdr ns-input-file))
+                    (dnd-handle-one-url (get-buffer-window) 'copy
+                                        (concat "file://" f)))))))
 
 ;;;; ============================================================
 ;;;; Misc tools

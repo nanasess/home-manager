@@ -477,6 +477,12 @@
                          mermaid-mode :host github :type git :protocol
                          https :inherit t :depth treeless :ref
                          "804dbcb1452e7496ae0c48e20362da6351227246"))
+ (mew :source "elpaca-menu-lock-file" :recipe
+      (:package "mew" :fetcher github :repo "kazu-yamamoto/Mew" :files
+                ("elisp/*.el" "etc" "info/*.info*") :source
+                "elpaca-menu-lock-file" :id mew :host github :type git
+                :protocol https :inherit t :depth treeless :ref
+                "5fd9336e13d54f1359d47c9d8bc98a27b2d368ee"))
  (migemo :source "elpaca-menu-lock-file" :recipe
          (:package "migemo" :repo "emacs-jp/migemo" :fetcher github
                    :files
@@ -545,12 +551,6 @@
                 https :inherit t :depth treeless :ref
                 "5a06ca52becf8f7a726bfa63ad2267d135d664ae" :files
                 ("src/*.el")))
- (oauth2 :source "elpaca-menu-lock-file" :recipe
-         (:package "oauth2" :repo "emacsmirror/oauth2" :tar "0.18.4"
-                   :host github :files ("*" (:exclude ".git")) :source
-                   "elpaca-menu-lock-file" :id oauth2 :type git
-                   :protocol https :inherit t :depth treeless :ref
-                   "9697975d6c2d721dfe9733f103eb4e5a6f491ad9"))
  (orderless :source "elpaca-menu-lock-file" :recipe
             (:package "orderless" :repo "oantolin/orderless" :fetcher
                       github :files
