@@ -100,3 +100,38 @@ systemctl --user status xremap.service
 gnome-extensions info xremap@k0kubun.com          # State: ACTIVE か
 busctl --user call org.gnome.Shell /com/k0kubun/Xremap com.k0kubun.Xremap WMClasses
 ```
+
+## タイプ中のトラックパッド無効化 (DWT) が効かなくなる
+
+xremap を動かすと、GNOME の「入力中はタッチパッドを無効にする」(`org.gnome.desktop.peripherals.touchpad disable-while-typing`、既定 true) が**効かなくなる**。文字入力中に手のひらがトラックパッドに触れてスクロールしてしまう症状として現れる (k-2 で実際に起きた)。
+
+原因は libinput の DWT の仕組みにある。
+
+- DWT はタッチパッドと**ペアになったキーボード**のキー入力だけを見る (`src/evdev-mt-touchpad.c` の `tp_dwt_pair_keyboard` / `tp_want_dwt`)
+- xremap は物理キーボードを `EVIOCGRAB` で占有し、uinput の仮想デバイス (既定 `1234:5678`、名前 `xremap`) からキーを打ち直す。つまり libinput には物理キーボードのキー入力が一切届かない
+- 仮想デバイス側は libinput のペア条件を満たさない
+
+ペア条件はタッチパッドの内蔵 / 外付け判定 (udev の `ID_INPUT_TOUCHPAD_INTEGRATION`) で分岐する。
+
+| タッチパッドの判定 | ペア条件 | 対処 |
+|---|---|---|
+| `external` (USB / Bluetooth 接続) | キーボードの vid/pid がタッチパッドと一致 | `xremap.outputDeviceId` で仮想デバイスの vid/pid を揃える (`--vendor` / `--product`) |
+| `internal` (i8042 / SPI / I2C) | キーボードが `AttrKeyboardIntegration=internal` (libinput quirk) | `/etc/libinput/local-overrides.quirks` に `MatchName=xremap` + `AttrKeyboardIntegration=internal` (root 作業、未検証) |
+
+k-2 (T2 Mac) は前者。内蔵キーボード / トラックパッドを apple-bce が USB デバイス (`05ac:027e`) として見せるため udev が external と判定する。`hosts/k-2/home.nix` で `xremap.outputDeviceId = { vendor = "0x05ac"; product = "0x027e"; }` を設定して解決した。
+
+ubuntu (`hosts/ubuntu.nix`) は未対応。内蔵タッチパッドが internal 判定なら後者の quirk が要る (未検証)。
+
+### 切り分け手順
+
+```bash
+# トラックパッドの判定と vid/pid
+udevadm info /dev/input/eventN | grep ID_INPUT_TOUCHPAD_INTEGRATION
+grep -B1 -A1 'Name="xremap"' /proc/bus/input/devices          # I: 行の Vendor / Product
+
+# DWT のペアリング状況 (input グループなら sudo 不要)。仮想デバイスとペアになっていれば
+# "dwt activated with <touchpad><->xremap" が出る
+nix shell nixpkgs#libinput -c libinput debug-events --verbose 2>&1 | grep 'dwt activated'
+```
+
+物理キーボードとのペア (`...Trackpad<->...Trackpad`) は出ていても意味がない。そのデバイスは xremap が占有しているのでキー入力が流れない (`ls -l /proc/$(systemctl --user show -p MainPID --value xremap)/fd | grep event` で確認できる)。
