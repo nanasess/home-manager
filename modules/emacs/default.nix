@@ -61,6 +61,12 @@ in
     # Mew の外部コマンド (mewl / mewencode / incm / cmew / smew)。elisp 側は
     # init.el の use-package mew (elpaca) で、両者は同じ上流コミットに固定する。
     (callPackage ../../pkgs/mew.nix { })
+    # Mew の master password 方式 (init.el の mew-use-master-passwd t) は
+    # ~/Mail/.mew-passwd.gpg を `gpg -c` で読み書きする (mew-prog-passwd の既定は
+    # "gpg"、gpg-connect-agent も呼ぶ)。wsl-gentoo / ubuntu はシステム側の gnupg で
+    # 動いていたが、NixOS (k-2) には無く M-x mew が "Searching for program gpg" で
+    # 止まるので、mew-bin と同じくここで揃える。
+    gnupg
   ];
 
   # GTK_IM_MODULE は GTK の IM モジュール選択、XMODIFIERS は X11 の XIM 用。
