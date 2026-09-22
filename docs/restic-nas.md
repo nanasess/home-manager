@@ -119,3 +119,19 @@ sudo install -d -m 700 /root/secrets
 op read 'op://synology/restic-key/restic-nas.pass' | sudo install -m 600 /dev/stdin /root/secrets/restic-nas.pass
 op read 'op://synology/restic-key/private_key'     | sudo install -m 600 /dev/stdin /root/secrets/restic-nas_ed25519
 ```
+
+## 落とし穴: inhibitsSleep は使わない
+
+`services.restic.backups.<name>.inhibitsSleep = true` にすると、サスペンドからの復帰直後に
+`Persistent = true` の追いつき実行が走ったとき、logind がまだ `suspend` 操作を終えておらず
+`systemd-inhibit` が拒否されてその回が失敗する:
+
+```
+20:34:46 systemd-sleep: System returned from sleep operation 'suspend'.
+20:34:46 systemd-logind: Operation 'suspend' finished.
+20:34:46 systemd-inhibit: Failed to inhibit: The operation inhibition has been requested for is already running
+20:34:46 systemd: restic-backups-nas.service: Failed with result 'exit-code'.
+```
+
+ノート PC では復帰のたびに再現するので無効にしてある (2026-09-22、k-2 実機)。差分バックアップは
+十数秒で終わり、restic は中断されても壊れない (次回の `unlock` でロックが外れる)。

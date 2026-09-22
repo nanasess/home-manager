@@ -425,8 +425,11 @@ in
       "--exclude-caches"
       "--one-file-system"
     ];
-    # 実行中は蓋を閉じても suspend しない (数分で終わる。NAS 不達は ConnectTimeout で切れる)
-    inhibitsSleep = true;
+    # inhibitsSleep は使わない。復帰直後に Persistent の追いつき実行が走ると、logind が
+    # まだ suspend 操作を終えておらず systemd-inhibit が
+    # "The operation inhibition has been requested for is already running" で失敗し、
+    # 復帰のたびにその回を落とす (2026-09-22 実機で確認。suspend exit と同じ秒に発火)。
+    # 差分バックアップは十数秒で終わり、restic は中断に強い (次回の unlock でロックを外す)。
     timerConfig = {
       OnCalendar = "hourly";
       # NAS に届かない時間帯 (外出先 / suspend 中) の分は起動時にまとめて追いつく
