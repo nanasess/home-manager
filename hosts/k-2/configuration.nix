@@ -350,6 +350,102 @@ in
     ];
 
   # ---------------------------------------------------------------------------
+  # バックアップ (restic → Synology DS720+ "home-backup")
+  # ---------------------------------------------------------------------------
+  #
+  # NixOS + home-manager で再現できるものは取らず、flake の外にある状態だけを
+  # restic で NAS に送る。復旧は docs/nixos-t2.md の再インストール → nixos-rebuild
+  # → restic-nas restore。NAS 側の設定 (backup ユーザー / SFTP / Btrfs スナップショット)
+  # と復旧手順は docs/restic-nas.md。
+  #
+  # 転送は DSM 組み込みの SFTP のみで、NAS 側に追加ソフトは要らない。DSM の SFTP は
+  # 非 admin ユーザーに「権限のある共有フォルダを / 直下に並べた仮想ルート」を見せる
+  # ので、リポジトリのパスは /volume1/restic/... ではなく /restic/... になる。
+  #
+  # 秘密情報は /root/secrets/ (0700、Nix 管理外、手動配置):
+  #   restic-nas.pass      リポジトリのパスフレーズ
+  #   restic-nas_ed25519   NAS の backup ユーザー用 SSH 秘密鍵 (パスフレーズなし)
+  # systemd から動くため 1Password の SSH agent は使えず、この 2 ファイルだけは復号値を
+  # ディスクに置く (CLAUDE.md「1Password とクレデンシャル管理」の例外運用)。正本は
+  # 1Password の "restic home-backup k-2" に控えてあり、復旧時は op read で取り出す。
+  # 鍵は backup ユーザー専用で、NAS 上の他の共有フォルダ (TimeMachine 等) には届かない。
+  services.restic.backups.nas = {
+    # /etc, /var/lib も取るので root で動かす
+    user = "root";
+    repository = "sftp:backup@192.168.100.15:/restic/k-2";
+    passwordFile = "/root/secrets/restic-nas.pass";
+    initialize = true;
+    extraOptions = [
+      # ホスト鍵は programs.ssh.knownHosts (/etc/ssh/ssh_known_hosts) で検証する。
+      # ConnectTimeout は NAS 不達 (外出先) で ssh が長く待って suspend を阻止しないため
+      "sftp.command='ssh backup@192.168.100.15 -i /root/secrets/restic-nas_ed25519 -o BatchMode=yes -o ConnectTimeout=10 -s sftp'"
+    ];
+    paths = [
+      "/home/nanasess"
+      # VPN (l2tp) の接続定義と秘密。NetworkManager が生成するので flake には無い
+      "/etc/NetworkManager/system-connections"
+      # Bluetooth のペアリング鍵
+      "/var/lib/bluetooth"
+    ];
+    exclude = [
+      # 再生成できるキャッシュ / パッケージストア
+      "/home/nanasess/.cache"
+      "/home/nanasess/.nuget"
+      "/home/nanasess/.npm"
+      "/home/nanasess/.local/share/NuGet"
+      "/home/nanasess/.local/share/pnpm"
+      "/home/nanasess/.local/share/uv"
+      "/home/nanasess/.local/share/flatpak"
+      # Claude Code 本体 (自己更新する)。設定とメモリは ~/.config/claude で別
+      "/home/nanasess/.local/share/claude"
+      # ChatGPT の Codex ランタイム (自己更新、CLAUDE.md 参照)
+      "/home/nanasess/.codex"
+      # クラウド側が正
+      "/home/nanasess/OneDrive - Skirnir Inc"
+      # Electron アプリの状態 (ログインし直せば戻る)
+      "/home/nanasess/.config/Slack"
+      "/home/nanasess/.config/Codex"
+      "/home/nanasess/.config/google-chrome/*/Cache"
+      "/home/nanasess/.config/google-chrome/*/Code Cache"
+      "/home/nanasess/.config/google-chrome/*/Service Worker/CacheStorage"
+      # elpaca のビルド成果物 (elpaca.lock から再現できる)
+      "/home/nanasess/.emacs.d/elpaca"
+      "/home/nanasess/.emacs.d/eln-cache"
+      # git-repos 配下の依存 / ビルド成果物。コミット済みのものは .git 側に残る
+      "**/node_modules"
+      "**/vendor"
+      "**/.venv"
+      "**/target"
+      "**/.direnv"
+      "**/result"
+    ];
+    extraBackupArgs = [
+      # CACHEDIR.TAG のあるディレクトリを除外 (mise / cargo / pip 等が置く)
+      "--exclude-caches"
+      "--one-file-system"
+    ];
+    # 実行中は蓋を閉じても suspend しない (数分で終わる。NAS 不達は ConnectTimeout で切れる)
+    inhibitsSleep = true;
+    timerConfig = {
+      OnCalendar = "hourly";
+      # NAS に届かない時間帯 (外出先 / suspend 中) の分は起動時にまとめて追いつく
+      Persistent = true;
+      RandomizedDelaySec = "10m";
+    };
+    pruneOpts = [
+      "--keep-hourly 24"
+      "--keep-daily 14"
+      "--keep-weekly 8"
+      "--keep-monthly 12"
+    ];
+  };
+
+  # NAS のホスト鍵。restic の sftp が root で動くため、ユーザーの known_hosts ではなく
+  # システム側に置く。鍵が変わったら (NAS 再インストール等) ここを更新する。
+  programs.ssh.knownHosts."192.168.100.15".publicKey =
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMX+S3/FfXieCNkRdNSvhg9lAKecozjGcG0unLIKa11l";
+
+  # ---------------------------------------------------------------------------
   # ユーザー / Nix
   # ---------------------------------------------------------------------------
 
