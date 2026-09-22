@@ -179,6 +179,15 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
    失敗したセッションでは古いステップ (merge) を再実行してまた失敗するため。ビルド後、対象を
    すでに load しているなら再起動して新しい `.elc` を読ませる。
 
+**`advice-add` と native-comp**: `modules/emacs/early-init.el` の `native-comp-speed` は既定値の
+2 のままにする。3 にするとネイティブコンパイラが「同じコンパイル単位 (同一ファイル) の関数は
+再定義されない」と仮定して呼び出しを直接化し、**`advice-add` と関数の再定義が素通りされる**。
+他人のパッケージの内部関数に advice を当てている設定 (init.el の `mew-read-passwd` /
+`mew-oauth2-get-auth-code` / `lsp-bridge--mode-line-format`) はこの最適化と両立しない。
+実例と切り分け方は `docs/mew.md`「native-comp-speed と advice」。speed を変えても `.eln` の
+ファイル名は変わらないので、戻した後は `M-x elpaca-rebuild` か `~/.emacs.d/eln-cache/` の削除で
+再コンパイルさせること。
+
 ### ChatGPT デスクトップアプリの更新手順
 
 「chatgpt を更新しておいて」と指示されたら、以下を一連で実行して PR まで作る。

@@ -76,6 +76,27 @@ init.el では `mew-oauth2-get-auth-code` を `:override` で置き換え、`&ac
 上流へ還元する価値が残るのは `access_type=offline` / `prompt=consent` (または追加パラメータ用の変数)
 の 1 点。
 
+### native-comp-speed と advice
+
+ここで使っている `:override` / `:around` の advice は、**`native-comp-speed` が 3 だと効かない**。
+ネイティブコンパイラは speed 3 のとき「同じコンパイル単位 (同一ファイル) で定義された関数は
+再定義されない」と仮定し、その呼び出しを直接呼び出しに最適化するため、`advice-add` も関数の
+再定義も素通りされる。`modules/emacs/early-init.el` は既定値の 2 に戻してある。
+
+実害の確認 (2026-09-22):
+
+- `mew-passwd-read-passwd` → `mew-read-passwd` はどちらも `mew-passwd.el` 内。speed 3 では
+  直接呼び出しになり、`my/mew-read-passwd-from-op` が呼ばれないまま素の `read-passwd` に落ちる。
+  つまり **master password は 1Password から供給されず、毎回手入力を求められていた**。
+- 同じ `mew-passwd.el` をソース (`.el`、ネイティブコンパイルなし) から読み直して同じ復号を
+  走らせると advice が呼ばれ、`op read` の値が gpg に渡り、パスワードエントリを読めた。
+- `mew-oauth2-get-auth-code` の `:override` も `mew-xoauth2-authorize` が同じ `mew-oauth2.el`
+  から呼ぶので同条件 (こちらは未検証)。`access_type=offline` が効いていなかった可能性がある。
+
+speed を変えても `.eln` のファイル名は変わらないので、**設定を戻したら対象パッケージを
+`M-x elpaca-rebuild` するか `~/.emacs.d/eln-cache/` を消して再コンパイルさせる**こと。
+他人のパッケージの内部関数に advice を当てている箇所は、この最適化とは両立しない。
+
 ### なぜ master password 方式か
 
 Mew の XOAUTH2 (`mew-oauth2.el`、6.10 以降) はトークンを「Mew のパスワード機構」

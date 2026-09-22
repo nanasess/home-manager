@@ -31,6 +31,16 @@
 
 (with-eval-after-load 'comp
   (setopt native-comp-async-jobs-number (num-processors))
-  (setq native-comp-speed 3))
+  ;; 既定値の 2 のままにする (3 にしない)。speed 3 はネイティブコンパイラに
+  ;; 「同じコンパイル単位 (同一ファイル) で定義された関数は再定義されない」と
+  ;; 仮定させ、その呼び出しを直接呼び出しに最適化する。結果として
+  ;; `advice-add' と関数の再定義が素通りされる。
+  ;; 実害があった例: Mew の master password を 1Password から供給する
+  ;; `mew-read-passwd' の advice が、同じ mew-passwd.el 内の
+  ;; `mew-passwd-read-passwd' から直接呼ばれるため無視され、毎回手入力を
+  ;; 求められていた (docs/mew.md「native-comp-speed と advice」)。
+  ;; init.el の advice はいずれも他人のパッケージの内部関数に当てているので、
+  ;; この最適化とは両立しない。
+  (setq native-comp-speed 2))
 
 (provide 'early-init)
