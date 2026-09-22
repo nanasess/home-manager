@@ -367,7 +367,8 @@ in
   #   restic-nas_ed25519   NAS の backup ユーザー用 SSH 秘密鍵 (パスフレーズなし)
   # systemd から動くため 1Password の SSH agent は使えず、この 2 ファイルだけは復号値を
   # ディスクに置く (CLAUDE.md「1Password とクレデンシャル管理」の例外運用)。正本は
-  # 1Password の "restic home-backup k-2" に控えてあり、復旧時は op read で取り出す。
+  # 1Password の op://synology/restic-key/{restic-nas.pass,private_key} に控えてあり、
+  # 復旧時は op read で取り出す (docs/restic-nas.md)。
   # 鍵は backup ユーザー専用で、NAS 上の他の共有フォルダ (TimeMachine 等) には届かない。
   services.restic.backups.nas = {
     # /etc, /var/lib も取るので root で動かす

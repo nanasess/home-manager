@@ -81,7 +81,7 @@ rm /tmp/authorized_keys
 | `restic-nas.pass` (0600) | リポジトリのパスフレーズ | `head -c 32 /dev/urandom \| base64` |
 | `restic-nas_ed25519` (0600) | `backup` ユーザー用 SSH 秘密鍵 (パスフレーズなし) | `ssh-keygen -t ed25519 -N ''` |
 
-正本は 1Password の `restic home-backup k-2` に控える。**パスフレーズを失うとリポジトリは
+正本は 1Password の `synology` vault、`restic-key` アイテムに控える。**パスフレーズを失うとリポジトリは
 二度と開けない**。NAS のホスト鍵は `programs.ssh.knownHosts` で `/etc/ssh/ssh_known_hosts`
 に載せている (root の `~/.ssh/known_hosts` には無いので、これが無いと `BatchMode=yes` で
 `Host key verification failed` になる)。NAS を再インストールしたら更新する。
@@ -111,5 +111,11 @@ sudo restic-nas restore latest --target /tmp/restore --include /home/nanasess/Ma
 sudo restic-nas restore latest --target / --include /home/nanasess
 ```
 
-再インストール直後は `/root/secrets/` が無いので、1Password から `op read` で 2 ファイルを
-復元してから `nixos-rebuild switch`。`restic-nas` wrapper が入れば上記が使える。
+再インストール直後は `/root/secrets/` が無いので、1Password から復元してから `nixos-rebuild switch`
+(`restic-nas` wrapper が入れば上記が使える):
+
+```bash
+sudo install -d -m 700 /root/secrets
+op read 'op://synology/restic-key/restic-nas.pass' | sudo install -m 600 /dev/stdin /root/secrets/restic-nas.pass
+op read 'op://synology/restic-key/private_key'     | sudo install -m 600 /dev/stdin /root/secrets/restic-nas_ed25519
+```
