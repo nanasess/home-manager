@@ -155,6 +155,30 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 
 **プラットフォーム非依存化の判断基準**: portage / apt など特定ホストのパッケージマネージャに依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で wsl-gentoo (旧 portage) と ubuntu を統一した先例 (PR #110)。
 
+### Emacs パッケージ (elpaca) の更新手順
+
+`modules/emacs/elpaca.lock` は全パッケージを `:ref` でピン留めしており (`elpaca-menu-lock-file`)、
+`~/.emacs.d/elpaca/sources/*` はすべて detached HEAD になっている。このため
+**`M-x elpaca-pull-all` / `elpaca-merge-all` は使えない**。`elpaca-fetch` はピン留めを検出して
+スキップするが、merge 側にはそのチェックが無く、`elpaca-git--merge` が引数なしの
+`git merge --ff-only` を実行して `fatal: No current branch.` (exit 128) で全パッケージが
+「Subprocess error」になる。更新は lock の `:ref` を書き換える。
+
+1. **上流を取る**: `git -C ~/.emacs.d/elpaca/sources/<Repo> fetch origin` して新しい rev を決める
+   (デフォルトブランチは上流により `master` / `main`。`origin/HEAD` を見る)。
+2. **lock を書き換える**: `modules/emacs/elpaca.lock` の当該パッケージの `:ref`。対応する
+   derivation が `pkgs/` にある場合 (Mew など) は rev / version / hash も同じコミットに揃える。
+   hash は `nix flake prefetch --json github:<owner>/<repo>/<rev>` で取り、`nix build` で確認する。
+3. **検証**: `nix flake check` と対象ホストの `activationPackage` ビルド。
+4. **適用**: `home-manager switch` (lock は activation で `~/.emacs.d/elpaca.lock` に install される)。
+5. **ソースを切り替える**: `git -C ~/.emacs.d/elpaca/sources/<Repo> checkout <rev>`。
+   `elpaca-rebuild` のビルドステップに checkout は含まれない (`elpaca-check-version` /
+   `elpaca-build-link` / `-autoloads` / `-compile` / `-docs` のみ) ので手動で行う。
+6. **Emacs を再起動してから `M-x elpaca-rebuild <pkg>`**。再起動が先なのは、`elpaca-rebuild` が
+   `:rebuild` 用のステップに差し替えるのは status が `finished` のときだけで、`elpaca-pull-all` が
+   失敗したセッションでは古いステップ (merge) を再実行してまた失敗するため。ビルド後、対象を
+   すでに load しているなら再起動して新しい `.elc` を読ませる。
+
 ### ChatGPT デスクトップアプリの更新手順
 
 「chatgpt を更新しておいて」と指示されたら、以下を一連で実行して PR まで作る。

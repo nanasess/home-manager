@@ -482,7 +482,7 @@
                 ("elisp/*.el" "etc" "info/*.info*") :source
                 "elpaca-menu-lock-file" :id mew :host github :type git
                 :protocol https :inherit t :depth treeless :ref
-                "5fd9336e13d54f1359d47c9d8bc98a27b2d368ee"))
+                "66261fb2eead0abfbf3d8c435b2f615c8bc7fe4b"))
  (migemo :source "elpaca-menu-lock-file" :recipe
          (:package "migemo" :repo "emacs-jp/migemo" :fetcher github
                    :files

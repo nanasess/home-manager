@@ -1477,48 +1477,6 @@ Mew は gpg 2.1+ に対して --pinentry-mode loopback を使うので、パス�
       (my/op-read (concat my/mew-op-item "/password"))
     (funcall orig prompt)))
 
-(defun my/mew-oauth2-post (url params)
-  "URL に PARAMS (application/x-www-form-urlencoded) を POST し、JSON 応答を
-hash-table で返す (`json-parse-buffer' と同じ形。上流の呼び出し側は
-\\=`(gethash \"access_token\" json)' で読む)。
-上流 mew-oauth2.el は `curl --data PARAMS' を `call-process' で叩くため、client
-secret / refresh token / 認可コードが curl の引数 (/proc/<pid>/cmdline で同一ホストの
-他ユーザーから読める) に載る。Emacs 内蔵の url-http なら本文はプロセス内で完結し、
-TLS も IMAP / SMTP と同じ GnuTLS (mew-ssl-default 'native) に揃う。curl への
-実行時依存も無くなる。"
-  (let ((url-request-method "POST")
-        (url-request-extra-headers
-         '(("Content-Type" . "application/x-www-form-urlencoded")))
-        (url-request-data (encode-coding-string params 'utf-8)))
-    (let ((buf (url-retrieve-synchronously url t t 30)))
-      (unless buf
-        (error "OAuth2 token endpoint に接続できません: %s" url))
-      (unwind-protect
-          (with-current-buffer buf
-            (goto-char url-http-end-of-headers)
-            (json-parse-buffer))
-        (kill-buffer buf)))))
-
-(defun my/mew-oauth2-get-access-token (url client-id client-secret redirect-url code verifier)
-  "`mew-oauth2-get-access-token' の置き換え (curl を使わない)。引数と戻り値は上流と同じ。"
-  (my/mew-oauth2-post
-   url
-   (concat "grant_type=authorization_code"
-           "&code=" code
-           "&code_verifier=" verifier
-           "&client_id=" client-id
-           "&client_secret=" client-secret
-           "&redirect_uri=" (url-hexify-string redirect-url))))
-
-(defun my/mew-oauth2-refresh-access-token (url client-id client-secret refresh-token)
-  "`mew-oauth2-refresh-access-token' の置き換え (curl を使わない)。引数と戻り値は上流と同じ。"
-  (my/mew-oauth2-post
-   url
-   (concat "grant_type=refresh_token"
-           "&client_id=" client-id
-           "&client_secret=" client-secret
-           "&refresh_token=" refresh-token)))
-
 (defun my/mew-oauth2-get-auth-code (url client-id resource-url redirect-url challenge port)
   "`mew-oauth2-get-auth-code' の置き換え。引数と戻り値は上流と同じ。
 上流の認可 URL には access_type=offline が無く、Google の OAuth クライアントが
@@ -1526,7 +1484,11 @@ TLS も IMAP / SMTP と同じ GnuTLS (mew-ssl-default 'native) に揃う。curl 
 トークンが切れる約 1 時間ごとにブラウザ認可が再発する。実測: 初回認可後の
 :refresh_token が nil)。access_type=offline でリフレッシュ トークンを要求し、
 prompt=consent で再認可時 (保存済みトークンを失った場合) も必ず発行させる。
-それ以外は上流 (mew-oauth2.el) のコピー。"
+この 2 つのパラメータ以外は上流 (mew-oauth2.el) のコピーで、state の生成
+(`mew-oauth2-state') もそのまま行う。上流のリダイレクト ハンドラは state が
+一致しない認可コードを 400 で弾く (RFC 6749 10.12) ので、これを落とすと認可が
+必ず失敗する。Mew を更新したら上流の本体と差分が開いていないか確認すること。"
+  (setq mew-oauth2-state (mew-oauth2-random-string))
   (let ((url-params
          (concat
           url
@@ -1534,20 +1496,24 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
           "&client_id=" client-id
           "&scope=" (url-hexify-string resource-url)
           "&redirect_uri=" (url-hexify-string redirect-url)
+          "&state=" mew-oauth2-state
           "&code_challenge=" challenge
           "&code_challenge_method=S256"
           "&access_type=offline"
           "&prompt=consent")))
     (mew-oauth2-cleanup-redirect-handler port)
-    (condition-case nil
-        (progn
-          (mew-oauth2-setup-redirect-handler port)
-          (browse-url url-params)
-          (mew-rendezvous (null mew-oauth2-code))
-          (mew-oauth2-cleanup-redirect-handler port)
-          mew-oauth2-code)
-      (error "")
-      (quit ""))))
+    ;; 認可を途中でやめてもリッスン ソケットは閉じる (閉じないとポートが
+    ;; セッション中ずっと塞がる)。上流と同じ unwind-protect。
+    (unwind-protect
+        (condition-case nil
+            (progn
+              (mew-oauth2-setup-redirect-handler port)
+              (browse-url url-params)
+              (mew-rendezvous (null mew-oauth2-code))
+              mew-oauth2-code)
+          (error "")
+          (quit ""))
+      (mew-oauth2-cleanup-redirect-handler port))))
 
 (defun my/mew-browse-url-open-gmail ()
   "現在のケースのドメインの Gmail (Google Workspace) をブラウザで開く。"
@@ -1631,11 +1597,10 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   (setq mew-thread-indent-strings [" +" " +" " |" "  "])
   :config
   (advice-add 'mew-read-passwd :around #'my/mew-read-passwd-from-op)
-  ;; トークン取得 / 更新を curl から url-http に置き換える (my/mew-oauth2-post 参照)。
-  ;; 上流のシグネチャに合わせた :override なので、Mew を更新したら
-  ;; mew-oauth2.el の両関数の引数が変わっていないか確認すること。
-  (advice-add 'mew-oauth2-get-access-token :override #'my/mew-oauth2-get-access-token)
-  (advice-add 'mew-oauth2-refresh-access-token :override #'my/mew-oauth2-refresh-access-token)
+  ;; トークン取得 / 更新 (mew-oauth2-get-access-token / -refresh-access-token) は
+  ;; 上流に任せる。秘密情報が curl の引数に載る問題は上流 66261fb (PR #235) が
+  ;; mew-oauth2-post で解決した (mode 600 の一時ファイルに本文を書いて
+  ;; `--data @file' で渡す)。値の url-hexify も上流 mew-oauth2-params が行う。
   ;; 認可 URL に access_type=offline / prompt=consent を足す (my/mew-oauth2-get-auth-code 参照)
   (advice-add 'mew-oauth2-get-auth-code :override #'my/mew-oauth2-get-auth-code)
   ;; macOS (NS) では Finder から draft へファイルをドロップして添付できるようにする
