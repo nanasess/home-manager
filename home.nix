@@ -44,6 +44,8 @@
     mariadb.client
     pgcli
     litecli
+    # SQL Server (EcAuth など)。Microsoft 公式の go-sqlcmd で ODBC ドライバ不要
+    sqlcmd
 
     # Development
     gh
