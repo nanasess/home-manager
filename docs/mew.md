@@ -50,19 +50,53 @@ init.el では `mew-oauth2-get-auth-code` を `:override` で置き換え、`&ac
 トークンを失って再認可するときにも必ずリフレッシュ トークンを発行させるため (Google は 2 回目以降の
 同意ではこれが無いと返さない)。
 
-### トークン取得 / 更新は url-http で行う
+このオーバーライドは上流本体のコピーなので、**Mew を更新したら差分が開いていないか確認する**。
+上流 66261fb (PR #235) は認可 URL に `state` を足し、リダイレクト ハンドラが `state` の一致しない
+認可コードを `400 Bad Request` で弾くようにした (RFC 6749 10.12)。`mew-oauth2-state` の生成を
+落としたオーバーライドを当てると、ブラウザ認可が毎回失敗する (`mew-oauth2-state` が nil のまま
+ハンドラの検証に入るため)。同じコミットで `unwind-protect` によるリッスン ソケットの後始末も
+入ったので、こちらも取り込んである。
+
+### トークン取得 / 更新は上流 (curl) に任せる
 
 上流 `mew-oauth2.el` はトークン取得 (認可コード → アクセス トークン) と更新 (リフレッシュ トークン →
-アクセス トークン) を `curl --data PARAMS` の `call-process` で行う。client secret / refresh token /
-認可コードが curl の**コマンドライン引数**に載るため、同一ホストの他ユーザーが `/proc/<pid>/cmdline`
-から読める (CodeRabbit の指摘、CWE-214)。init.el では `mew-oauth2-get-access-token` /
-`mew-oauth2-refresh-access-token` を `:override` で `url-retrieve-synchronously` 版
-(`my/mew-oauth2-post`) に差し替え、本文をプロセス内に留めている。副作用として `curl` への実行時依存も
-無くなり、TLS は IMAP / SMTP と同じ GnuTLS になる。上流を更新したら両関数のシグネチャが変わっていないか
-確認する (`elisp/mew-oauth2.el`)。
+アクセス トークン) を curl で行う。6.11 の途中まではパラメータを `curl --data PARAMS` と
+コマンドライン引数に載せており、client secret / refresh token / 認可コードが同一ホストの他ユーザーから
+`/proc/<pid>/cmdline` 経由で読めた (CodeRabbit の指摘、CWE-214)。init.el はこれを
+`url-retrieve-synchronously` 版 (`my/mew-oauth2-post`) への `:override` で回避していたが、
+**上流 66261fb (PR #235) が `mew-oauth2-post` を入れて解決したのでオーバーライドは削除した**。
+上流版は `mew-temp-dir` にモード 600 の一時ファイルを作って本文を書き、`--data @file` で渡し、
+終わったら消す。値のエンコードも `mew-oauth2-params` が `url-hexify-string` で行うので、
+`+` や `&` を含む client secret も壊れない (自前版はそこまで見ていなかった)。
 
-上流へ還元する価値があるのは (1) `access_type=offline` / `prompt=consent` (または追加パラメータ用の変数)、
-(2) curl 引数から秘密情報を外す (`--data @-` で stdin 渡し、または url-http) の 2 点。
+その代わり `curl` への実行時依存は残る。Mew は `mew-prog-curl` (既定 `"curl"`) を
+`mew-which-exec` で `exec-path` から探し、無ければ `"curl does not exist"` と表示してトークン取得を
+諦める。wsl-gentoo は portage の、NixOS / Ubuntu は既定のシステム `curl` を使う (Nix では
+明示していない)。
+
+上流へ還元する価値が残るのは `access_type=offline` / `prompt=consent` (または追加パラメータ用の変数)
+の 1 点。
+
+### native-comp-speed と advice
+
+ここで使っている `:override` / `:around` の advice は、**`native-comp-speed` が 3 だと効かない**。
+ネイティブコンパイラは speed 3 のとき「同じコンパイル単位 (同一ファイル) で定義された関数は
+再定義されない」と仮定し、その呼び出しを直接呼び出しに最適化するため、`advice-add` も関数の
+再定義も素通りされる。`modules/emacs/early-init.el` は既定値の 2 に戻してある。
+
+実害の確認 (2026-09-22):
+
+- `mew-passwd-read-passwd` → `mew-read-passwd` はどちらも `mew-passwd.el` 内。speed 3 では
+  直接呼び出しになり、`my/mew-read-passwd-from-op` が呼ばれないまま素の `read-passwd` に落ちる。
+  つまり **master password は 1Password から供給されず、毎回手入力を求められていた**。
+- 同じ `mew-passwd.el` をソース (`.el`、ネイティブコンパイルなし) から読み直して同じ復号を
+  走らせると advice が呼ばれ、`op read` の値が gpg に渡り、パスワードエントリを読めた。
+- `mew-oauth2-get-auth-code` の `:override` も `mew-xoauth2-authorize` が同じ `mew-oauth2.el`
+  から呼ぶので同条件 (こちらは未検証)。`access_type=offline` が効いていなかった可能性がある。
+
+speed を変えても `.eln` のファイル名は変わらないので、**設定を戻したら対象パッケージを
+`M-x elpaca-rebuild` するか `~/.emacs.d/eln-cache/` を消して再コンパイルさせる**こと。
+他人のパッケージの内部関数に advice を当てている箇所は、この最適化とは両立しない。
 
 ### なぜ master password 方式か
 
