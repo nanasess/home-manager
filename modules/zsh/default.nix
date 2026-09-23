@@ -98,7 +98,6 @@ in
       eval "$(op completion zsh)"; compdef _op op
 
       autoload -U +X bashcompinit && bashcompinit
-      complete -o nospace -C /usr/bin/terraform terraform
 
       if [ -f "$HOME/.config/azure-cli-env/az.completion" ]; then
         source "$HOME/.config/azure-cli-env/az.completion"
