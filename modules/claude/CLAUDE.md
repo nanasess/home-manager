@@ -46,7 +46,7 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 ### 環境固有の制約
 
-- WSL2 から Windows 側ファイルへのアクセスは `/mnt/c/` 経由 (例: WezTerm 設定は `/mnt/c/Users/nanasess/.wezterm.lua` にコピー)。
+- WSL2 から Windows 側ファイルへのアクセスは `/mnt/c/` 経由 (例: noctty 設定は `/mnt/c/Users/nanasess/AppData/Local/noctty/config.ghostty` にコピー)。
 - 1Password CLI のセッションはデスクトップアプリ連携 (`op signin` で確立)。SSH エージェントソケットは `~/.1password/agent.sock`。
 - ロケールは `ja_JP.UTF-8`。East Asian Ambiguous 文字 (`△` `○` `■` 等) はターミナル (noctty / Ghostty 系) も glibc も**幅 1 (半角) 扱い**。Emacs GUI だけ `eaw-console.el` + UDEV Gothic JPDOC で幅 2 にしている。
 - AMD Ryzen Zen 3 環境 (`-march=znver3`) を使用 (パフォーマンスチューニングの前提)。

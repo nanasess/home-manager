@@ -29,7 +29,6 @@ let
   # (%LOCALAPPDATA%\ghostty\config.ghostty) で共有する
   settings = {
     # UDEV Gothic JPDOC をプライマリ、NF を Nerd Font フォールバックとして使用
-    # (WezTerm 設定と合わせる。modules/wezterm/wezterm.lua 参照)
     font-family = [
       "UDEV Gothic JPDOC"
       "UDEV Gothic NF"
@@ -55,7 +54,7 @@ let
   # Windows port (PR #12167) 固有の追加設定
   # - command: 起動時に WSL の Gentoo-systemd ディストリをログインシェルで立ち上げる
   #   "direct:" プレフィックスを付けて /bin/sh -c ラップを回避 (Windows には sh が無い)
-  #   --cd ~ でホームディレクトリに入る (WezTerm の default_cwd と等価)
+  #   --cd ~ でホームディレクトリに入る
   # - env = WSLENV=TERM: ConPTY 経由で wsl.exe を起動する構成では、Windows 側
   #   プロセスの env は WSL のシェルに届かない。TERM も例外ではなく、何もしないと
   #   WSL 側の既定である xterm-256color になる。実測:

@@ -148,7 +148,7 @@ k-2 の注意点:
 flake.nix              -- エントリポイント（inputs、homeConfigurations、nixosConfigurations、packages、devShells）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
-  wsl-gentoo.nix       -- WSL Gentoo 固有設定（WezTerm / Ghostty コピー、1Password CLI、WSLg、Mackerel、wl-paste shim）
+  wsl-gentoo.nix       -- WSL Gentoo 固有設定（noctty / Ghostty 設定と UDEV Gothic のコピー、1Password CLI、WSLg、Mackerel、wl-paste shim）
   ubuntu.nix           -- Ubuntu 固有設定（Ghostty (nixGL)、apt 差分チェック、GNOME 拡張）
   k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu からの移行先 (docs/nixos-t2.md)
     configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager、usbmuxd、1Password、ibus、nix.settings）
@@ -158,7 +158,6 @@ hosts/
 modules/
   zsh/                 -- Zsh（プラグイン、エイリアス、補完、1Password 連携、Powerlevel10k）
   emacs/               -- Emacs（elpaca でパッケージ管理。init.el / early-init.el / elpaca.lock / init.d / site-lisp）
-  wezterm/             -- WezTerm 設定（WSL → Windows 側にコピー）
   ghostty/             -- Ghostty 共有設定（Linux native / noctty / Windows port を同一 attrset から生成）
   claude/              -- Claude Code のユーザー設定（CLAUDE.md、PreToolUse hook）
   wakatime/            -- WakaTime CLI（API キーは 1Password から実行時に解決）
@@ -177,7 +176,7 @@ pkgs/
   mew.nix              -- Mew (Emacs メーラ) の外部コマンド（elisp は elpaca。docs/mew.md）
 shells/
   php-build.nix        -- mise php プラグイン (ソースビルド) 用 devShell（NixOS 用）
-docs/                  -- 領域別の詳細ドキュメント（EAW 文字幅、WezTerm、Bluetooth、ibus-skk、xremap、NixOS T2 等）
+docs/                  -- 領域別の詳細ドキュメント（EAW 文字幅、Bluetooth、ibus-skk、xremap、NixOS T2 等）
 .claude/skills/
   flake-update-pr/     -- nix flake update を PR 化する手順（更新パッケージ一覧の生成を含む）
 .github/workflows/
@@ -464,7 +463,7 @@ nix log '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
 
 GitHub Actions (`.github/workflows/check.yml`) が push / PR 時に以下を実行:
 
-- **check** -- `nix flake check` + WezTerm Lua 構文チェック
+- **check** -- `nix flake check`
 - **emacs** -- `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
 - **build** -- 各ホストの `activationPackage` ビルド（ubuntu-latest。wsl-gentoo / ubuntu）
 - **nixos** -- `nixosConfigurations.k-2` の toplevel 評価 + home-manager 部分のビルド（カーネルとファームウェアは CI で作らない）
@@ -490,7 +489,6 @@ glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcw
 |---|---|
 | [docs/nixos-t2.md](docs/nixos-t2.md) | k-2 (T2 Mac) の NixOS。カーネルのバイナリキャッシュ、ファームウェア、ESP と GRUB、インストール手順、NVRAM の整理 |
 | [docs/eaw-width.md](docs/eaw-width.md) | East Asian Ambiguous 文字幅の方針 |
-| [docs/wezterm.md](docs/wezterm.md) | WezTerm 設定を Windows 側へコピーする経路 |
 | [docs/bluetooth-audio.md](docs/bluetooth-audio.md) | Bluetooth の接続不安定の切り分け、A2DP / HFP の排他 |
 | [docs/nix-desktop-integration.md](docs/nix-desktop-integration.md) | Ubuntu で nixpkgs の GUI アプリがランチャーに出ない問題 |
 | [docs/ibus-skk.md](docs/ibus-skk.md) | apt 版 1.4.3 のバグ、Nix ビルド 1.4.4 の登録 |
