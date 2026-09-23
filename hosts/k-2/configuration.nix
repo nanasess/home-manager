@@ -430,6 +430,20 @@ in
     # "The operation inhibition has been requested for is already running" で失敗し、
     # 復帰のたびにその回を落とす (2026-09-22 実機で確認。suspend exit と同じ秒に発火)。
     # 差分バックアップは十数秒で終わり、restic は中断に強い (次回の unlock でロックを外す)。
+    # サスペンド復帰の直後に Persistent の追いつき実行が走ると、WiFi が上がる前なので
+    # "Network is unreachable" で失敗する (2026-09-23 実機。suspend exit の 1 秒前に発火した)。
+    # unit の After=network-online.target は起動時に到達済みで、復帰時には何も待たない。
+    # NAS が応答するまで最大 3 分待ってから本体に進む (届かなければそのまま進み、
+    # restic が通常どおり失敗して次回に持ち越す = 外出先の挙動は変わらない)。
+    backupPrepareCommand = ''
+      #!${pkgs.runtimeShell}
+      for _ in $(seq 18); do
+        if ${lib.getExe' pkgs.iputils "ping"} -c 1 -W 2 192.168.100.15 > /dev/null 2>&1; then
+          break
+        fi
+        sleep 10
+      done
+    '';
     timerConfig = {
       OnCalendar = "hourly";
       # NAS に届かない時間帯 (外出先 / suspend 中) の分は起動時にまとめて追いつく
