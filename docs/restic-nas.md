@@ -123,7 +123,7 @@ op read 'op://synology/restic-key/restic-nas.pass' | sudo install -m 600 /dev/st
 op read 'op://synology/restic-key/private_key'     | sudo install -m 600 /dev/stdin /root/secrets/restic-nas_ed25519
 ```
 
-## 落とし穴: inhibitsSleep は使わない
+## 落とし穴: サスペンド復帰直後の追いつき実行
 
 `services.restic.backups.<name>.inhibitsSleep = true` にすると、サスペンドからの復帰直後に
 `Persistent = true` の追いつき実行が走ったとき、logind がまだ `suspend` 操作を終えておらず
@@ -138,3 +138,19 @@ op read 'op://synology/restic-key/private_key'     | sudo install -m 600 /dev/st
 
 ノート PC では復帰のたびに再現するので無効にしてある (2026-09-22、k-2 実機)。差分バックアップは
 十数秒で終わり、restic は中断されても壊れない (次回の `unlock` でロックが外れる)。
+
+`inhibitsSleep` を外した後も、同じ「復帰直後」の競合が別の症状で残っていた。WiFi が上がる前に
+追いつき実行が走ると NAS に届かない:
+
+```
+2026-09-22 20:40:25 kernel: PM: suspend entry (deep)
+2026-09-23 14:04:54 systemd: Starting restic-backups-nas.service...
+2026-09-23 14:04:54 restic-backups-nas-pre-start: ssh: connect to host 192.168.100.15 port 22: Network is unreachable
+2026-09-23 14:04:55 kernel: PM: suspend exit
+```
+
+unit の `After=network-online.target` は起動時に到達済みで、復帰時には何も待たない。
+`backupPrepareCommand` で NAS が ping に応答するまで最大 3 分待ってから本体に進むようにした
+(届かなければそのまま進んで restic が通常どおり失敗し、次回に持ち越す。外出先の挙動は変わらない)。
+`Type=oneshot` の `TimeoutStartSec` は無限なので、3 分待っても systemd に打ち切られない
+(初回の全量 2 分 24 秒が通っていることでも確認できる)。
