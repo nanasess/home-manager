@@ -80,14 +80,9 @@ in
     BROWSER = "wsl-open";
   };
 
-  # WezTerm 設定を Windows 側にコピー
-  home.activation.weztermConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    install -Dm644 ${../modules/wezterm/wezterm.lua} /mnt/c/Users/${config.home.username}/.wezterm.lua
-  '';
-
   # UDEV Gothic JPDOC / NF フォントを Windows 側にコピー
-  # (WezTerm font_dirs / Ghostty Windows font directory scan の両方から参照される)
-  home.activation.weztermFonts = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  # (install-ghostty-windows-fonts がここから C:\Windows\Fonts へコピーする)
+  home.activation.windowsFonts = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     fontdir="/mnt/c/Users/${config.home.username}/.local/share/fonts"
     mkdir -p "$fontdir"
     install -m644 ${pkgs.udev-gothic}/share/fonts/truetype/UDEVGothicJPDOC-*.ttf "$fontdir/"
