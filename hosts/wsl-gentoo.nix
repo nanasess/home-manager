@@ -16,6 +16,11 @@ let
     "x11-apps/xeyes"
     "app-shells/zsh"
     "sys-apps/plocate"
+    # 日常の git は Nix 版が PATH で優先されるが、repos.conf の全リポジトリが
+    # sync-type = git のため emerge --sync に portage 側の git が必要
+    "dev-vcs/git"
+    # ~/.gnupg/gpg-agent.conf の pinentry-program (/usr/bin/pinentry-tty)
+    "app-crypt/pinentry"
 
     # SKK 辞書サーバ yaskkserv2 は Nix ビルド (pkgs/yaskkserv2.nix) で ubuntu と
     # 共通化したため portage 管理から外した。常駐は systemd ユーザーサービス
