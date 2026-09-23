@@ -18,8 +18,6 @@ let
     # 日常の git は Nix 版が PATH で優先されるが、repos.conf の全リポジトリが
     # sync-type = git のため emerge --sync に portage 側の git が必要
     "dev-vcs/git"
-    # ~/.gnupg/gpg-agent.conf の pinentry-program (/usr/bin/pinentry-tty)
-    "app-crypt/pinentry"
 
     # SKK 辞書サーバ yaskkserv2 は Nix ビルド (pkgs/yaskkserv2.nix) で ubuntu と
     # 共通化したため portage 管理から外した。常駐は systemd ユーザーサービス
@@ -59,6 +57,21 @@ in
   home.homeDirectory = "/home/nanasess";
 
   programs.git.signing.signer = "/mnt/c/Users/${config.home.username}/AppData/Local/Microsoft/WindowsApps/op-ssh-sign.exe";
+
+  # ~/.gnupg/gpg-agent.conf を宣言する (旧: 手書きで portage の /usr/bin/pinentry-tty を参照)。
+  # Mew は --pinentry-mode loopback でパスフレーズを渡すため allow-loopback-pinentry が必要。
+  # GPG_TTY は modules/zsh で export 済みなので zsh 連携は重複させない。
+  services.gpg-agent = {
+    enable = true;
+    pinentry.package = pkgs.pinentry-tty;
+    enableZshIntegration = false;
+    # 既定 (true) だと grab が入る。GUI pinentry 専用で tty では無意味なので旧設定に合わせる
+    grabKeyboardAndMouse = false;
+    extraConfig = ''
+      allow-loopback-pinentry
+      allow-emacs-pinentry
+    '';
+  };
 
   home.packages = with pkgs; [
     # WSLg では Weston が Wayland コンポジタとして動作し、Wayland ネイティブアプリは
