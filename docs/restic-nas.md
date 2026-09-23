@@ -78,8 +78,8 @@ rm /tmp/authorized_keys
 
 | ファイル | 内容 | 作り方 |
 |---|---|---|
-| `restic-nas.pass` (0600) | リポジトリのパスフレーズ | `head -c 32 /dev/urandom \| base64` |
-| `restic-nas_ed25519` (0600) | `backup` ユーザー用 SSH 秘密鍵 (パスフレーズなし) | `ssh-keygen -t ed25519 -N ''` |
+| `restic-nas.pass` (0600) | リポジトリのパスフレーズ | `umask 077; head -c 32 /dev/urandom \| base64 > /root/secrets/restic-nas.pass` |
+| `restic-nas_ed25519` (0600) | `backup` ユーザー用 SSH 秘密鍵 (パスフレーズなし) | `ssh-keygen -t ed25519 -N '' -f /root/secrets/restic-nas_ed25519` |
 
 正本は 1Password の `synology` vault、`restic-key` アイテムに控える。**パスフレーズを失うとリポジトリは
 二度と開けない**。NAS のホスト鍵は `programs.ssh.knownHosts` で `/etc/ssh/ssh_known_hosts`
@@ -98,7 +98,7 @@ sudo restic-nas stats latest
 
 - 外出先など NAS に届かないときは `ConnectTimeout=10` で失敗して終わり、次回に持ち越す
   (`Persistent=true` で起動時に追いつく)。失敗ログ自体は正常
-- 実行中は `systemd-inhibit` で suspend を止める (数分)
+- 実行中にサスペンドしても構わない (suspend は止めない。理由は後述「落とし穴」)
 - DSM の OpenSSH 8.2 が post-quantum 鍵交換に非対応で ssh が警告を出す。LAN 内なので無視
 - 半年に一度: `sudo restic-nas check --read-data-subset=10%` と試験リストア
 
@@ -109,6 +109,9 @@ sudo restic-nas stats latest
 sudo restic-nas restore latest --target /tmp/restore --include /home/nanasess/Mail
 # ホーム全体 (再インストール直後。home-manager の activation 前に戻すと衝突しない)
 sudo restic-nas restore latest --target / --include /home/nanasess
+# ホーム以外 (VPN の接続プロファイルと Bluetooth のペアリング鍵)
+sudo restic-nas restore latest --target / --include /etc/NetworkManager/system-connections
+sudo restic-nas restore latest --target / --include /var/lib/bluetooth
 ```
 
 再インストール直後は `/root/secrets/` が無いので、1Password から復元してから `nixos-rebuild switch`
