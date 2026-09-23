@@ -24,11 +24,6 @@
     sync-type = git
     sync-uri = https://github.com/gentoo-mirror/gentoo.git
 
-    [dark-sushier]
-    location = /var/db/repos/dark-sushier
-    sync-type = git
-    sync-uri = https://github.com/dark-sushier/portage-overlay.git
-
     [guru]
     location = /var/db/repos/guru
     sync-type = git
@@ -38,16 +33,6 @@
     location = /var/db/repos/jaredallard-overlay
     sync-type = git
     sync-uri = https://github.com/jaredallard/overlay.git
-
-    [tatsh-overlay]
-    location = /var/db/repos/tatsh-overlay
-    sync-type = git
-    sync-uri = https://github.com/Tatsh/tatsh-overlay.git
-
-    [supertux88]
-    location = /var/db/repos/supertux88
-    sync-type = git
-    sync-uri = https://github.com/SuperTux88/gentoo-overlay.git
   '';
 
   xdg.configFile."portage/make.conf".text = ''
@@ -93,13 +78,7 @@
 
   # #48 移行済みパッケージを除外
   xdg.configFile."portage/package.accept_keywords".text = ''
-    dev-python/sqlglot
     sys-devel/gcc:15
-    app-admin/cf-terraforming
-    dev-python/userpath
-
-    dev-python/pyfzf
-    dev-python/click
     media-libs/mesa
 
     # 1Password CLI (GURU overlay)。GUI は app-admin/1password::jaredallard (stable のため keyword 不要)
@@ -109,8 +88,6 @@
 
   xdg.configFile."portage/package.unmask".text = ''
     >=www-client/google-chrome-126.0.6478.55
-    # mycli-1.41.2の依存関係
-    dev-python/click
   '';
 
   # #48 移行済みパッケージを除外（terraform, op-cli-bin）
