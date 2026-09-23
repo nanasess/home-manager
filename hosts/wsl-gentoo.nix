@@ -11,7 +11,6 @@ let
     "dev-util/pkgdev"
     "dev-util/pkgcheck"
     "www-client/google-chrome"
-    "x11-misc/xvfb-run"
     "x11-apps/mesa-progs"
     "x11-apps/xeyes"
     "app-shells/zsh"
