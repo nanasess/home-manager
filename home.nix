@@ -173,6 +173,34 @@
 
   xdg.configFile."phpactor/phpactor.yml".source = ./dotfiles/phpactor.yml;
 
+  # AWS の長期アクセスキーを ~/.aws/credentials に平文で置かず、1Password から供給する。
+  # ~/.aws/config のプロファイルに以下を書いて使う (--profile 指定のまま動く):
+  #   credential_process = /home/nanasess/.local/bin/aws-credential-op <vault> <item>
+  # アイテムは API Credential で "access key id" / "secret access key" フィールドを持つこと。
+  # op は PATH から解決する (wsl-gentoo は ~/.local/bin/op シム → op.exe、NixOS は wrapper)。
+  # op run + 環境変数ではなく credential_process にしているのは、--profile を付けると
+  # aws CLI が環境変数のクレデンシャルを無視し、プロファイル側の s3 設定
+  # (multipart_chunksize 等) と両立しないため。
+  home.file.".local/bin/aws-credential-op" = {
+    executable = true;
+    text = ''
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+      if [ $# -ne 2 ]; then
+        echo "usage: aws-credential-op <vault> <item>" >&2
+        exit 2
+      fi
+      op item get "$2" --vault "$1" --reveal --format json \
+        --fields 'label=access key id,label=secret access key' \
+        | ${pkgs.jq}/bin/jq -e '
+            (map({(.label): .value}) | add) as $f
+            | {Version: 1,
+               AccessKeyId: $f["access key id"],
+               SecretAccessKey: $f["secret access key"]}
+            | if .AccessKeyId and .SecretAccessKey then . else error("fields not found") end'
+    '';
+  };
+
   xdg.mimeApps = lib.mkIf pkgs.stdenv.isLinux {
     enable = true;
     defaultApplications = {
