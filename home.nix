@@ -53,6 +53,13 @@
     terraform
     azure-cli
     awscli2
+    # MFA 必須 (EnforceMFAPolicy) の IAM ユーザーで STS セッションを作り、環境変数で
+    # コンテナ等に渡す (例: `aws-vault exec <profile> -- docker compose up`)。
+    # nixpkgs は保守が続く ByteNess 版。長期キーは op-desktop バックエンドで 1Password に置く。
+    # AWS_VAULT_BACKEND / AWS_VAULT_OP_VAULT_ID / AWS_VAULT_OP_DESKTOP_ACCOUNT_ID は
+    # 公開リポジトリに UUID を置かないため 1Password Environments (.env.local) から供給する。
+    # MFA コードは ~/.aws/config の mfa_process で 1Password の TOTP を読む。
+    aws-vault
     hugo
     symfony-cli
     apacheHttpd
