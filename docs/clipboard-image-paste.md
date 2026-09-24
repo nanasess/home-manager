@@ -22,7 +22,7 @@ $ wl-paste --type image/bmp | file -
 /dev/stdin: PC bitmap, Windows 3.x format, 320 x 200 x 32, 3 compression, ...
 ```
 
-対処として `hosts/wsl-gentoo.nix` で `~/.local/bin/wl-paste` に shim を置き、`image/png` を**追加で**広告して要求時に ImageMagick で変換する。既存の `image/bmp` 経路は触らないので、BMP を直接扱う他アプリの挙動は変わらない。`~/.local/bin` は PATH 上で `~/.nix-profile/bin` より前にあるため優先される。
+対処として `modules/wsl` (WSL ホスト共通) で `~/.local/bin/wl-paste` に shim を置き、`image/png` を**追加で**広告して要求時に ImageMagick で変換する。既存の `image/bmp` 経路は触らないので、BMP を直接扱う他アプリの挙動は変わらない。`~/.local/bin` は PATH 上で `~/.nix-profile/bin` より前にあるため優先される。
 
 Claude Code は貼り付けのたびに `sh -c` でクリップボードコマンドを起動するので、**shim を置けば Claude Code の再起動なしで効く**。
 

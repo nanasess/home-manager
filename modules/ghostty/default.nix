@@ -18,7 +18,7 @@
 # - IME・フォントのスタイル解決・ホイール座標も noctty が優位
 #
 # **同梱 ConPTY は自前ビルドには入らない**。`zig build` は staging しないので、
-# ビルドし直したら `install-noctty-conpty` (hosts/wsl-gentoo.nix) を実行すること。
+# ビルドし直したら `install-noctty-conpty` (modules/wsl) を実行すること。
 # 忘れると画像プロトコルとバルク描画性能が同時に失われる。
 
 { pkgs, lib, ... }:
@@ -133,7 +133,7 @@ let
   #   working_directory_seen が立って cwd の自動挿入が止まる。
   # - 同梱 ConPTY はここでは設定できない。config オプションが無く、conpty.dll と
   #   OpenConsole.exe を exe の隣に置くかどうかで決まる (src/pty.zig の loadBundled)。
-  #   配置は install-noctty-conpty (hosts/wsl-gentoo.nix) が行う。
+  #   配置は install-noctty-conpty (modules/wsl) が行う。
   # - *-inherit-working-directory は指定しない (既定の true のまま)。新規ウィンドウ /
   #   タブ / split は直前のサーフェスの cwd を引き継ぐ。継承の可否は文脈ごとに別
   #   オプションで決まる (src/apprt/surface.zig の shouldInheritWorkingDirectory:
