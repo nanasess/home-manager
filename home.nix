@@ -184,7 +184,7 @@
   # ~/.aws/config のプロファイルに以下を書いて使う (--profile 指定のまま動く):
   #   credential_process = /home/nanasess/.local/bin/aws-credential-op <vault> <item>
   # アイテムは API Credential で "access key id" / "secret access key" フィールドを持つこと。
-  # op は PATH から解決する (wsl-gentoo は ~/.local/bin/op シム → op.exe、NixOS は wrapper)。
+  # op は PATH から解決する (WSL は ~/.local/bin/op シム → op.exe、k-2 は wrapper)。
   # op run + 環境変数ではなく credential_process にしているのは、--profile を付けると
   # aws CLI が環境変数のクレデンシャルを無視し、プロファイル側の s3 設定
   # (multipart_chunksize 等) と両立しないため。
