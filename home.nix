@@ -168,9 +168,9 @@
     };
   };
 
-  home.file.".signature".text = ''
-    Kentaro Ohkouchi
-  '';
+  # 区切りは RFC 3676 の "-- " (末尾空白あり)。'' 文字列だと末尾空白が
+  # フォーマッタやエディタで消されやすいので通常の文字列で書く。
+  home.file.".signature".text = "-- \n大河内健太郎\n";
 
   home.file.".myclirc".source = ./dotfiles/myclirc;
 
