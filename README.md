@@ -1,7 +1,7 @@
 # home-manager
 
 Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。
-WSL2 Gentoo Linux, Ubuntu, NixOS の環境を1リポジトリで宣言的に管理する。
+WSL2 (Gentoo Linux / NixOS), Ubuntu, NixOS の環境を1リポジトリで宣言的に管理する。
 
 ## 対応ホスト
 
@@ -10,9 +10,11 @@ WSL2 Gentoo Linux, Ubuntu, NixOS の環境を1リポジトリで宣言的に管�
 | `nanasess@wsl-gentoo` | WSL2 Gentoo Linux | `home-manager switch` (standalone) | `hosts/wsl-gentoo.nix` |
 | `nanasess@ubuntu` | Ubuntu 24.04 (Wayland) | `home-manager switch` (standalone) | `hosts/ubuntu.nix` |
 | `k-2` | NixOS (Intel MacBook Pro 2020, T2) | `nixos-rebuild switch` (home-manager は NixOS モジュール) | `hosts/k-2/` |
+| `wsl-nixos` | WSL2 NixOS ([NixOS-WSL](https://github.com/nix-community/NixOS-WSL)) | `nixos-rebuild switch` (home-manager は NixOS モジュール) | `hosts/wsl-nixos/` |
 
 k-2 は Ubuntu からの移行先 (issue #151)。T2 固有の事情 (linux-t2 カーネル、ファームウェア、
 ESP と GRUB) とインストール手順は [docs/nixos-t2.md](docs/nixos-t2.md) にまとめてある。
+wsl-nixos は wsl-gentoo からの移行先 (issue #183)。WSL 共通の設定は `modules/wsl` で両者が共有する。
 
 ## セットアップ
 
@@ -20,7 +22,7 @@ ESP と GRUB) とインストール手順は [docs/nixos-t2.md](docs/nixos-t2.md
 
 - wsl-gentoo / ubuntu: [Nix](https://nixos.org/download/) (Flakes 有効) と
   [Home Manager](https://github.com/nix-community/home-manager) がインストール済みであること
-- k-2: NixOS 本体。home-manager は `flake.nix` の `nixosConfigurations."k-2"` に組み込まれているので
+- k-2 / wsl-nixos: NixOS 本体。home-manager は `flake.nix` の `nixosConfigurations` に組み込まれているので
   standalone の `home-manager` コマンドは使わない (入っていない)
 
 ### 初回適用
@@ -34,10 +36,35 @@ cd ~/.config/home-manager
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 home-manager switch --flake '.#nanasess@ubuntu'
 sudo nixos-rebuild switch --flake '.#k-2'    # NixOS (home-manager も同時に適用)
+sudo nixos-rebuild switch --flake '.#wsl-nixos'
 ```
 
 k-2 の初回インストール (パーティション作成、`nixos-install`、NVRAM の整理) は
 [docs/nixos-t2.md](docs/nixos-t2.md) のランブックに従う。
+
+### NixOS-WSL (wsl-nixos) の初回導入
+
+公式の `nixos.wsl` (既定ユーザー `nixos`) ではなく、この flake の設定を焼き込んだ tarball を
+作って導入する。最初から `nanasess` で起動し、home-manager も適用済みの状態になる。
+Nix が動く既存の WSL ディストリ (wsl-gentoo 等) で作る。
+
+```bash
+# 1. tarball を作る (root が必要。出力先は Windows 側から見える場所)
+sudo nix run '.#nixosConfigurations.wsl-nixos.config.system.build.tarballBuilder' -- \
+  /mnt/c/Users/nanasess/Downloads/nixos.wsl
+```
+
+```powershell
+# 2. Windows 側で導入 (ディストリ名は NixOS)。既存ディストリはそのまま残る
+wsl --install --from-file $env:USERPROFILE\Downloads\nixos.wsl --name NixOS
+
+# 3. sudo 用のパスワードを設定 (wheelNeedsPassword = true。root は wsl -u root で入れる)
+wsl -d NixOS -u root passwd nanasess
+```
+
+導入後は `~/.config/home-manager` を clone し、`sudo nixos-rebuild switch --flake '.#wsl-nixos'` で更新する。
+Docker Desktop は Settings > Resources > WSL integration で NixOS を有効にする。
+問題があれば `wsl --set-default` で既存ディストリに戻し、`wsl --unregister NixOS` で作り直せる。
 
 ### Portage 設定のセットアップ（WSL Gentoo のみ）
 
@@ -110,10 +137,10 @@ mise の php プラグイン (`jdx/vfox-php`) は PHP をソースからビル�
 | ホスト | ビルド依存の入手 |
 |---|---|
 | wsl-gentoo | portage (`hosts/wsl-gentoo.nix` の `mise PHP ビルド依存`)。`mise install php@8.5` をそのまま実行 |
-| k-2 (NixOS) | `nix develop .#php-build` (`shells/php-build.nix`)。FHS 前提のツールチェーンが無いので devShell 経由で実行する |
+| k-2 / wsl-nixos (NixOS) | `nix develop .#php-build` (`shells/php-build.nix`)。FHS 前提のツールチェーンが無いので devShell 経由で実行する |
 
 ```bash
-# PHP インストール (k-2)。--profile で GC root を作り、リンク先ライブラリが
+# PHP インストール (k-2 / wsl-nixos)。--profile で GC root を作り、リンク先ライブラリが
 # nix-collect-garbage で消えないようにする (RPATH に /nix/store が焼き込まれる)
 nix develop '.#php-build' --profile ~/.local/state/nix/profiles/php-build \
   -c mise install php@8.5
@@ -155,12 +182,16 @@ hosts/
     hardware-configuration.nix -- ディスク (LABEL 参照) / カーネルモジュール
     home.nix           -- ユーザー環境（hosts/ubuntu.nix の NixOS 版）
     scripts/backup-before-install.sh -- インストール前の退避
+  wsl-nixos/           -- NixOS-WSL。wsl-gentoo からの移行先 (issue #183)
+    configuration.nix  -- システム設定（NixOS-WSL の wsl.*、Docker Desktop 統合、sudo、Chrome、plocate）
+    home.nix           -- ユーザー環境（WSL 共通は modules/wsl、op は /run/wrappers/bin/op）
 modules/
   zsh/                 -- Zsh（プラグイン、エイリアス、補完、1Password 連携、Powerlevel10k）
   emacs/               -- Emacs（elpaca でパッケージ管理。init.el / early-init.el / elpaca.lock / init.d / site-lisp）
   ghostty/             -- Ghostty 共有設定（Linux native / noctty / Windows port を同一 attrset から生成）
   claude/              -- Claude Code のユーザー設定（CLAUDE.md、PreToolUse hook）
   wakatime/            -- WakaTime CLI（API キーは 1Password から実行時に解決）
+  nixos/common.nix     -- NixOS ホスト共通のシステム設定（zsh、nix-ld + Playwright 用ライブラリ、1Password、Chrome の 1Password 拡張）
   wsl/                 -- WSL ホスト共通（Windows 側への noctty / Ghostty 設定・UDEV Gothic・Mackerel のコピー、op / wl-paste シム、gpg-agent、WSLg）
   mackerel/            -- LibreHardwareMonitor → Mackerel カスタムメトリック（modules/wsl が Windows 側へ配置）
   bluetooth-audio/     -- WirePlumber の HFP 自動切替無効化 + pavucontrol（GNOME ホスト共通）
@@ -431,10 +462,13 @@ nixos-rebuild build --flake '.#k-2'                                     # k-2 �
 # (toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージを抱える。「開発コマンド」参照)
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
 nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'
+# wsl-nixos はカーネルを持たないので toplevel をそのままビルドできる
+nix build '.#nixosConfigurations.wsl-nixos.config.system.build.toplevel'
 
 # 設定を適用
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 sudo nixos-rebuild switch --flake '.#k-2'                              # k-2
+sudo nixos-rebuild switch --flake '.#wsl-nixos'                        # wsl-nixos
 ```
 
 ## 開発コマンド
@@ -456,6 +490,10 @@ nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage'
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
 nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'
 
+# wsl-nixos: toplevel の評価と home-manager 部分のビルド
+nix eval --raw '.#nixosConfigurations.wsl-nixos.config.system.build.toplevel.drvPath'
+nix build '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage'
+
 # ビルドログの確認
 nix log '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
 ```
@@ -467,7 +505,7 @@ GitHub Actions (`.github/workflows/check.yml`) が push / PR 時に以下を実�
 - **check** -- `nix flake check`
 - **emacs** -- `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
 - **build** -- 各ホストの `activationPackage` ビルド（ubuntu-latest。wsl-gentoo / ubuntu）
-- **nixos** -- `nixosConfigurations.k-2` の toplevel 評価 + home-manager 部分のビルド（カーネルとファームウェアは CI で作らない）
+- **nixos** -- `nixosConfigurations` (k-2 / wsl-nixos) の toplevel 評価 + home-manager 部分のビルド（k-2 のカーネルとファームウェアは CI で作らない）
 
 ## East Asian Ambiguous 文字幅 (EAW)
 

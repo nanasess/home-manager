@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 概要
 
-Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。WSL2 Gentoo Linux, Ubuntu の環境を1リポジトリで宣言的に管理する。
+Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。WSL2 (Gentoo Linux / NixOS), Ubuntu, NixOS の環境を1リポジトリで宣言的に管理する。
 
 ### 目標
 
@@ -41,10 +41,15 @@ nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage'
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
 nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'
 
+# wsl-nixos (NixOS-WSL) のシステム設定を評価 / ビルド (カーネルを持たないので toplevel もビルドできる)
+nix eval --raw '.#nixosConfigurations.wsl-nixos.config.system.build.toplevel.drvPath'
+nix build '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage'
+
 # 設定を適用
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 home-manager switch --flake '.#nanasess@ubuntu'
 sudo nixos-rebuild switch --flake '.#k-2'   # NixOS ホスト (home-manager も同時に適用)
+sudo nixos-rebuild switch --flake '.#wsl-nixos'
 
 # Nix ファイルのフォーマット
 nix fmt
@@ -74,6 +79,9 @@ hosts/
     hardware-configuration.nix -- ディスク (LABEL 参照) / カーネルモジュール
     home.nix           -- ユーザー環境（hosts/ubuntu.nix の NixOS 版）
     scripts/backup-before-install.sh -- インストール前の退避（ファームウェア / ESP イメージ / システム情報）
+  wsl-nixos/           -- NixOS-WSL。wsl-gentoo からの移行先 (issue #183。導入手順は README)
+    configuration.nix  -- システム設定（NixOS-WSL の wsl.*、Docker Desktop 統合、sudo はパスワード必須、DNS は WSL 生成の resolv.conf）
+    home.nix           -- ユーザー環境（WSL 共通は modules/wsl、wsl.opLinux = /run/wrappers/bin/op）
 modules/
   zsh/
     default.nix        -- Zsh モジュール（プラグイン、エイリアス、補完、1Password 連携）
@@ -98,6 +106,8 @@ modules/
     default.nix        -- Walker / Elephant ランチャー（systemd ユーザーサービス + GNOME キーバインド。GNOME ホスト共通）
   xremap/
     default.nix        -- キーリマッパー（Chrome のタブ移動を Ctrl+H / Ctrl+L に。GNOME ホスト共通）
+  nixos/
+    common.nix         -- NixOS ホスト共通のシステム設定（zsh、nix-ld + Playwright 用ライブラリ、1Password、Chrome の 1Password 拡張）。unfree 許可は各ホスト
   wsl/
     default.nix        -- WSL ホスト共通（Windows 側への noctty / Ghostty 設定・UDEV Gothic・mackerel のコピー、op シム、wl-paste shim、gpg-agent、WSLg X11/Wayland）
   portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
@@ -228,7 +238,7 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 - **check** — `nix flake check`
 - **emacs** — `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
 - **build** — 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest）
-- **nixos** — `nixosConfigurations.k-2` の toplevel 評価 + home-manager 部分のビルド（カーネルとファームウェアは CI で作らない）
+- **nixos** — `nixosConfigurations` (k-2 / wsl-nixos) の toplevel 評価 + home-manager 部分のビルド（k-2 のカーネルとファームウェアは CI で作らない）
 
 ## 詳細ドキュメント (`docs/`)
 

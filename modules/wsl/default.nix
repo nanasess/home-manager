@@ -216,7 +216,9 @@
       export PATH="/mnt/c/Users/''${USER}/AppData/Local/Programs/Microsoft VS Code/bin":$PATH
 
       # X11/Wayland symlinks for WSLg
-      if [ ! -L /tmp/.X11-unix ]; then
+      # NixOS-WSL は /tmp/.X11-unix/X0 を bind mount し、/tmp/.X11-unix がリンクだと
+      # 起動時に消す (nixos-wsl-migration-x11mount)。ソケットが既にあれば張らない。
+      if [ ! -L /tmp/.X11-unix ] && [ ! -S /tmp/.X11-unix/X0 ]; then
         rm -rf /tmp/.X11-unix
         ln -s /mnt/wslg/.X11-unix /tmp/.X11-unix
       fi

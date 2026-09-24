@@ -16,9 +16,14 @@
       url = "github:NixOS/nixos-hardware";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # WSL2 上の NixOS (wsl-nixos、Issue #183)。
+    nixos-wsl = {
+      url = "github:nix-community/NixOS-WSL";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager, nixgl, nixos-hardware, ... }:
+  outputs = { self, nixpkgs, home-manager, nixgl, nixos-hardware, nixos-wsl, ... }:
     let
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -81,6 +86,34 @@
               home-manager.users.nanasess.imports = gnomeHomeModules ++ [
                 ./hosts/k-2/home.nix
                 ./modules/ibus-skk
+              ];
+            }
+          ];
+        };
+
+        # WSL2 上の NixOS (NixOS-WSL)。wsl-gentoo からの移行先 (issue #183)。
+        # 初回導入用の tarball は config.system.build.tarballBuilder で作る (README)。
+        "wsl-nixos" = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            nixos-wsl.nixosModules.default
+            ./hosts/wsl-nixos/configuration.nix
+            home-manager.nixosModules.home-manager
+            {
+              # 各設定の理由は k-2 と同じ。
+              home-manager.useUserPackages = true;
+              home-manager.backupFileExtension = "hm-backup";
+              home-manager.users.nanasess.imports = [
+                ./home.nix
+                ./hosts/wsl-nixos/home.nix
+                ./modules/wsl
+                ./modules/onedrive.nix
+                ./modules/yaskkserv2.nix
+                ./modules/emacs
+                ./modules/zsh
+                ./modules/ghostty
+                ./modules/wakatime
+                ./modules/claude
               ];
             }
           ];
