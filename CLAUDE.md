@@ -67,7 +67,7 @@ home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
 flake.nix              -- エントリポイント（inputs、homeConfigurations、nixosConfigurations）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
-  wsl-gentoo.nix       -- WSL Gentoo 固有設定（noctty / Ghostty 設定と UDEV Gothic のコピー、1Password CLI、WSLg X11/Wayland）
+  wsl-gentoo.nix       -- WSL Gentoo 固有設定（gentooPackages と check-system-packages、op の setgid バイナリのパス）。WSL 共通部分は modules/wsl
   ubuntu.nix           -- Ubuntu 固有設定（Ghostty (nixGL)、apt 差分チェック、GNOME 拡張）
   k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu からの移行先 (docs/nixos-t2.md)
     configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager + l2tp、usbmuxd (iPhone テザリング)、1Password、ibus、nix-ld + Playwright 用ライブラリ、蓋閉じ suspend + Touch Bar 復帰フック、restic → NAS バックアップ）
@@ -98,6 +98,8 @@ modules/
     default.nix        -- Walker / Elephant ランチャー（systemd ユーザーサービス + GNOME キーバインド。GNOME ホスト共通）
   xremap/
     default.nix        -- キーリマッパー（Chrome のタブ移動を Ctrl+H / Ctrl+L に。GNOME ホスト共通）
+  wsl/
+    default.nix        -- WSL ホスト共通（Windows 側への noctty / Ghostty 設定・UDEV Gothic・mackerel のコピー、op シム、wl-paste shim、gpg-agent、WSLg X11/Wayland）
   portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
   onedrive.nix         -- OneDrive 設定（WSL Gentoo 用）
   yaskkserv2.nix       -- SKK 辞書サーバ（systemd ユーザーサービス。wsl-gentoo / ubuntu 共通）
@@ -146,7 +148,7 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 | ChatGPT デスクトップアプリ | Nix ビルド (`pkgs/chatgpt/`) + `hosts/k-2/configuration.nix` の systemPackages | nixpkgs の `chatgpt` は Darwin 専用。OpenAI 公式 deb (Electron) を dpkg 展開 + autoPatchelf で包む。`latest` URL は中身が変わるので apt pool のバージョン付き URL + SHA256 に固定し、`pkgs/chatgpt/update.sh` が Packages インデックスから `source.nix` を更新。同梱プラグインの `~/.codex/.tmp/` へのコピーが Nix ストアの 555 モードを写して EACCES になるため app.asar を展開 → chmod 挿入 → 再パックしている（詳細は `default.nix` のコメント）。Codex ランタイム (`~/.codex/`) はアプリが自己更新する管理外状態 |
 | キーリマップ (xremap) | Nix (`xremap` gnome variant) + systemd ユーザーサービス (`modules/xremap/`) | Chrome にキーバインド変更機能が無いため evdev/uinput レベルで置換。アプリ判定に GNOME Shell 拡張が要る。`input` グループ / udev ルールのみ root 作業として残る |
 | Bluetooth オーディオ | home-manager (xdg.configFile) + pavucontrol | WirePlumber の HFP 自動切替を無効化し、A2DP (ステレオ) / HFP (マイク) は pavucontrol で手動切替。プロファイルの記憶 (`~/.local/state/wireplumber/`) はランタイム状態のため管理外 |
-| クリップボード画像 (WSL) | `wl-paste` shim (`hosts/wsl-gentoo.nix`) | WSLg が `image/bmp` しか出さず Claude Code が扱えないため、`image/png` を追加広告して ImageMagick で変換（`docs/clipboard-image-paste.md`） |
+| クリップボード画像 (WSL) | `wl-paste` shim (`modules/wsl`) | WSLg が `image/bmp` しか出さず Claude Code が扱えないため、`image/png` を追加広告して ImageMagick で変換（`docs/clipboard-image-paste.md`） |
 | PHP (mise) | mise php プラグイン (ソースビルド) + ビルド依存はホスト別 | wsl-gentoo は portage、k-2 は `nix develop .#php-build` (`shells/php-build.nix`)。gettext / readline / gmp の `configure` は `/usr` 直下しか探さないので devShell が `PHP_EXTRA_CONFIGURE_OPTIONS` でストアパスを渡す。RPATH に `/nix/store` が焼き込まれるため `--profile` で GC root を作る (README「mise PHP のセットアップ」) |
 | Playwright ブラウザ (k-2) | 公式配布バイナリ (`playwright install`) + `programs.nix-ld.libraries` (`hosts/k-2/configuration.nix`) | nixpkgs の `playwright-driver` (1.61) はプロジェクト側 (`@playwright/test` 1.63) とブラウザリビジョンが合わず、nixpkgs 側で追従すると更新のたびに hash 更新が要る。Chromium の実行時ライブラリだけ nix-ld に載せて公式バイナリを使う (`playwright install-deps` 相当)。nixpkgs に依存ライブラリのみのパッケージは無い (2026-09 時点) |
 | バックアップ (k-2) | restic (`services.restic.backups.nas`) → Synology DS720+ の SFTP、秘密情報は `/root/secrets/` (正本は 1Password) | flake で再現できない状態 (`~`、VPN 定義、BT ペアリング) だけを毎時送る。NAS 側は DSM 組み込み SFTP のみで追加ソフト不要、Btrfs の変更不可スナップショットで履歴を保護。ディスクイメージは取らず、復旧は再インストール + `restic-nas restore` (`docs/restic-nas.md`) |
@@ -239,7 +241,7 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/nix-desktop-integration.md](docs/nix-desktop-integration.md) | nixpkgs の GUI アプリがランチャー/アイコンに出ない `XDG_DATA_DIRS` 問題と対処 | `hosts/ubuntu.nix`, 各 GUI モジュール |
 | [docs/ibus-skk.md](docs/ibus-skk.md) | apt 版 1.4.3 のバグ、`IBUS_COMPONENT_PATH` によるエンジン登録、反映手順 | `pkgs/ibus-skk.nix`, `modules/ibus-skk/` (ubuntu) |
 | [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、XKB レイヤとの関係、GNOME Wayland でのアプリ判定、root 作業 | `modules/xremap/` (ubuntu) |
-| [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | Claude Code への画像貼り付け。`Ctrl+V` が正解な理由、WSLg の BMP 問題と `wl-paste` shim、切り分け手順 | `hosts/wsl-gentoo.nix` (wsl-gentoo) |
+| [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | Claude Code への画像貼り付け。`Ctrl+V` が正解な理由、WSLg の BMP 問題と `wl-paste` shim、切り分け手順 | `modules/wsl` (WSL ホスト共通) |
 | [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
 | [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |
 | [docs/restic-nas.md](docs/restic-nas.md) | restic → Synology NAS。DSM の SFTP 仮想ルート (`/restic/...`)、backup 専用ユーザーと `authorized_keys` の置き方、`/root/secrets/` の運用、復旧手順 | `hosts/k-2/configuration.nix` (バックアップ) |

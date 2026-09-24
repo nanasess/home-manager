@@ -3,7 +3,7 @@
 # NOTE: Comments are intentionally ASCII-only. Windows PowerShell 5.1 reads a
 # BOM-less file as the system ANSI codepage (CP932 on Japanese Windows), and
 # multibyte Japanese bytes corrupt parsing. Japanese rationale lives in the
-# home-manager module (hosts/wsl-gentoo.nix) and conf.d/lhm.conf instead.
+# home-manager module (modules/wsl) and conf.d/lhm.conf instead.
 #
 # Executed by the Windows mackerel-agent. Walks the LHM sensor tree and emits
 # Mackerel custom-metric lines: <metric_name>\t<value>\t<epoch>
