@@ -64,7 +64,7 @@ wsl -d NixOS -u root passwd nanasess
 
 導入後は `~/.config/home-manager` を clone し、`sudo nixos-rebuild switch --flake '.#wsl-nixos'` で更新する。
 Docker Desktop は Settings > Resources > WSL integration で NixOS を有効にする。
-問題があれば `wsl --set-default` で既存ディストリに戻し、`wsl --unregister NixOS` で作り直せる。
+問題があれば `wsl --set-default` で既存ディストリに戻し、`wsl --unregister NixOS` で作り直せる。ただし、unregister はディストリのファイルと設定を完全に削除するため、必要なデータは事前にバックアップする（例: `wsl --export NixOS NixOS-backup.tar`）。
 
 ### Portage 設定のセットアップ（WSL Gentoo のみ）
 
