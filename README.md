@@ -148,7 +148,7 @@ k-2 の注意点:
 flake.nix              -- エントリポイント（inputs、homeConfigurations、nixosConfigurations、packages、devShells）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
-  wsl-gentoo.nix       -- WSL Gentoo 固有設定（noctty / Ghostty 設定と UDEV Gothic のコピー、1Password CLI、WSLg、Mackerel、wl-paste shim）
+  wsl-gentoo.nix       -- WSL Gentoo 固有設定（gentooPackages と check-system-packages、op の setgid バイナリのパス）
   ubuntu.nix           -- Ubuntu 固有設定（Ghostty (nixGL)、apt 差分チェック、GNOME 拡張）
   k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu からの移行先 (docs/nixos-t2.md)
     configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager、usbmuxd、1Password、ibus、nix.settings）
@@ -161,7 +161,8 @@ modules/
   ghostty/             -- Ghostty 共有設定（Linux native / noctty / Windows port を同一 attrset から生成）
   claude/              -- Claude Code のユーザー設定（CLAUDE.md、PreToolUse hook）
   wakatime/            -- WakaTime CLI（API キーは 1Password から実行時に解決）
-  mackerel/            -- LibreHardwareMonitor → Mackerel カスタムメトリック（Windows 側へ配置。wsl-gentoo）
+  wsl/                 -- WSL ホスト共通（Windows 側への noctty / Ghostty 設定・UDEV Gothic・Mackerel のコピー、op / wl-paste シム、gpg-agent、WSLg）
+  mackerel/            -- LibreHardwareMonitor → Mackerel カスタムメトリック（modules/wsl が Windows 側へ配置）
   bluetooth-audio/     -- WirePlumber の HFP 自動切替無効化 + pavucontrol（GNOME ホスト共通）
   ibus-skk/            -- ibus-skk の辞書設定 (dconf) と ubuntu 用エンジン登録
   walker/              -- Walker / Elephant ランチャー（GNOME ホスト共通）
