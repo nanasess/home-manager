@@ -169,7 +169,8 @@
   };
 
   home.file.".signature".text = ''
-    Kentaro Ohkouchi
+    --
+    大河内健太郎
   '';
 
   home.file.".myclirc".source = ./dotfiles/myclirc;
