@@ -60,6 +60,9 @@
     createDirectories = true;
     # home-manager 独自の XDG_PROJECTS_DIR (~/Projects) は使わない (~/git-repos がある)。
     projects = null;
+    # stateVersion < 26.05 の旧既定 (true) を明示して警告を消す。XDG_DOWNLOAD_DIR 等を
+    # セッション変数に出す従来の挙動を維持する。
+    setSessionVariables = true;
   };
 
   # 文字入力中にトラックパッドを無効化する (libinput の disable-while-typing) ための設定。

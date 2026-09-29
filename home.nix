@@ -88,7 +88,7 @@
     # 未導入だと doom-modeline 等のアイコン (U+F0000 台) が豆腐になる。
     nerd-fonts.symbols-only
   ]
-  ++ lib.optionals stdenv.isLinux [
+  ++ lib.optionals stdenv.hostPlatform.isLinux [
     wl-clipboard
     xrandr
     libnotify
@@ -208,7 +208,7 @@
     '';
   };
 
-  xdg.mimeApps = lib.mkIf pkgs.stdenv.isLinux {
+  xdg.mimeApps = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     enable = true;
     defaultApplications = {
       "text/html" = "google-chrome.desktop";

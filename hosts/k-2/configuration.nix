@@ -150,6 +150,19 @@ in
     };
   };
 
+  # os-prober は dmraid (BIOS フェイク RAID) が PATH にあると `dmraid -sa -c` の出力を
+  # RAID セット名として扱う。RAID が無いと "no block devices found" が単語分割されて
+  # `lsblk: /dev/mapper/no*[0-9]: そのようなファイルやディレクトリはありません` が
+  # switch のたびに出る (検出結果には影響しない)。k-2 にフェイク RAID は無いので、
+  # 常に失敗する dmraid スタブに差し替えて探索自体をスキップさせる。
+  nixpkgs.overlays = [
+    (final: prev: {
+      os-prober = prev.os-prober.override {
+        dmraid = final.writeShellScriptBin "dmraid" "exit 1";
+      };
+    })
+  ];
+
   # ---------------------------------------------------------------------------
   # ネットワーク
   # ---------------------------------------------------------------------------

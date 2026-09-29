@@ -77,7 +77,7 @@ in
   # shebang は pkgs.runtimeShell (store パスの bash)。NixOS には /bin/bash が無く
   # (/bin/sh と /usr/bin/env のみ)、#!/bin/bash だと .desktop 経由の起動が
   # "bad interpreter" で失敗する。
-  home.file.".local/bin/emacs-wrapper" = lib.mkIf pkgs.stdenv.isLinux {
+  home.file.".local/bin/emacs-wrapper" = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     executable = true;
     text = ''
       #!${pkgs.runtimeShell}
@@ -88,7 +88,7 @@ in
     '';
   };
 
-  home.file.".local/bin/emacsclient-wrapper" = lib.mkIf pkgs.stdenv.isLinux {
+  home.file.".local/bin/emacsclient-wrapper" = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     executable = true;
     text = ''
       #!${pkgs.runtimeShell}
@@ -103,7 +103,7 @@ in
     '';
   };
 
-  home.file.".local/share/applications/emacs.desktop" = lib.mkIf pkgs.stdenv.isLinux {
+  home.file.".local/share/applications/emacs.desktop" = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     text = ''
       [Desktop Entry]
       Name=Emacs (GUI)
@@ -122,7 +122,7 @@ in
     '';
   };
 
-  home.file.".local/share/applications/emacsclient.desktop" = lib.mkIf pkgs.stdenv.isLinux {
+  home.file.".local/share/applications/emacsclient.desktop" = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     text = ''
       [Desktop Entry]
       Name=Emacs (Client)
