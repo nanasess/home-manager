@@ -39,7 +39,11 @@
   # WSL では tty1 でログインしない。/dev はディストリ間で共有されるので、Gentoo の
   # getty@tty1 と取り合いになる。取り合いに負けると start-limit-hit で failed になり、
   # システムが常に degraded 表示になる (WSL 2.9.13 で同時起動して確認)。
+  # NixOS の getty.target が起動するのは getty@tty1 ではなく autovt@tty1 (getty@ の
+  # エイリアス、nixos/modules/services/ttys/getty.nix)。インスタンスは名前ごとにマスク
+  # されるので、getty@tty1 だけを止めても autovt@tty1 は起動する。両方をマスクする。
   systemd.services."getty@tty1".enable = false;
+  systemd.services."autovt@tty1".enable = false;
 
   time.timeZone = "Asia/Tokyo";
   i18n.defaultLocale = "ja_JP.UTF-8";
