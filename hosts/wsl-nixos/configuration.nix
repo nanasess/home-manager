@@ -36,6 +36,11 @@
   # Gentoo は generateResolvConf=false + systemd-resolved だったが、上流 DNS を何も
   # 設定しておらず Fallback DNS (1.1.1.1 等) で解決していただけなので再現しない。
 
+  # WSL では tty1 でログインしない。/dev はディストリ間で共有されるので、Gentoo の
+  # getty@tty1 と取り合いになる。取り合いに負けると start-limit-hit で failed になり、
+  # システムが常に degraded 表示になる (WSL 2.9.13 で同時起動して確認)。
+  systemd.services."getty@tty1".enable = false;
+
   time.timeZone = "Asia/Tokyo";
   i18n.defaultLocale = "ja_JP.UTF-8";
 
