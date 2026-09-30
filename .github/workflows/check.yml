@@ -56,6 +56,11 @@ jobs:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', '**/*.nix') }}
           # キーが外れても直近のキャッシュを復元し、差分だけビルドする
           restore-prefixes-first-match: nix-${{ runner.os }}-
+          # 保存は main への push のときだけ。1 個約 4GB あり、PR ごとに保存すると 10GB の枠が
+          # すぐ埋まる。.nix を変える PR は primary-key が PR 側のキャッシュとも一致しないので、
+          # 保存しても効くのは同じ PR への .nix 以外の再 push くらい。PR は main のキャッシュを
+          # restore-prefixes-first-match で復元して差分だけビルドする
+          save: ${{ github.event_name == 'push' }}
           # 保存時に同じ ref の古いキャッシュを消す (primary-key のものは残す)
           purge: true
           purge-prefixes: nix-${{ runner.os }}-
