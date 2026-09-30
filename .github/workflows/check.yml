@@ -12,9 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: DeterminateSystems/nix-installer-action@main
-
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: nixbuild/nix-quick-install-action@v35
 
       - name: nix flake check
         run: nix flake check
@@ -34,47 +32,61 @@ jobs:
       - name: Emacs batch load test
         run: emacs --init-directory modules/emacs -l modules/emacs/early-init.el -l modules/emacs/init.el --batch
 
+  # 全ホストを 1 ジョブでビルドする。ホストごとにジョブを分けると、自作 derivation
+  # (yaskkserv2 / ibus-skk / mew-bin) や Hydra が作らないもの (unfree の terraform、
+  # override した xremap-gnome) を各ジョブが毎回ソースからビルドする。
+  # magic-nix-cache は GitHub Actions Cache API に throttle されて run の途中で無効化され、
+  # これらを保存できていなかったため、/nix をまるごと 1 つのキャッシュにする
+  # cache-nix-action に置き換えた。/nix 全体の tarball はジョブ数ぶん作ると 10GB の枠を
+  # 圧迫するので、キャッシュを持つジョブはこの 1 つだけにする。
+  #
+  # NixOS ホストは toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージ
+  # (KVM が要る) を抱えるので、評価と home-manager 側のビルドまでに留める。
   build:
     needs: check
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            config: nanasess@wsl-gentoo
-          - os: ubuntu-latest
-            config: nanasess@ubuntu
-
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: DeterminateSystems/nix-installer-action@v16
-
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-
-      - name: Build activation package
-        run: nix build '.#homeConfigurations."${{ matrix.config }}".activationPackage'
-
-  # NixOS ホストは toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージ
-  # (KVM が要る) を抱えるので、CI では評価と home-manager 側のビルドまでに留める。
-  nixos:
-    needs: check
-    strategy:
-      fail-fast: false
-      matrix:
-        host: [k-2, wsl-nixos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - uses: DeterminateSystems/nix-installer-action@v16
+      # cache-nix-action が対応するインストーラ。DeterminateSystems/nix-installer-action は対象外
+      - uses: nixbuild/nix-quick-install-action@v35
 
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', '**/*.nix') }}
+          # キーが外れても直近のキャッシュを復元し、差分だけビルドする
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          # 保存は main への push のときだけ。1 個約 4GB あり、PR ごとに保存すると 10GB の枠が
+          # すぐ埋まる。.nix を変える PR は primary-key が PR 側のキャッシュとも一致しないので、
+          # 保存しても効くのは同じ PR への .nix 以外の再 push くらい。PR は main のキャッシュを
+          # restore-prefixes-first-match で復元して差分だけビルドする
+          save: ${{ github.event_name == 'push' }}
+          # 保存時に同じ ref の古いキャッシュを消す (primary-key のものは残す)
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-
+          purge-created: 0
+          purge-primary-key: never
 
       - name: Evaluate NixOS toplevel
-        run: nix eval --raw '.#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel.drvPath'
+        run: |
+          for host in k-2 wsl-nixos; do
+            nix eval --raw ".#nixosConfigurations.$host.config.system.build.toplevel.drvPath"
+            echo
+          done
 
-      - name: Build home-manager generation
-        run: nix build '.#nixosConfigurations.${{ matrix.host }}.config.home-manager.users.nanasess.home.activationPackage'
+      # 1 回の nix build にまとめ、ホスト間で共通の依存を 1 度だけビルドする。
+      # --keep-going で 1 ホストが失敗しても他ホストのエラーまで出し切る。result* の
+      # out-link は GC root として残す (gc-max-store-size を入れたときに消されないように)
+      - name: Build activation packages
+        run: |
+          nix build --keep-going --print-out-paths \
+            '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage' \
+            '.#homeConfigurations."nanasess@ubuntu".activationPackage' \
+            '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage' \
+            '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage'
+
+      - name: Report store and disk usage
+        if: always()
+        run: |
+          du -sh /nix/store
+          df -h / /nix
