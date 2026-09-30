@@ -45,6 +45,13 @@ jobs:
   build:
     needs: check
     runs-on: ubuntu-latest
+    # リポジトリの GITHUB_TOKEN 既定権限は read のため、cache-nix-action が古いキャッシュを
+    # purge (削除) するには actions: write が要る。無いと "Resource not accessible by
+    # integration" で削除に失敗し、ジョブは成功のまま main のキャッシュが約 4GB ずつ溜まる。
+    # purge 対象は現在の ref のキャッシュだけなので、PR の run が main のキャッシュを消すことはない
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v7
 
