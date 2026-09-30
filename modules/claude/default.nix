@@ -5,13 +5,14 @@
   #
   # 対象は CLAUDE.md (全プロジェクト共通指示) と hooks/ (PreToolUse hook 等)。
   # hooks/ のスクリプトは settings.json の hooks 設定から参照される
-  # (配線となる settings.json 側の hooks エントリは下記の理由で宣言管理せず、
-  # nanasess/claude.git リポジトリで追跡する)。
+  # (配線となる settings.json 側の hooks エントリは下記の理由で宣言管理しない)。
   # settings.json はこのモジュールでは扱わない:
   #   - Claude Code は実行時 state (theme / feedbackSurveyState / verbose 等) を
-  #     settings.json ではなく ~/.config/claude/.claude.json に書き込むため、
-  #     read-only symlink でも実害は小さいが、/config・update-config による
-  #     settings.json への明示的書き込みは失敗する。
+  #     settings.json にも書き込む (2026-10 時点で .claude.json と両方に存在)。
+  #     read-only symlink にすると、これらの書き込みや /config・update-config に
+  #     よる設定変更が失敗する。
+  #   - nanasess/claude.git (~/.config/claude) は 2025-10 以降コミットされておらず、
+  #     settings.json の現行内容 (hooks エントリ含む) はどこにも追跡されていない。
   #   - その他の ~/.config/claude/ 配下 (.claude.json, projects/, sessions/ 等) は
   #     Claude Code が自由に書き込む runtime ディレクトリのため管理対象外。
   #

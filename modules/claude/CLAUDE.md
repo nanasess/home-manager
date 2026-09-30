@@ -10,8 +10,8 @@ Claude Code (claude.ai/code) のユーザーレベル設定 — 全プロジェ�
 - **EC-CUBE 開発者**。EC-CUBE 2 系 / 4 系の保守・モダナイゼーションに従事 (詳細は下記「EC-CUBE への目線」参照)。本家リポジトリは `~/git-repos/ec-cube`、Enterprise 版は `~/git-repos/enterprise`。
 - **元寿司職人**。技術職への転身組で、現場叩き上げの経験を持つ。
 - **GNU Emacs アイコン (23 / 24) のコントリビューター**。Emacs は長年のヘビーユーザー。Elisp は基本的な設定記述程度なので、複雑な実装の議論よりも設定 (`init.el` / `use-package` / elpaca) や運用面の議論を好む。
-- **主環境**: WSL2 Gentoo Linux + Ubuntu の 2 環境を 1 リポジトリ (`~/.config/home-manager`) で宣言的に管理。
-- **システム設定**: Nix Flake + home-manager。
+- **主環境**: WSL2 (Gentoo Linux。NixOS-WSL へ移行中) と Intel MacBook Pro 2020 (T2、NixOS。Ubuntu から移行) を 1 リポジトリ (`~/.config/home-manager`) で宣言的に管理。ホスト一覧と移行状況はリポジトリの `CLAUDE.md` が正本。
+- **システム設定**: Nix Flake + home-manager (NixOS ホストは `nixosConfigurations` + home-manager の NixOS モジュール)。
 - **エディタ**: GNU Emacs (elpaca によるパッケージ管理、tree-sitter モード、lsp-bridge を採用)。
 
 ### EC-CUBE への目線
@@ -29,7 +29,7 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 - **機能ライフサイクル完結を期待**: 調査 → 実装 → テスト → PR 作成 → レビュー対応 → 本番検証 → Issue クローズまでを 1 セッションで連鎖実行する。「ローカルで動く」で止めない。ただし CI / デプロイの完了待ちだけは例外で、後述「Commits & PRs」の規約どおり前景では待たずにバックグラウンドで監視し、成功通知を受けた場合だけレビュー対応・本番検証・Issue クローズを続行する。失敗通知の場合は結果と原因の見立てを報告し、指示を受けるまで後続工程を停止する。
 - **簡潔な指示を好む**: 「PR 化して」「CLAUDE.md に記録」のような短い指示でも、完成形まで自走することを期待する。
-- **並列作業時は git worktree**: `worktree-create` Skill で worktree を切り、PR ごとや実験ごとに分離する。
+- **並列作業時は git worktree**: PR ごとや実験ごとに worktree で分離する。`worktree-create` Skill は `disable-model-invocation: true` でユーザー起動専用 (`/worktree-create`) なので、Claude が切るときは `EnterWorktree` ツールか `git worktree add` を使う。
 - **コミットメッセージは Conventional Commits 形式 + 日本語**: `feat: ...`, `fix: ...`, `chore: ...` などのプレフィックスを使い、本文は日本語で書く (`/commit` Skill を活用)。
 - **メモリへの永続化を重視**: 学んだ規約・判断基準・例外運用は `projects/<encoded-path>/memory/` 配下の `feedback_*.md` / `project_*.md` に保存する。
 
@@ -46,10 +46,10 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 ### 環境固有の制約
 
-- WSL2 から Windows 側ファイルへのアクセスは `/mnt/c/` 経由 (例: noctty 設定は `/mnt/c/Users/nanasess/AppData/Local/noctty/config.ghostty` にコピー)。
+- (WSL ホスト) Windows 側ファイルへのアクセスは `/mnt/c/` 経由 (例: noctty 設定は `/mnt/c/Users/nanasess/AppData/Local/noctty/config.ghostty` にコピー)。
 - 1Password CLI のセッションはデスクトップアプリ連携 (`op signin` で確立)。SSH エージェントソケットは `~/.1password/agent.sock`。
 - ロケールは `ja_JP.UTF-8`。East Asian Ambiguous 文字 (`△` `○` `■` 等) はターミナル (noctty / Ghostty 系) も glibc も**幅 1 (半角) 扱い**。Emacs GUI だけ `eaw-console.el` + UDEV Gothic JPDOC で幅 2 にしている。
-- AMD Ryzen Zen 3 環境 (`-march=znver3`) を使用 (パフォーマンスチューニングの前提)。
+- CPU はホストで異なる。WSL ホストは AMD Ryzen Zen 3 (`-march=znver3`、Gentoo の Portage 設定の前提)、k-2 は Intel (MacBook Pro 2020)。パフォーマンスの議論では作業中のホストを `hostname` / `/etc/os-release` で確認してから前提を置く。
 - **ローカルの Web サーバは symfony-cli (`symfony serve -d --port=<port>`、HTTPS) で起動する。`php -S` は使わない。** EC-CUBE のセッション cookie は SameSite / Secure 属性の制約で http:// ではブラウザに保存されず、管理画面ログインが `POST /admin/login` → 302 → `/admin/login` に戻るループになる。Playwright には `BASE_URL=https://127.0.0.1:<port>` を渡す。CI の `e2e-test.yml` が `php -S` で動くのは CI 専用の `e2e` 環境設定があるためで、ローカルの根拠にしない。何度も指摘済みの規約なので、`php -S` を選んだ時点で規約違反と扱う。
 
 ## 行動規範
@@ -102,7 +102,7 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 ### Build & Test Verification
 
-- Nix 設定変更後は完了を宣言する前に `nix build` あるいは `home-manager switch --dry-run` を実行する。`default.nix` の dangling 参照は静かに失敗を引き起こす。
+- Nix 設定変更後は完了を宣言する前に `nix build` あるいは `home-manager switch --dry-run` を実行する。NixOS ホストの設定は `nix eval` による toplevel の評価 + home-manager 部分のビルドで確認する (具体的なコマンドはリポジトリの `CLAUDE.md`)。`default.nix` の dangling 参照は静かに失敗を引き起こす。
 - tree-sitter 文法のリネーム後は、対応する `*-ts-mode` が期待する正確なシンボル名を検証する (例: `csharp` ではなく `c-sharp`)。
 - PR 作成前に lint、型チェック、テストを実行する。モック/テストコードが本番ビルドに漏れていないか確認する。
 - TypeScript の型定義ファイル (`.d.ts`) に実装コードを書かない。型と実装の境界を厳守する。
