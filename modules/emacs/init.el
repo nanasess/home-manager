@@ -542,6 +542,36 @@ direct-idle からのかな復帰) は `nskk-kakutei' に委譲する。"
     (setopt browse-url-browser-function #'browse-url-generic
             browse-url-generic-program program)))
 
+(use-package jka-cmpr-hook
+  :ensure nil
+  :config
+  ;; auto-compression-mode は拡張子だけで圧縮形式を決めるため、OWASP ZAP の
+  ;; Zest スクリプト (*.zst、中身は平文 JSON) を zstd に渡して
+  ;; "unsupported format" で開けない。既存のローカルファイルは先頭バイトを
+  ;; jka-compr-compression-info-list のマジックバイトと照合し、一致しなければ
+  ;; 非圧縮として扱う (保存時も再圧縮しない)。新規ファイル・空ファイル・
+  ;; マジックバイト未定義の形式 (.lzma)・リモートファイルは従来どおり。
+  (defun my/jka-compr-ignore-uncompressed (orig filename)
+    (let ((info (funcall orig filename)))
+      (if-let* ((info)
+                (magic (jka-compr-info-file-magic-bytes info))
+                ((not (string-empty-p magic)))
+                ((not (file-remote-p filename)))
+                ((file-regular-p filename))
+                ((file-readable-p filename))
+                (head (with-temp-buffer
+                        (set-buffer-multibyte nil)
+                        (let ((file-name-handler-alist nil))
+                          (insert-file-contents-literally
+                           filename nil 0 (length magic)))
+                        (buffer-string)))
+                ((not (string-empty-p head)))
+                ((not (string-prefix-p magic head))))
+          nil
+        info)))
+  (advice-add 'jka-compr-get-compression-info
+              :around #'my/jka-compr-ignore-uncompressed))
+
 ;; 以下 3 つも newcomers-presets 由来 (いずれも Emacs 同梱、既定は無効)。
 (use-package saveplace
   :ensure nil
@@ -1301,7 +1331,18 @@ JSON からはグループを特定できないため。"
 ;;; JSON
 (use-package json-ts-mode
   :ensure nil
-  :mode "\\.json\\'")
+  :mode "\\.json\\'"
+  :init
+  ;; OWASP ZAP の Zest スクリプト (*.zst) は中身が JSON。auto-mode-alist では
+  ;; jka-compr が .zst を剥がして残りの名前で判定するためモードが付かない。
+  ;; 内容で判定する magic-mode-alist に、.zst かつ先頭が "{" のときだけ足す
+  ;; (平文で開けるのは jka-cmpr-hook の advice による)。
+  (add-to-list 'magic-mode-alist
+               (cons (lambda ()
+                       (and buffer-file-name
+                            (string-match-p "\\.zst\\'" buffer-file-name)
+                            (looking-at-p "[ \t\n\r]*{")))
+                     #'json-ts-mode)))
 
 ;;; Shell scripts
 ;; sh-mode に決まったあと bash-ts-mode へリマップする。bash-ts-mode 自体が
