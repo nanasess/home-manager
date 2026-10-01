@@ -37,7 +37,16 @@ nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage' --no-link
 # (linux-t2 カーネルは cache.soopy.moe から取る。README「NixOS (k-2) の更新」のキャッシュ確認を先に)
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
 nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage' --no-link
+# k-2 の T2 パッチが新しい linux_6_18 に当たるか (パッチ適用 + make config のみで数分、KVM 不要)
+nix build '.#nixosConfigurations.k-2.config.boot.kernelPackages.kernel.configfile' --no-link
 ```
+
+**`kernel.configfile` が `Hunk #N FAILED` で落ちたら nixpkgs は上げない。**
+nixos-hardware の `apple/t2/pkgs/linux-t2/stable.json` (T2 パッチ集) は nixpkgs の `linux_6_18` の
+patch リリースに追従しておらず、nixpkgs を上げるとパッチが当たらなくなる (nixos-hardware#2027)。
+その場合は `nix flake update home-manager nixos-hardware` のように nixpkgs 以外に絞るか、
+nixpkgs を現 rev に戻す (`nix flake update nixpkgs --override-input nixpkgs github:nixos/nixpkgs/<現 rev>`)。
+実例: PR #202 で 6.18.46 → 6.18.54 に上がり `3001-applesmc-*.patch` が当たらず、PR #204 で戻した。
 
 CI の build matrix (`.github/workflows/check.yml`) と `flake.nix` の `homeConfigurations` が
 一致しているとは限らない。**PR 本文に検証状況を書く前に workflow を読んで確認する**こと。

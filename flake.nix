@@ -2,6 +2,9 @@
   description = "Home Manager configuration";
 
   inputs = {
+    # k-2 の linux-t2 は nixpkgs の linux_6_18 に T2 パッチを当てるため、nixpkgs を上げると
+    # パッチが当たらず linux-config のビルドで落ちることがある (nixos-hardware#2027)。
+    # 上げる前に kernel.configfile をビルドして確認する (flake-update-pr Skill の手順 3)。
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     home-manager = {
       url = "github:nix-community/home-manager";
