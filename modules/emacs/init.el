@@ -542,6 +542,64 @@ direct-idle からのかな復帰) は `nskk-kakutei' に委譲する。"
     (setopt browse-url-browser-function #'browse-url-generic
             browse-url-generic-program program)))
 
+(use-package jka-cmpr-hook
+  :ensure nil
+  :config
+  ;; auto-compression-mode は拡張子だけで圧縮形式を決めるため、OWASP ZAP の
+  ;; Zest スクリプト (*.zst、中身は平文 JSON) を zstd に渡して
+  ;; "unsupported format" で開けない。既存のローカルファイルは先頭バイトを
+  ;; jka-compr-compression-info-list のマジックバイトと照合し、一致しなければ
+  ;; 非圧縮として扱う (保存時も再圧縮しない)。新規ファイル・空ファイル・
+  ;; マジックバイト未定義の形式 (.lzma)・リモートファイルは従来どおり。
+  ;;
+  ;; 保存時はバックアップ作成 (既定はリネーム) で元ファイルが消えた状態で
+  ;; write-region が呼ばれ、先頭バイトを読めず新規ファイル扱い = 圧縮されて
+  ;; しまう。そこで訪問時の判定をバッファローカルに残し、ファイルが無いときは
+  ;; それを見る。
+  (defvar-local my/jka-compr-plain nil
+    "非 nil なら、圧縮拡張子だが中身が非圧縮のファイルを訪問している。")
+  (put 'my/jka-compr-plain 'permanent-local t)
+
+  (defun my/jka-compr-uncompressed-p (filename info)
+    "INFO の圧縮形式なのに FILENAME の先頭がマジックバイトと一致しなければ非 nil。"
+    (when-let* ((magic (jka-compr-info-file-magic-bytes info))
+                ((not (string-empty-p magic)))
+                ((not (file-remote-p filename)))
+                ((file-regular-p filename))
+                ((file-readable-p filename))
+                (head (with-temp-buffer
+                        (set-buffer-multibyte nil)
+                        (let ((file-name-handler-alist nil))
+                          (insert-file-contents-literally
+                           filename nil 0 (length magic)))
+                        (buffer-string)))
+                ((not (string-empty-p head))))
+      (not (string-prefix-p magic head))))
+
+  (defun my/jka-compr-ignore-uncompressed (orig filename)
+    (let ((info (funcall orig filename)))
+      (if (and info
+               (if (file-exists-p filename)
+                   (my/jka-compr-uncompressed-p filename info)
+                 (when-let* ((buf (get-file-buffer filename)))
+                   (buffer-local-value 'my/jka-compr-plain buf))))
+          nil
+        info)))
+  (advice-add 'jka-compr-get-compression-info
+              :around #'my/jka-compr-ignore-uncompressed)
+
+  ;; advice を通すと平文判定済みのファイルは nil になるので、拡張子での
+  ;; 照合は jka-compr-get-compression-info と同じ処理を自前で行う。
+  (defun my/jka-compr-mark-plain ()
+    (when-let* ((filename buffer-file-name)
+                (info (let ((case-fold-search nil)
+                            (name (file-name-sans-versions filename)))
+                        (seq-find (lambda (x)
+                                    (string-match-p (jka-compr-info-regexp x) name))
+                                  jka-compr-compression-info-list))))
+      (setq my/jka-compr-plain (my/jka-compr-uncompressed-p filename info))))
+  (add-hook 'find-file-hook #'my/jka-compr-mark-plain))
+
 ;; 以下 3 つも newcomers-presets 由来 (いずれも Emacs 同梱、既定は無効)。
 (use-package saveplace
   :ensure nil
@@ -1301,7 +1359,18 @@ JSON からはグループを特定できないため。"
 ;;; JSON
 (use-package json-ts-mode
   :ensure nil
-  :mode "\\.json\\'")
+  :mode "\\.json\\'"
+  :init
+  ;; OWASP ZAP の Zest スクリプト (*.zst) は中身が JSON。auto-mode-alist では
+  ;; jka-compr が .zst を剥がして残りの名前で判定するためモードが付かない。
+  ;; 内容で判定する magic-mode-alist に、.zst かつ先頭が "{" のときだけ足す
+  ;; (平文で開けるのは jka-cmpr-hook の advice による)。
+  (add-to-list 'magic-mode-alist
+               (cons (lambda ()
+                       (and buffer-file-name
+                            (string-match-p "\\.zst\\'" buffer-file-name)
+                            (looking-at-p "[ \t\n\r]*{")))
+                     #'json-ts-mode)))
 
 ;;; Shell scripts
 ;; sh-mode に決まったあと bash-ts-mode へリマップする。bash-ts-mode 自体が
