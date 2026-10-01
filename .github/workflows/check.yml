@@ -73,6 +73,12 @@ jobs:
           purge-prefixes: nix-${{ runner.os }}-
           purge-created: 0
           purge-primary-key: never
+          # 保存前に GC で消せるものをすべて消す。指定しないと、復元した古い世代のパスが
+          # 残ったまま新しいビルド結果が足され、flake update のたびにキャッシュが膨らむ
+          # (4.0GB → 7.8GB になった)。result* の out-link が GC root なので 4 ホストの
+          # 実行時 closure (terraform 等の自前ビルド物を含む) は残り、消えるのは古い世代と
+          # ビルド時のみの依存 (Go / Rust ツールチェーン等、cache.nixos.org から取り直せる)
+          gc-max-store-size-linux: 0
 
       - name: Evaluate NixOS toplevel
         run: |
