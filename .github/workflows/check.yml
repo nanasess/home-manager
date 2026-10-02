@@ -57,7 +57,6 @@ jobs:
     outputs:
       hosts-md: ${{ steps.hosts.outputs.hosts-md }}
       store-size: ${{ steps.hosts.outputs.store-size }}
-      primary-key: ${{ steps.cache.outputs.primary-key }}
       hit-primary-key: ${{ steps.cache.outputs.hit-primary-key }}
       hit-first-match: ${{ steps.cache.outputs.hit-first-match }}
       restored-key: ${{ steps.cache.outputs.restored-key }}
@@ -191,7 +190,6 @@ jobs:
           BUILD_RESULT: ${{ needs.build.result }}
           HOSTS_MD: ${{ needs.build.outputs.hosts-md }}
           STORE_SIZE: ${{ needs.build.outputs.store-size }}
-          PRIMARY_KEY: ${{ needs.build.outputs.primary-key }}
           HIT_PRIMARY: ${{ needs.build.outputs.hit-primary-key }}
           HIT_FIRST_MATCH: ${{ needs.build.outputs.hit-first-match }}
           RESTORED_KEY: ${{ needs.build.outputs.restored-key }}
@@ -216,11 +214,12 @@ jobs:
             : > "$log"
           fi
 
-          # 復元
-          if [ -z "$PRIMARY_KEY" ]; then
+          # 復元。cache-nix-action v7 は outputs の primary-key を設定しないので、hit-* と
+          # restored-key で判定する (primary-key に一致したときは restored-key = primary-key)
+          if [ -z "$HIT_PRIMARY" ]; then
             restore="取得できず (build: $BUILD_RESULT)"
           elif [ "$HIT_PRIMARY" = "true" ]; then
-            restore="primary-key に一致 (\`$(short "$PRIMARY_KEY")\`, $(mib "$(size_of "$PRIMARY_KEY")"))"
+            restore="primary-key に一致 (\`$(short "$RESTORED_KEY")\`, $(mib "$(size_of "$RESTORED_KEY")"))"
           elif [ "$HIT_FIRST_MATCH" = "true" ]; then
             restore="prefix 一致で復元 (\`$(short "$RESTORED_KEY")\`, $(mib "$(size_of "$RESTORED_KEY")"))"
           else
@@ -237,9 +236,10 @@ jobs:
             gc="取得できず"
           fi
 
-          # 保存
+          # 保存。保存したキーは Post ステップのログから取る
+          saved_key=$(grep -m1 -oE '^Saving a new cache with the key "[^"]+"' "$log" | grep -oE '"[^"]+"$' | tr -d '"' || true)
           if grep -q '^Saved the new cache\.' "$log"; then
-            save="保存 (\`$(short "$PRIMARY_KEY")\`, $(mib "$(size_of "$PRIMARY_KEY")"))"
+            save="保存 (\`$(short "$saved_key")\`, $(mib "$(size_of "$saved_key")"))"
           elif [ "$EVENT_NAME" != "push" ]; then
             save="保存なし (PR では保存しない)"
           elif [ "$HIT_PRIMARY" = "true" ]; then
