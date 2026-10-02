@@ -148,6 +148,11 @@
     LESSCHARSET = "utf-8";
     LESS = "-R";
     LESSCOLORIZER = "pygmentize -O style=solarized-light";
+    # mise の PHP (ソースビルド) は php.ini を持たず memory_limit が既定の 128M のままで、
+    # EC-CUBE の rector / php-cs-fixer が Fatal になる。install 先の conf.d は
+    # `mise install --force` で作り直されるので、home-manager 管理のディレクトリを追加で読ませる。
+    # 先頭の ":" (空要素) はビルド時の既定 scan dir も併せて読む指定。
+    PHP_INI_SCAN_DIR = ":${config.xdg.configHome}/php/conf.d";
   };
 
   programs.ssh = {
@@ -179,6 +184,10 @@
   '';
 
   xdg.configFile."phpactor/phpactor.yml".source = ./dotfiles/phpactor.yml;
+
+  xdg.configFile."php/conf.d/99-memory-limit.ini".text = ''
+    memory_limit = 512M
+  '';
 
   # AWS の長期アクセスキーを ~/.aws/credentials に平文で置かず、1Password から供給する。
   # ~/.aws/config のプロファイルに以下を書いて使う (--profile 指定のまま動く):
