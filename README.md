@@ -148,8 +148,9 @@ nix develop '.#php-build' --profile ~/.local/state/nix/profiles/php-build \
 # PHP インストール (wsl-gentoo)
 mise install php@8.5
 
-# カスタム設定（memory_limit 等）
-echo "memory_limit=1G" > ~/.local/share/mise/installs/php/8.5.9/conf.d/custom.ini
+# カスタム設定（memory_limit 等）は home.nix の xdg.configFile."php/conf.d/*.ini" で管理する。
+# PHP_INI_SCAN_DIR=":~/.config/php/conf.d" で install 先の conf.d の後に読まれるため、
+# install 先 conf.d に同じ設定を書いても上書きされる (同一ディレクトリ内はファイル名の辞書順)
 
 # PECL 拡張の追加 (k-2 では devShell 内で実行する)
 pecl install redis
