@@ -52,6 +52,23 @@ jobs:
     permissions:
       contents: read
       actions: write
+    # report ジョブへ渡す。キャッシュの保存・GC・purge は cache-nix-action の Post ステップで
+    # 走るため build ジョブ内では結果を読めず、Summary と PR コメントは report ジョブで出す
+    outputs:
+      hosts-md: ${{ steps.hosts.outputs.hosts-md }}
+      store-size: ${{ steps.hosts.outputs.store-size }}
+      hit-primary-key: ${{ steps.cache.outputs.hit-primary-key }}
+      hit-first-match: ${{ steps.cache.outputs.hit-first-match }}
+      restored-key: ${{ steps.cache.outputs.restored-key }}
+    env:
+      # ビルド対象。1 行 1 ホストで「表示名 activationPackage の attr」。ビルドと結果集計で共有する
+      HM_TARGETS: |
+        nanasess@wsl-gentoo homeConfigurations."nanasess@wsl-gentoo".activationPackage
+        nanasess@ubuntu homeConfigurations."nanasess@ubuntu".activationPackage
+        k-2 nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage
+        wsl-nixos nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage
+      # toplevel を評価する NixOS ホスト (HM_TARGETS の表示名と揃える)
+      NIXOS_HOSTS: k-2 wsl-nixos
     steps:
       - uses: actions/checkout@v7
 
@@ -59,6 +76,7 @@ jobs:
       - uses: nixbuild/nix-quick-install-action@v35
 
       - uses: nix-community/cache-nix-action@v7
+        id: cache
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', '**/*.nix') }}
           # キーが外れても直近のキャッシュを復元し、差分だけビルドする
@@ -80,26 +98,223 @@ jobs:
           # ビルド時のみの依存 (Go / Rust ツールチェーン等、cache.nixos.org から取り直せる)
           gc-max-store-size-linux: 0
 
+      # 1 ホストの失敗で止めず全ホストを評価し、結果を Summary 用に残す
       - name: Evaluate NixOS toplevel
         run: |
-          for host in k-2 wsl-nixos; do
-            nix eval --raw ".#nixosConfigurations.$host.config.system.build.toplevel.drvPath"
-            echo
+          fail=0
+          for host in $NIXOS_HOSTS; do
+            if nix eval --raw ".#nixosConfigurations.$host.config.system.build.toplevel.drvPath"; then
+              echo
+              echo "$host ok" >> "$RUNNER_TEMP/toplevel.txt"
+            else
+              echo "$host ng" >> "$RUNNER_TEMP/toplevel.txt"
+              echo "::error title=$host::NixOS toplevel の評価に失敗"
+              fail=1
+            fi
           done
+          exit "$fail"
 
       # 1 回の nix build にまとめ、ホスト間で共通の依存を 1 度だけビルドする。
       # --keep-going で 1 ホストが失敗しても他ホストのエラーまで出し切る。result* の
-      # out-link は GC root として残す (gc-max-store-size を入れたときに消されないように)
+      # out-link は GC root として残す (gc-max-store-size を入れたときに消されないように)。
+      # toplevel の評価が失敗してもビルドは走らせ、Summary に全ホストの結果を出す
       - name: Build activation packages
+        if: ${{ !cancelled() }}
         run: |
-          nix build --keep-going --print-out-paths \
-            '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage' \
-            '.#homeConfigurations."nanasess@ubuntu".activationPackage' \
-            '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage' \
-            '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage'
+          mapfile -t installables < <(awk 'NF { print ".#" $2 }' <<< "$HM_TARGETS")
+          nix build --keep-going --print-out-paths "${installables[@]}"
 
-      - name: Report store and disk usage
-        if: always()
+      # ホストごとの成否を表 (Markdown) にして report ジョブへ渡す。ビルドは 1 ステップに
+      # まとめているので、成否は出力パスがストアにあるか (nix-store --check-validity) で判定する。
+      # out-link は --keep-going で一部失敗したときの作られ方に依存したくないので使わない
+      - name: Collect per-host results
+        id: hosts
+        if: ${{ !cancelled() }}
         run: |
+          table="$RUNNER_TEMP/hosts.md"
+          {
+            echo "| host | toplevel 評価 | activationPackage | closure |"
+            echo "|---|---|---|---|"
+          } > "$table"
+          while read -r label attr; do
+            [ -n "$label" ] || continue
+            toplevel="–"
+            if [[ " $NIXOS_HOSTS " == *" $label "* ]]; then
+              case "$(awk -v h="$label" '$1 == h { print $2 }' "$RUNNER_TEMP/toplevel.txt" 2>/dev/null)" in
+                ok) toplevel="✅" ;;
+                ng) toplevel="❌" ;;
+                *) toplevel="⏭️ 未実行" ;;
+              esac
+            fi
+            closure="–"
+            if ! out=$(nix eval --raw ".#$attr.outPath" 2>/dev/null); then
+              result="❌ 評価失敗"
+              echo "::error title=$label::activationPackage の評価に失敗"
+            elif nix-store --check-validity "$out" 2>/dev/null; then
+              result="✅"
+              closure=$(nix path-info -Sh "$out" | awk '{ print $2, $3 }')
+            else
+              result="❌"
+              echo "::error title=$label::activationPackage のビルドに失敗"
+            fi
+            echo "| $label | $toplevel | $result | $closure |" >> "$table"
+          done <<< "$HM_TARGETS"
+          {
+            echo "hosts-md<<EOF_HOSTS_MD"
+            cat "$table"
+            echo "EOF_HOSTS_MD"
+            echo "store-size=$(du -sh /nix/store | cut -f1)"
+          } >> "$GITHUB_OUTPUT"
           du -sh /nix/store
           df -h / /nix
+
+  # ホスト別の結果と Nix キャッシュのレポートを run の Summary に出し、PR では 1 件の
+  # コメントとして上書き更新する。キャッシュの保存・GC・purge の結果は build ジョブの
+  # Post ステップのログにしか出ないので、API でジョブログを取得して cache-nix-action の
+  # 文言から拾う (文言が変わったら「取得できず」になるだけでジョブは落とさない)
+  report:
+    needs: build
+    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Build report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          EVENT_NAME: ${{ github.event_name }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          HOSTS_MD: ${{ needs.build.outputs.hosts-md }}
+          STORE_SIZE: ${{ needs.build.outputs.store-size }}
+          HIT_PRIMARY: ${{ needs.build.outputs.hit-primary-key }}
+          HIT_FIRST_MATCH: ${{ needs.build.outputs.hit-first-match }}
+          RESTORED_KEY: ${{ needs.build.outputs.restored-key }}
+        run: |
+          # サイズが取れない (キャッシュが既に削除されている等) ときは「–」
+          mib() { if [ -n "${1:-}" ]; then awk -v b="$1" 'BEGIN { printf "%.0f MiB", b / 1048576 }'; else printf '–'; fi; }
+          short() { printf '%s' "${1:0:22}…"; }
+
+          caches="$RUNNER_TEMP/caches.json"
+          gh cache list --limit 1000 --json key,ref,sizeInBytes > "$caches" || echo '[]' > "$caches"
+          size_of() { jq -r --arg k "$1" '[.[] | select(.key == $k) | .sizeInBytes] | max // empty' "$caches"; }
+
+          # build ジョブ (この attempt) のログ。Post ステップの出力を含む
+          log="$RUNNER_TEMP/build.log"
+          job_id=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs" \
+            --jq '.jobs[] | select(.name == "build") | .id' | head -1)
+          if [ -n "$job_id" ]; then
+            curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$GH_REPO/actions/jobs/$job_id/logs" \
+              | sed -e 's/\x1b\[[0-9;]*m//g' -e 's/^[0-9T:.-]*Z //' > "$log" || : > "$log"
+          else
+            : > "$log"
+          fi
+
+          # 復元。cache-nix-action v7 は outputs の primary-key を設定しないので、hit-* と
+          # restored-key で判定する (primary-key に一致したときは restored-key = primary-key)
+          if [ -z "$HIT_PRIMARY" ]; then
+            restore="取得できず (build: $BUILD_RESULT)"
+          elif [ "$HIT_PRIMARY" = "true" ]; then
+            restore="primary-key に一致 (\`$(short "$RESTORED_KEY")\`, $(mib "$(size_of "$RESTORED_KEY")"))"
+          elif [ "$HIT_FIRST_MATCH" = "true" ]; then
+            restore="prefix 一致で復元 (\`$(short "$RESTORED_KEY")\`, $(mib "$(size_of "$RESTORED_KEY")"))"
+          else
+            restore="キャッシュ無し (全体をビルド)"
+          fi
+
+          # GC (保存するときだけ走る)
+          if line=$(grep -m1 -E '^[0-9]+ store paths deleted' "$log"); then
+            mapfile -t sizes < <(grep -oE 'Current store size in bytes: [0-9]+' "$log" | grep -oE '[0-9]+$')
+            gc="$line (ストア $(mib "${sizes[0]:-}") → $(mib "${sizes[-1]:-}"))"
+          elif [ -s "$log" ]; then
+            gc="実行なし"
+          else
+            gc="取得できず"
+          fi
+
+          # 保存。保存したキーは Post ステップのログから取る
+          saved_key=$(grep -m1 -oE '^Saving a new cache with the key "[^"]+"' "$log" | grep -oE '"[^"]+"$' | tr -d '"' || true)
+          if grep -q '^Saved the new cache\.' "$log"; then
+            save="保存 (\`$(short "$saved_key")\`, $(mib "$(size_of "$saved_key")"))"
+          elif [ "$EVENT_NAME" != "push" ]; then
+            save="保存なし (PR では保存しない)"
+          elif [ "$HIT_PRIMARY" = "true" ]; then
+            save="保存なし (primary-key に一致)"
+          elif [ -s "$log" ]; then
+            save="⚠️ 保存されていない"
+          else
+            save="取得できず"
+          fi
+
+          # purge (古いキャッシュの削除)
+          mapfile -t purged < <(grep -oE '^Purging the cache that was created at .* key "[^"]+"' "$log" | grep -oE '"[^"]+"$' | tr -d '"')
+          if grep -q 'Failed to delete the cache' "$log"; then
+            purge="❌ 失敗あり (ログの \`Failed to delete the cache\` を確認)"
+          elif [ "${#purged[@]}" -gt 0 ]; then
+            bt='`'
+            purge="${#purged[@]} 件削除 ($(for k in "${purged[@]}"; do printf '%s%s%s ' "$bt" "$(short "$k")" "$bt"; done | sed 's/ $//'))"
+          elif [ -s "$log" ]; then
+            purge="対象なし"
+          else
+            purge="取得できず"
+          fi
+
+          report="$RUNNER_TEMP/report.md"
+          {
+            echo "<!-- check-yml-build-report -->"
+            echo "## ホスト別ビルド結果"
+            echo
+            if [ -n "$HOSTS_MD" ]; then echo "$HOSTS_MD"; else echo "build ジョブから結果を受け取れなかった (build: $BUILD_RESULT)"; fi
+            echo
+            echo "## Nix キャッシュ"
+            echo
+            echo "| 項目 | 結果 |"
+            echo "|---|---|"
+            echo "| 復元 | $restore |"
+            echo "| GC | $gc |"
+            echo "| 保存 | $save |"
+            echo "| 古いキャッシュの削除 | $purge |"
+            echo "| /nix/store | ${STORE_SIZE:-–} |"
+            echo
+            echo "<details><summary>キャッシュ枠の使用量 (Actions 全体)</summary>"
+            echo
+            echo "| 種類 | 件数 | サイズ |"
+            echo "|---|---|---|"
+            jq -r '
+              group_by(if (.key | startswith("nix-")) then "Nix ストア"
+                       elif (.key | startswith("elpaca-")) then "elpaca"
+                       else "その他" end)[]
+              | [ (if (.[0].key | startswith("nix-")) then "Nix ストア"
+                   elif (.[0].key | startswith("elpaca-")) then "elpaca"
+                   else "その他" end),
+                  length, ((map(.sizeInBytes) | add) / 1048576 | round) ]
+              | "| \(.[0]) | \(.[1]) | \(.[2]) MiB |"' "$caches"
+            jq -r '"| **合計** | \(length) | **\((map(.sizeInBytes) | add // 0) / 1048576 | round) MiB** / 10240 MiB |"' "$caches"
+            echo
+            echo "</details>"
+            echo
+            echo "<sub>[run $RUN_ID](https://github.com/$GH_REPO/actions/runs/$RUN_ID) (attempt $RUN_ATTEMPT)</sub>"
+          } > "$report"
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+
+      # PR には 1 件のコメントを上書き更新する (目印の HTML コメントで探す)。
+      # フォークからの PR は token が読み取り専用で書き込めないので対象外
+      - name: Comment report on PR
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          marker="<!-- check-yml-build-report -->"
+          comment_id=$(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$marker\"))) | .id" | head -1)
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$comment_id" -F body=@"$RUNNER_TEMP/report.md" > /dev/null
+          else
+            gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" -F body=@"$RUNNER_TEMP/report.md" > /dev/null
+          fi
