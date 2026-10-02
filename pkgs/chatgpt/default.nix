@@ -167,11 +167,18 @@ stdenv.mkDerivation {
     # 展開 → パッチ → 再パックする。--unpack-dir は元の app.asar.unpacked に含まれる
     # ディレクトリ (ネイティブモジュール入り)。元より多くのファイルが unpacked 側に
     # 出るが動作は同じ。--replace-fail なので、上流がこの箇所を変えたらここで失敗する。
+    # 26.930 からは Local Work executor 用の codex-app-tools (resources 配下) も
+    # ~/.config/Codex/executor-plugins/ へ fs.cp され、直後の .mcp.json 書き込みで
+    # 同じ EACCES になる (tpp-local-executor startup failed) ので、そこにも挟む。
+    # b / nne はミニファイ後の名前 (fs/promises と promisify(execFile)) で版ごとに変わる。
     asar extract $out/lib/chatgpt/resources/app.asar app
     substituteInPlace app/.vite/build/main-*.js \
       --replace-fail \
-        'await y.default.cp(e,t,{recursive:!0,verbatimSymlinks:!0});return}' \
-        'await y.default.cp(e,t,{recursive:!0,verbatimSymlinks:!0});await dne(`${coreutils}/bin/chmod`,[`-R`,`u+w`,t]);return}'
+        'await b.default.cp(e,t,{recursive:!0,verbatimSymlinks:!0});return}' \
+        'await b.default.cp(e,t,{recursive:!0,verbatimSymlinks:!0});await nne(`${coreutils}/bin/chmod`,[`-R`,`u+w`,t]);return}' \
+      --replace-fail \
+        'await b.default.cp(n.cwd,e,{recursive:!0}),' \
+        'await b.default.cp(n.cwd,e,{recursive:!0}),await nne(`${coreutils}/bin/chmod`,[`-R`,`u+w`,e]),'
     rm -r $out/lib/chatgpt/resources/app.asar $out/lib/chatgpt/resources/app.asar.unpacked
     asar pack app $out/lib/chatgpt/resources/app.asar \
       --unpack-dir '{node_modules/@parcel/watcher-linux-x64-glibc,node_modules/@worklouder/device-kit-oai,node_modules/better-sqlite3,node_modules/node-pty}'

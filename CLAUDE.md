@@ -206,10 +206,11 @@ version / hash を差し替えるだけで追従できる。
 
 1. **source.nix を更新**: main を最新にした状態で `./pkgs/chatgpt/update.sh`。apt の Packages インデックスから `Package: chatgpt` の最新スタンザを読んで `source.nix` を書き換え、バージョンを表示する (deb 本体は落とさない)。`git diff pkgs/chatgpt/source.nix` が空なら既に最新なのでその旨を報告して終了する。
 2. **ブランチを切る**: `git checkout -b chore/chatgpt-<新バージョン>` (手順 1 の変更は作業ツリーに残ったまま新ブランチに持ち越される)。
-3. **ビルド**: `nix build .#chatgpt` (400MB 弱の deb を取得するので数分かかる)。失敗したら原因は次のどちらか:
-   - `substituteInPlace ... --replace-fail` で止まった → 上流が `fs.cp` でプラグインをコピーする箇所を変えた。`asar extract` で新しい `main-*.js` を取り出し、`verbatimSymlinks` 付近を `grep` して置換パターンを合わせる (`default.nix` の該当コメント参照)。パッチの目的は「コピー直後に宛先を `chmod -R u+w` する」ことなので、それが満たせれば形は変えてよい。
+3. **ビルド**: `nix build .#chatgpt` (400MB 弱の deb を取得するので数分かかる)。失敗したら原因は次のいずれか:
+   - `substituteInPlace ... --replace-fail` で止まった → 上流が `fs.cp` でプラグインをコピーする箇所を変えた。`asar extract` で新しい `main-*.js` を取り出し、`default.\w*\.cp(` を `grep` して置換パターンを合わせる (`default.nix` の該当コメント参照)。パッチ箇所は 2 つ (同梱プラグイン → `~/.codex/.tmp/` と codex-app-tools → `~/.config/Codex/executor-plugins/`)。fs と `promisify(execFile)` のミニファイ名 (`b` / `nne` 等) は版ごとに変わるので両方追従させる。パッチの目的は「コピー直後に宛先を `chmod -R u+w` する」ことなので、それが満たせれば形は変えてよい。
    - `auto-patchelf could not satisfy dependency` → 新しい共有ライブラリ依存が増えた。NEEDED を見て `buildInputs` に足す。Qt や musl のような環境依存でしか使わないものは `autoPatchelfIgnoreMissingDeps` に追加する。
-4. **起動確認** (k-2 上で作業しているとき): `./result/bin/chatgpt > /tmp/chatgpt.log 2>&1 &` で 20 秒ほど走らせ、ログに `window ready-to-show` と `plugin_marketplace_folder_write_succeeded` があり `EACCES` が無いことを確認して `pkill -x ChatGPT` で止める (`pkill -f` はシェル自身を巻き込むので使わない)。401 / `Unauthorized` は未ログインなだけで正常。k-2 以外では省略し、未検証と報告する。
+   - ビルドは通るが起動ログに `EACCES` が出る → 上流が新たに Nix ストアからの `fs.cp` を追加した。スタックトレースの関数を `main-*.js` で探し、コピー直後に同じ chmod を挟む。テスト起動で読み取り専用のコピーが残ると次回の `cp` が `unlink` で失敗するので、`chmod -R u+w` で戻してから再確認する。
+4. **起動確認** (k-2 上で作業しているとき): 先に `pgrep -x ChatGPT` で起動中でないことを確かめる (起動中だと新プロセスは既存インスタンスへ委譲して即終了し、後の `pkill` がユーザーのアプリを閉じてしまう。起動中ならユーザーに閉じてもらう)。`./result/bin/chatgpt > /tmp/chatgpt.log 2>&1 &` で 20 秒ほど走らせ、ログに `window ready-to-show` と `plugin_marketplace_folder_write_succeeded` があり `EACCES` が無いことを確認して `pkill -x ChatGPT` で止める (`pkill -f` はシェル自身を巻き込むので使わない)。401 / `Unauthorized` は未ログインなだけで正常。k-2 以外では省略し、未検証と報告する。
 5. **flake 検証**: `nix flake check` と `nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'`。
 6. **コミット / PR**: `chore(chatgpt): <旧> → <新> に更新` でコミットし、PR 本文に手順 3〜5 の結果を書く。`result` シンボリックリンクはコミットしない。CI はポーリングせず、PR URL を報告して終える。
 7. **適用はユーザーが行う**: `sudo nixos-rebuild switch --flake .#k-2`。ロールバックは `source.nix` の revert または `nixos-rebuild switch --rollback`。
