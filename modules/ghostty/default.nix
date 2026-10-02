@@ -39,6 +39,11 @@ let
       "ctrl+h=previous_tab"
     ];
     theme = "iTerm2 Solarized Light";
+    # Solarized Light は palette 15 (bright white) が背景色と同じ #fdf6e3 なので、
+    # 明るい白で描かれた文字が消える (op signin の選択行 `ESC[1;99m` など)。
+    # 前景/背景のコントラスト比に下限を設けて、背景と同化する色だけ補正させる。
+    # 1.1 は「見えない文字を防ぐ」最小値 (ghostty(5) の minimum-contrast)。
+    minimum-contrast = 1.1;
     # マウス選択で通常クリップボードにコピー (Ctrl+V で貼付可能)
     # Linux では selection clipboard にも入るので中クリックペーストも維持される
     # Windows のデフォルトは false, Linux のデフォルトは true (selection のみ)
