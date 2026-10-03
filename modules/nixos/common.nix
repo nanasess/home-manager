@@ -15,6 +15,15 @@
   # nixpkgs の claude-code (autoPatchelf 版) は flake update 待ちになるため採らない。
   programs.nix-ld.enable = true;
 
+  # Claude Code が Bash から `python3` (heredoc でのファイル加工、JSON 整形等) を
+  # 頻繁に呼ぶため、PATH に素の python3 (標準ライブラリのみ) を置く。他ホスト
+  # (ubuntu / wsl-gentoo) は OS の /usr/bin/python3 があるので NixOS ホストだけ。
+  # home.nix に入れると他ホストで /usr/bin/python3 を隠してしまう
+  # (docs/nix-desktop-integration.md の gi typelib 問題)。
+  # 追加パッケージは pip ではなく `uv run --with <pkg>` で使う (ストアは読み取り専用)。
+  # uv は既定で uv 管理の Python を優先するので lsp-bridge の venv には影響しない。
+  environment.systemPackages = [ pkgs.python3 ];
+
   # Playwright が公式配布する Chromium (~/.cache/ms-playwright、`playwright install`) を
   # nix-ld で動かすための実行時ライブラリ。EcAuth (E2ETests) は @playwright/test 1.63
   # を要求するが nixpkgs の playwright-driver は 1.61 でブラウザのリビジョンが合わず
