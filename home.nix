@@ -206,8 +206,11 @@
         echo "usage: aws-credential-op <vault> <item>" >&2
         exit 2
       fi
+      # op は起動時に継承した stdin を数百 KiB 読み捨てる。credential_process は
+      # aws CLI の stdin を継承するので、`... | aws s3 cp - s3://...` のようにパイプで
+      # データを流すと先頭が欠けて壊れる (issue #213)。stdin は使わないので切り離す。
       op item get "$2" --vault "$1" --reveal --format json \
-        --fields 'label=access key id,label=secret access key' \
+        --fields 'label=access key id,label=secret access key' </dev/null \
         | ${pkgs.jq}/bin/jq -e '
             (map({(.label): .value}) | add) as $f
             | {Version: 1,
