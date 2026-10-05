@@ -210,6 +210,81 @@
       install -Dm644 ${../mackerel/lhm.conf} "$deploy_dir/conf.d/lhm.conf"
     '';
 
+    # WSLg のタスクバーで Emacs / 1Password がペンギンアイコンになる問題の対処。
+    # WSLg (weston-mirror の rdprail-shell) はアイコンを
+    #   1. X11 ウィンドウの _NET_WM_ICON
+    #   2. Wayland の app_id / X11 の WM_CLASS と同じキーの .desktop の Icon=
+    # の順に探し、無ければペンギンを出す。.desktop の探索先は /usr/share/applications
+    # などの固定パスで XDG_DATA_DIRS を見ない。Icon= の相対名も /usr/share/icons と
+    # /usr/share/pixmaps しか探さない。.desktop のキーはファイル名から .desktop を除いた
+    # 最後の "." 以降の部分になる。
+    #
+    # Emacs (pgtk、app_id = emacs): .desktop が ~/.nix-profile 側にあって見つからない。
+    # WSLg 専用のディレクトリに Icon= を絶対パスにした emacs.desktop を置き、
+    # %USERPROFILE%\.wslgconfig の WESTON_RDPRAIL_SHELL_APP_LIST_PATH で探索先に足す。
+    # NoDisplay=true にすると WSLg が読み飛ばすので付けない (スタートメニューに出る)。
+    xdg.dataFile."wslg/applications/emacs.desktop".text = ''
+      [Desktop Entry]
+      Type=Application
+      Name=Emacs
+      Exec=${config.home.profileDirectory}/bin/emacs %F
+      Icon=${pkgs.emacs31-pgtk}/share/icons/hicolor/128x128/apps/emacs.png
+      StartupWMClass=Emacs
+    '';
+
+    # .wslgconfig は全ディストリ共通で、[system-distro-env] は WSLGd が setenv して
+    # weston に引き継ぐ。パスは user-distro の名前空間で解決されるが、HOME は weston
+    # (wslg ユーザー) のものなので ~ は使わず絶対パスで書く。存在しないディストリでは
+    # WSLg が読み飛ばす。反映には wsl --shutdown が必要。
+    # 手書きの .wslgconfig を壊さないよう、内容が違う既存ファイルは上書きしない。
+    home.activation.wslgConfig =
+      let
+        wslgConfig = pkgs.writeText "wslgconfig" ''
+          [system-distro-env]
+          WESTON_RDPRAIL_SHELL_APP_LIST_PATH=${config.xdg.dataHome}/wslg/applications
+        '';
+      in
+      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        wslgconfig="/mnt/c/Users/${config.home.username}/.wslgconfig"
+        if [ ! -e "$wslgconfig" ]; then
+          install -m644 ${wslgConfig} "$wslgconfig"
+          echo "WSLg: $wslgconfig を作成しました。反映には wsl --shutdown が必要です"
+        elif ! cmp -s ${wslgConfig} "$wslgconfig"; then
+          echo "WARNING: $wslgconfig が管理対象と異なるので上書きしません。次の内容を手で反映してください:" >&2
+          cat ${wslgConfig} >&2
+        fi
+      '';
+
+    # 1Password (Electron の X11 版): WM_CLASS が com.onepassword.OnePassword で "." を
+    # 含むため、上のキー変換ではどの .desktop とも一致しない (WSLg 側の欠陥)。
+    # _NET_WM_ICON を自分で付与する。WSLg の XWM は _NET_WM_ICON の PropertyNotify で
+    # アイコンを取り直すので、ウィンドウ表示後に設定しても反映される。
+    # アイコンの置き場所は wsl-gentoo (portage) と wsl-nixos (nixpkgs) で違うので両方渡す。
+    systemd.user.services.wslg-net-wm-icon = {
+      Unit = {
+        Description = "Set _NET_WM_ICON on X11 windows that WSLg cannot map to an icon";
+        # X ソケット (/tmp/.X11-unix/X0) が用意される前や WSLg の再起動で落ちても
+        # 再起動し続ける (Restart = on-failure)
+        StartLimitIntervalSec = 0;
+      };
+      Service = {
+        ExecStart = lib.escapeShellArgs [
+          "${pkgs.python3.withPackages (ps: [ ps.xlib ])}/bin/python3"
+          "${./wslg-net-wm-icon.py}"
+          "com.onepassword.OnePassword=/usr/share/pixmaps/1password.png"
+          "com.onepassword.OnePassword=/run/current-system/sw/share/icons/hicolor/512x512/apps/1password.png"
+        ];
+        Environment = [
+          "DISPLAY=:0"
+          "MAGICK=${pkgs.imagemagick}/bin/magick"
+        ];
+        # アイコンが 1 つも無いときは 0 で終わるので再起動しない。X 切断は非 0
+        Restart = "on-failure";
+        RestartSec = 10;
+      };
+      Install.WantedBy = [ "default.target" ];
+    };
+
     # WSL 固有の zsh 設定
     programs.zsh.initContent = lib.mkAfter ''
       # VS Code PATH (WSL)
