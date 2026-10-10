@@ -40,6 +40,11 @@
       emacs31-pgtk
       # 字形本体の Noto。home.nix 共通から移動 (Ubuntu のみ OS 静的 Noto に委譲する方針)。
       noto-fonts
+      # 簡体字 / 繁体字 / ハングル。UDEV Gothic は JIS 範囲の漢字しか持たないため、
+      # 無いと GUI Emacs (WSLg は Linux 側 fontconfig で解決) で 发 やハングルが豆腐になる。
+      # init.el の variable-pitch が指定する "Noto Sans CJK JP" もこれで解決する。
+      # 可変フォント版は Emacs (ftcrhb) が realize できないので静的版 (k-2 と同じ)。
+      noto-fonts-cjk-sans-static
       # WSL から Windows 既定ブラウザを開く opener (内部で powershell.exe Start を呼ぶ)。
       # BROWSER から参照する。portage の /usr/bin/wsl-open ではなく Nix で宣言して
       # ホスト間の入手経路を揃える (CLAUDE.md「プラットフォーム非依存化の判断基準」)。
