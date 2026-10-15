@@ -61,6 +61,16 @@ in
   # 提供する (gentooPackages 参照)。
   wsl.opLinux = "/usr/bin/op";
 
+  # wsl-nixos へ移行済み (Issue #183) のため、常駐系は Gentoo では自動起動しない。
+  # - yaskkserv2: WSL2 のディストリはネットワーク名前空間を共有するので、両方で
+  #   起動すると 127.0.0.1:1178 を取り合い、後から起動した側が
+  #   "Address already in use" で落ちる。
+  # - onedrive: refresh_token を wsl-nixos へコピーしたため、両方で動くと
+  #   トークンの更新を取り合う。
+  # ユニット自体は残すので、Gentoo で使うときは systemctl --user start で起動できる。
+  systemd.user.services.yaskkserv2.Install.WantedBy = lib.mkForce [ ];
+  systemd.user.services.onedrive.Install.WantedBy = lib.mkForce [ ];
+
   home.file.".local/bin/check-system-packages" = {
     executable = true;
     text = ''
