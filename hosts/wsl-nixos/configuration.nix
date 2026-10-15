@@ -75,16 +75,15 @@
   # ユーザーディストロから読むのは WSLg の config/local.conf が足す
   # /mnt/wslg/distro/usr/{,local/}share/fonts のみ。/nix/store やユーザーの fontconfig は
   # 届かず、ストアへのシンボリックリンクもシステムディストロ側では解決できないので、
-  # /usr/share/fonts に実ファイルを置く。/nix/store と /usr は同じ ext4 なのでハードリンクにする
-  # (容量が増えない。GC でストア側が消えても実体は残る)。GTK の CSD で自前描画する Emacs は
-  # 影響を受けない。反映は Weston の再起動 (`wsl --shutdown`) 後。
+  # /usr/share/fonts に実ファイルを置く。/nix/store は同じ ext4 でも読み取り専用の bind mount
+  # なので、マウントをまたぐハードリンクは EXDEV で作れずコピーになる (Regular + Bold で約 40MB)。
+  # GTK の CSD で自前描画する Emacs は影響を受けない。反映は Weston の再起動 (`wsl --shutdown`) 後。
   system.activationScripts.wslgTitlebarFonts = ''
     dir=/usr/share/fonts/noto-cjk
     rm -rf "$dir"
     mkdir -p "$dir"
     for f in NotoSansCJK-Regular.ttc NotoSansCJK-Bold.ttc; do
-      src=${pkgs.noto-fonts-cjk-sans-static}/share/fonts/opentype/noto-cjk/$f
-      ln "$src" "$dir/$f" 2>/dev/null || cp "$src" "$dir/$f"
+      cp ${pkgs.noto-fonts-cjk-sans-static}/share/fonts/opentype/noto-cjk/$f "$dir/$f"
     done
   '';
 
