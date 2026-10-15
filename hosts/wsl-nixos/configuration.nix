@@ -69,6 +69,24 @@
     xeyes
   ];
 
+  # WSLg の X11 アプリ (Chrome / 1Password) のタイトルバーで日本語が豆腐になる対策 (Issue #74)。
+  # このタイトルバーはアプリではなく WSLg システムディストロ (Azure Linux) の Weston の XWM が
+  # pango の "Sans Bold 10" で描く。システムディストロのフォントは freefont (CJK 無し) だけで、
+  # ユーザーディストロから読むのは WSLg の config/local.conf が足す
+  # /mnt/wslg/distro/usr/{,local/}share/fonts のみ。/nix/store やユーザーの fontconfig は
+  # 届かず、ストアへのシンボリックリンクもシステムディストロ側では解決できないので、
+  # /usr/share/fonts に実ファイルを置く。/nix/store は同じ ext4 でも読み取り専用の bind mount
+  # なので、マウントをまたぐハードリンクは EXDEV で作れずコピーになる (Regular + Bold で約 40MB)。
+  # GTK の CSD で自前描画する Emacs は影響を受けない。反映は Weston の再起動 (`wsl --shutdown`) 後。
+  system.activationScripts.wslgTitlebarFonts = ''
+    dir=/usr/share/fonts/noto-cjk
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    for f in NotoSansCJK-Regular.ttc NotoSansCJK-Bold.ttc; do
+      cp ${pkgs.noto-fonts-cjk-sans-static}/share/fonts/opentype/noto-cjk/$f "$dir/$f"
+    done
+  '';
+
   # wsl-gentoo の sys-apps/plocate 相当 (既定のパッケージが plocate)
   services.locate.enable = true;
 
