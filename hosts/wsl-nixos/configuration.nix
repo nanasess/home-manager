@@ -19,6 +19,14 @@
     # Docker Desktop の WSL 統合。Windows 側の Docker Desktop の設定
     # (Resources > WSL integration) でこのディストリを有効にする。
     docker-desktop.enable = true;
+    # Docker Desktop は `wsl.exe -d NixOS -u root -e test -s .../backend.sock` で
+    # プロキシのソケットを待つ。-e はシェルも PATH も通さず execvpe するので、/bin に
+    # test が無いと「execvpe(test) failed」で WSL integration を有効にできない。
+    # NixOS-WSL の docker-desktop モジュールが入れるのは cat / whoami / groupadd /
+    # usermod / install / mv だけで、上流 main (2026-10) にもまだ test は無い。
+    extraBin = [
+      { src = "${pkgs.coreutils}/bin/test"; }
+    ];
   };
 
   # NixOS-WSL の既定 (sudo にパスワード不要) を戻す。既定ユーザーにはパスワードが無いので、
