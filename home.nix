@@ -144,6 +144,11 @@
   home.sessionVariables = {
     LANG = "ja_JP.UTF-8";
     SSH_AUTH_SOCK = "$HOME/.1password/agent.sock";
+    # 1Password に複数アカウントでサインインしていると、--account を省いた op が
+    # "account is not signed in" で失敗する (CLI 側に既定アカウントの設定が無い
+    # 新規環境で起きる)。op://Personal/... 等の参照先である個人アカウントを既定にする。
+    # WSL では op シム (modules/wsl) が OP_* を WSLENV に載せるので op.exe にも効く。
+    OP_ACCOUNT = "my.1password.com";
     PAGER = "less";
     LESSCHARSET = "utf-8";
     LESS = "-R";
