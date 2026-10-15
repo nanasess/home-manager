@@ -57,7 +57,9 @@ let
   windowsFontFamily = settings.font-family ++ [ "Segoe UI Symbol" ];
 
   # Windows port (PR #12167) 固有の追加設定
-  # - command: 起動時に WSL の Gentoo-systemd ディストリをログインシェルで立ち上げる
+  # - command: 起動時に WSL の NixOS ディストリ (wsl-nixos) をログインシェルで立ち上げる。
+  #   Issue #183 で既定を Gentoo-systemd から移した。設定は wsl-gentoo / wsl-nixos 共通なので
+  #   どちらのホストで switch しても NixOS が起動する (Gentoo は wsl.exe -d Gentoo-systemd で入る)
   #   "direct:" プレフィックスを付けて /bin/sh -c ラップを回避 (Windows には sh が無い)
   #   --cd ~ でホームディレクトリに入る
   # - env = WSLENV=TERM: ConPTY 経由で wsl.exe を起動する構成では、Windows 側
@@ -81,7 +83,7 @@ let
   #   (Config.zig の env の doc)。他に WSL へ伝播したい変数が増えたら、この 1 行に
   #   コロン区切りで列挙して足すこと。
   windowsSettings = settings // {
-    command = "direct:wsl.exe -d Gentoo-systemd --cd ~";
+    command = "direct:wsl.exe -d NixOS --cd ~";
     env = [ "WSLENV=TERM" ];
     font-family = windowsFontFamily;
   };
