@@ -81,7 +81,7 @@ hosts/
     scripts/backup-before-install.sh -- インストール前の退避（ファームウェア / ESP イメージ / システム情報）
   wsl-nixos/           -- NixOS-WSL。wsl-gentoo からの移行先 (issue #183。導入手順は README)
     configuration.nix  -- システム設定（NixOS-WSL の wsl.*、Docker Desktop 統合、sudo はパスワード必須、DNS は WSL 生成の resolv.conf）
-    home.nix           -- ユーザー環境（WSL 共通は modules/wsl、wsl.opLinux = /run/wrappers/bin/op）
+    home.nix           -- ユーザー環境（WSL 共通は modules/wsl、wsl.opLinux = /run/wrappers/bin/op、WSLg スタートメニュー用の 1Password / Chrome の .desktop）
 modules/
   zsh/
     default.nix        -- Zsh モジュール（プラグイン、エイリアス、補完、1Password 連携）
