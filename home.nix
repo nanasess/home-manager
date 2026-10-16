@@ -134,6 +134,13 @@
   programs.mise = {
     enable = true;
     globalConfig = {
+      # mise は NixOS で all_compile を既定 true にし、node をソースビルドしようとして
+      # configure の check_compiler で落ちる (Python 3.14 で戻り値の数が合わない)。
+      # NixOS ホストは nix-ld が有効 (modules/nixos/common.nix) なので公式のビルド済み
+      # バイナリがそのまま動く。この自動 true は deprecated で、mise 2027.8.0 で全環境 false が既定になる。
+      # 影響は node / python / ruby / erlang の compile 既定値のみで、php (jdx/vfox-php) は
+      # この設定を見ずに常にソースビルドする (shells/php-build.nix)。
+      settings.all_compile = false;
       tools = {
         node = "lts";
         php = "8.5";
