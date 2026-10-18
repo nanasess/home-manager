@@ -311,6 +311,21 @@
       if [ -z "$WAYLAND_DISPLAY" ]; then
         if which setxkbmap > /dev/null; then setxkbmap -layout us; fi
       fi
+
+      # Ghostty 系ターミナルへの OSC 7 (cwd 報告) は host を localhost で送る。
+      #
+      # noctty / Ghostty Windows port / GhostInTheWSL は OSC 7 の host を Windows の
+      # コンピュータ名 (GetComputerNameExW の DNS / NetBIOS 名) と比較し、一致しないと
+      # 報告を捨てる (noctty: src/os/hostname.zig の isLocal、src/termio/stream_handler.zig
+      # の reportPwd "OSC 7 host must be local")。WSL の既定ではディストリの hostname が
+      # Windows 名を継承するので通るが、wsl-nixos は networking.hostName = "wsl-nixos"
+      # (wsl.conf の hostname=) にしていて一致しない。捨てられると新規タブは親サーフェスの
+      # cwd を継承できず、起動プロセスの Windows cwd (C:\Users\<user>) が --cd に載って
+      # /mnt/c/Users/<user> で zsh が立ち上がる。
+      # localhost は isLocal が無条件に受け付ける (noctty 自身の cmd 統合も
+      # kitty-shell-cwd://localhost を送る) ので、$HOST の代わりに localhost を送る。
+      # 変数は modules/zsh がパッチした統合スクリプトの _ghostty_report_pwd が読む。
+      typeset -g _ghostty_osc7_host=localhost
     '';
 
     # Ghostty Windows port は C:\Windows\Fonts のみをスキャンするため
