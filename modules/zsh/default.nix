@@ -27,12 +27,23 @@ let
   # 効く。失うのは「リサイズ時に複数行プロンプトの継続行を再描画する」ヒントだけ。
   #
   # --replace-fail なので、上流がこの行を変えたらビルドが落ちて気づける。
+  #
+  # 2 つ目の置換は OSC 7 (cwd 報告) の host を変数 _ghostty_osc7_host で差し替えられる
+  # ようにするもの。上流は $HOST (= gethostname) を送り、受け手のターミナルはそれを
+  # 自分のホスト名か localhost と比較して、一致しなければ報告ごと捨てる (ssh 先からの
+  # 偽装対策)。Windows 側で動く noctty 等は Windows のコンピュータ名と比較するため、
+  # wsl.conf で hostname を変えている wsl-nixos からの報告は全て捨てられ、新規タブが
+  # 親の cwd を継承できなくなる。modules/wsl が _ghostty_osc7_host=localhost を置く
+  # (経緯はそちらのコメント)。未設定なら上流どおり $HOST を送る。
+  # _ghostty_report_pwd は precmd の _ghostty_deferred_init で定義されるため .zshrc から
+  # 関数を再定義しても間に合わない。変数は呼び出し時に読まれるので .zshrc で置けばよい。
   ghosttyZshIntegration =
-    pkgs.runCommand "ghostty-integration-no-ps1-newline-mark" { } ''
+    pkgs.runCommand "ghostty-integration-patched" { } ''
       substitute \
         ${pkgs.ghostty}/share/ghostty/shell-integration/zsh/ghostty-integration \
         $out \
-        --replace-fail 'builtin local ps1_changed=0' 'builtin local ps1_changed=1'
+        --replace-fail 'builtin local ps1_changed=0' 'builtin local ps1_changed=1' \
+        --replace-fail '"$HOST""$PWD"' '"''${_ghostty_osc7_host:-$HOST}""$PWD"'
     '';
 in
 {

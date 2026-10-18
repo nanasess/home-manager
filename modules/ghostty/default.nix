@@ -157,7 +157,11 @@ let
   #   .envrc に direnv が反応して p10k instant prompt 警告を誘発していた。
   #
   #   modules/zsh の shell integration 手動ロード + env = WSLENV=TERM で OSC 7 が
-  #   WSL 側から届くようになり、この前提が解消した。noctty 側の受け口も
+  #   WSL 側から届くようになり、この前提が解消した。ただし OSC 7 の host は Windows の
+  #   コンピュータ名か localhost でないと捨てられる (src/os/hostname.zig の isLocal) ので、
+  #   wsl.conf で hostname を変えている wsl-nixos では modules/wsl が localhost で報告する
+  #   (捨てられると上記の Windows cwd フォールバックに戻り、新規タブが
+  #   /mnt/c/Users/<user> で開く)。noctty 側の受け口も
   #   osc7PathToLocal / isWslPath が POSIX パスを WSL 形式のまま保持して後続の WSL
   #   シェルへ継承するので、本来の「直前の cwd を引き継ぐ」挙動が成立する。
   #   親サーフェスが無い初回ウィンドウは working-directory = home (= --cd ~) になる。
