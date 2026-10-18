@@ -100,6 +100,25 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 **補足:** CI/CD では Service Account トークン (`OP_SERVICE_ACCOUNT_TOKEN`) を使う。Docker は `-e` 渡しを優先。Item/フィールド名変更時は `grep -r 'op://'` で参照を一括更新する。
 
+**社内 (Business アカウント) の vault 構成と Service Account の運用:** このファイルは公開リポジトリにあるため書かない。1Password の Business アカウントや Service Account、共通 vault を扱う作業の前に、次の secure note を読んで従う。
+
+```bash
+op read --account skirnir 'op://skirnir-common/claude-1password-conventions/notesPlain' </dev/null
+```
+
+**`op` を非対話で使うときの注意 (op 2.30 で確認):**
+
+- **`op item edit` は代入形式 (`'field=value'`) を使わない。** 非対話環境 (スクリプト / CI / Claude Code の Bash ツール) では標準入力を JSON テンプレートとして読むため、`</dev/null` 付きなら `invalid JSON provided` で失敗し、標準入力を継承すると EOF 待ちで止まる。JSON を標準入力で渡す。値はコマンドライン引数に書かず (`ps` / シェル履歴 / トランスクリプトに残る) 環境変数経由で jq に渡す:
+  ```bash
+  V="$(op read 'op://vault/item/field')" sh -c \
+    'op item get <id> --format json | jq "(.fields[] | select(.label == \"x\")).value = env.V" | op item edit <id>'
+  ```
+  `op item get --format json` は秘匿フィールドの値も出力するので、パイプせずに実行しない。
+- `while read` ループの中で `op` を呼ぶときは `</dev/null` を付ける (`op` がループの標準入力を読み込んでしまう)。
+- Service Account のトークン item (`Service Account Auth Token: <name>`) はタイトルに `:` を含み、`op://` で `invalid character in secret reference` になる。item ID で参照する。
+- 1Password の Terraform provider はセクション外のカスタムフィールドを読めない。カテゴリ組み込みのフィールド (`username` / `password` / `hostname` / `database` / `credential`) だけを直下に置き、カスタムフィールドはラベル `fields` の単一セクションに集約する (provider からは `section_map["fields"].field_map["<label>"]`)。`op://` 参照にはセクション名を書かない。
+- Terraform provider (`1Password/onepassword` 3.x) は `OP_ACCOUNT` を `account` 設定として読むため、`service_account_token` と併用すると `Config conflict` で失敗する。home-manager がグローバルに `OP_ACCOUNT` を設定しているので、Service Account で動かす Terraform は `env -u OP_ACCOUNT terraform ...` で実行する (op CLI 自体は `OP_SERVICE_ACCOUNT_TOKEN` があれば `OP_ACCOUNT` を無視する)。
+
 ### Build & Test Verification
 
 - Nix 設定変更後は完了を宣言する前に `nix build` あるいは `home-manager switch --dry-run` を実行する。NixOS ホストの設定は `nix eval` による toplevel の評価 + home-manager 部分のビルドで確認する (具体的なコマンドはリポジトリの `CLAUDE.md`)。`default.nix` の dangling 参照は静かに失敗を引き起こす。
