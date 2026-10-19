@@ -144,6 +144,7 @@
       tools = {
         node = "lts";
         php = "8.5";
+        bun = "latest";
       };
     };
   };
