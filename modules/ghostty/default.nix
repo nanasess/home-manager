@@ -165,7 +165,15 @@ let
   #   osc7PathToLocal / isWslPath が POSIX パスを WSL 形式のまま保持して後続の WSL
   #   シェルへ継承するので、本来の「直前の cwd を引き継ぐ」挙動が成立する。
   #   親サーフェスが無い初回ウィンドウは working-directory = home (= --cd ~) になる。
-  nocttySettings = windowsSettings;
+  # - auto-update = download: 常用を自前ビルドから winget の公式インストーラに移した
+  #   (2026-10-25)。既定の check は通知だけなので、download でインストーラを事前に
+  #   取得・検証 (SHA-256 + Authenticode) させ、適用は通知のクリックで行う。
+  #   GitHub Releases を直接見るので winget-pkgs の審査待ちを挟まない。
+  #   `winget upgrade` の無人実行は、インストーラが CloseApplications=yes で稼働中の
+  #   noctty を閉じるため使わない。noctty 固有のキーなので windowsSettings には入れない。
+  nocttySettings = windowsSettings // {
+    auto-update = "download";
+  };
 
   # home-manager の programs.ghostty が内部で使っているのと同じフォーマッタ
   # (listsAsDuplicateKeys = true で keybind = ... 行を複数行に展開)
