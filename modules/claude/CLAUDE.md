@@ -51,6 +51,12 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 - ロケールは `ja_JP.UTF-8`。East Asian Ambiguous 文字 (`△` `○` `■` 等) はターミナル (noctty / Ghostty 系) も glibc も**幅 1 (半角) 扱い**。Emacs GUI だけ `eaw-console.el` + UDEV Gothic JPDOC で幅 2 にしている。
 - CPU はホストで異なる。WSL ホストは AMD Ryzen Zen 3 (`-march=znver3`、Gentoo の Portage 設定の前提)、k-2 は Intel (MacBook Pro 2020)。パフォーマンスの議論では作業中のホストを `hostname` / `/etc/os-release` で確認してから前提を置く。
 - **ローカルの Web サーバは symfony-cli (`symfony serve -d --port=<port>`、HTTPS) で起動する。`php -S` は使わない。** EC-CUBE のセッション cookie は SameSite / Secure 属性の制約で http:// ではブラウザに保存されず、管理画面ログインが `POST /admin/login` → 302 → `/admin/login` に戻るループになる。Playwright には `BASE_URL=https://127.0.0.1:<port>` を渡す。CI の `e2e-test.yml` が `php -S` で動くのは CI 専用の `e2e` 環境設定があるためで、ローカルの根拠にしない。何度も指摘済みの規約なので、`php -S` を選んだ時点で規約違反と扱う。
+- **mise の PHP はソースビルドで、NixOS ホスト (k-2 / wsl-nixos) では devShell の外では入らない。** `mise run` / `mise exec` / `mise install` が `missing system dependencies` (`cc` / `make` / `autoconf` / `re2c` 等) の警告の後に `buildconf: autoconf not found` → `Failed to run buildconf` で止まるのは、要求バージョンが未インストールで、自動インストールが devShell の外で走ったため (設定の不具合ではない)。`hostname` と `mise ls php` で状況を確かめ、次のコマンドを `run_in_background` で実行してから (数分〜10 分) 元のコマンドを再実行する。`--profile` は GC root なので省略しない。
+  ```bash
+  nix develop "$HOME/.config/home-manager#php-build" --profile ~/.local/state/nix/profiles/php-build \
+    -c mise install php@<要求バージョン>
+  ```
+  インストール後は `php -v` と `php -r 'echo ini_get("memory_limit"),"\n";'` (`512M` なら home-manager の conf.d が効いている) で確認する。インストール済みの PHP が `error while loading shared libraries` で起動しないときは GC でリンク先が消えているので、同じ devShell で `mise install php@<ver> --force` する。wsl-gentoo は devShell 不要で、失敗したら portage のビルド依存 (`hosts/wsl-gentoo.nix`) の不足を疑う。詳細はリポジトリの README「mise PHP のセットアップ」。
 
 ## 行動規範
 
