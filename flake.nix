@@ -2,9 +2,11 @@
   description = "Home Manager configuration";
 
   inputs = {
-    # k-2 の linux-t2 は nixpkgs の linux_6_18 に T2 パッチを当てるため、nixpkgs を上げると
-    # パッチが当たらず linux-config のビルドで落ちることがある (nixos-hardware#2027)。
-    # 上げる前に kernel.configfile をビルドして確認する (flake-update-pr Skill の手順 3)。
+    # k-2 の linux-t2 は T2 パッチを当てたカーネル。upstream の nixos-hardware は nixpkgs の
+    # linux_6_18 にパッチを当てるため、nixpkgs を上げると linux-config で落ちることがあった
+    # (nixos-hardware#2027)。現在はカーネルのバージョンを固定する fork に向けている
+    # (下の nixos-hardware)。上げる前に kernel.configfile をビルドし、linux-t2 が
+    # cache.soopy.moe にあるかも確認する (flake-update-pr Skill の手順 3)。
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     home-manager = {
       url = "github:nix-community/home-manager";
@@ -15,10 +17,19 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # T2 Mac (k-2) 用: linux-t2 カーネル / apple-bce / WiFi・BT ファームウェア。
+    # upstream の apple/t2 は nixpkgs のカーネル更新でパッチが当たらなくなるため
+    # (nixos-hardware#2027)、カーネルのバージョンを固定する PR #1934 の head に一時的に向ける。
+    # force-push が多いのでブランチ名ではなくコミットで固定する。#1934 がマージされたら
+    # github:NixOS/nixos-hardware に戻す (issue #227)。
     nixos-hardware = {
-      url = "github:NixOS/nixos-hardware";
+      url = "github:soopyc/nixos-hardware/7082b484432124bd8d53790a11b808429b73fb6b";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # azure-cli だけ fabric が壊れる前の nixos-unstable (2026-10-17) から取る一時措置。
+    # invoke 3.0 への更新で fabric が broken になり azure-cli が評価できない
+    # (NixOS/nixpkgs#575989)。修正 PR NixOS/nixpkgs#576874 が nixos-unstable に
+    # 入ったら、この input と azureCliPinModule を削除する。
+    nixpkgs-azure-cli.url = "github:nixos/nixpkgs/fe13242281a67641c0102cdb1087f0ebe586c7df";
     # WSL2 上の NixOS (wsl-nixos、Issue #183)。
     nixos-wsl = {
       url = "github:nix-community/NixOS-WSL";
@@ -26,14 +37,25 @@
     };
   };
 
-  outputs = { self, nixpkgs, home-manager, nixgl, nixos-hardware, nixos-wsl, ... }:
+  outputs = { self, nixpkgs, home-manager, nixgl, nixos-hardware, nixpkgs-azure-cli, nixos-wsl, ... }:
     let
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
+      # azure-cli を nixpkgs-azure-cli から取る (inputs のコメント参照)。home.nix と一緒に
+      # 全ホストの home-manager に読み込む。
+      azureCliPinModule = {
+        nixpkgs.overlays = [
+          (final: prev: {
+            azure-cli = nixpkgs-azure-cli.legacyPackages.${prev.stdenv.hostPlatform.system}.azure-cli;
+          })
+        ];
+      };
+
       # GNOME デスクトップを持つホスト (ubuntu / k-2) 共通の home-manager モジュール。
       gnomeHomeModules = [
         ./home.nix
+        azureCliPinModule
         ./modules/onedrive.nix
         ./modules/yaskkserv2.nix
         ./modules/bluetooth-audio
@@ -50,7 +72,7 @@
       homeConfigurations = {
         "nanasess@wsl-gentoo" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
-          modules = [ ./home.nix ./hosts/wsl-gentoo.nix ./modules/wsl ./modules/onedrive.nix ./modules/portage.nix ./modules/yaskkserv2.nix ./modules/emacs ./modules/zsh ./modules/ghostty ./modules/wakatime ./modules/claude ];
+          modules = [ ./home.nix azureCliPinModule ./hosts/wsl-gentoo.nix ./modules/wsl ./modules/onedrive.nix ./modules/portage.nix ./modules/yaskkserv2.nix ./modules/emacs ./modules/zsh ./modules/ghostty ./modules/wakatime ./modules/claude ];
         };
         "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -108,6 +130,7 @@
               home-manager.backupFileExtension = "hm-backup";
               home-manager.users.nanasess.imports = [
                 ./home.nix
+                azureCliPinModule
                 ./hosts/wsl-nixos/home.nix
                 ./modules/wsl
                 ./modules/onedrive.nix
