@@ -308,7 +308,11 @@ Hydra が nixpkgs の更新に追随するまでは新しい `flake.lock` に対
 (`github:soopyc/nixos-hardware/<rev>`) に向けている (issue #227)。#1934 がマージされたら
 `flake.nix` の `nixos-hardware` を `github:NixOS/nixos-hardware` に戻す。
 それでもパッチ適用で落ちた場合は `nix log` で `linux-config-*.drv` の patchPhase を見て、
-nixpkgs を据え置き、`nix flake update home-manager` のように他の input だけ更新する (下記)。
+原因になった input を戻す。fork は `stable.json` でカーネルソースとパッチ集をまとめて固定して
+いるので、**fork の rev を上げて落ちたなら `flake.nix` の `nixos-hardware` の URL を直前に
+成功した rev に戻して `nix flake update nixos-hardware` する** (nixpkgs を据え置いても直らない)。
+nixpkgs だけを上げて落ちたなら nixpkgs を据え置き、`nix flake update home-manager` のように
+他の input だけ更新する (下記)。
 
 ```bash
 # 目的のカーネルがキャッシュにあるか (200 なら有り)

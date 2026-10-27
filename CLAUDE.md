@@ -220,6 +220,62 @@ Nix 側の更新はあくまで Electron 本体 (deb) の追従。in-app updater
 効かない。ライブラリ依存の全体像 (Electron が dlopen するもの含む) は
 `pkgs/chatgpt/default.nix` のコメントにまとめてある。
 
+### k-2 (T2) の nixpkgs / nixos-hardware の更新手順
+
+k-2 の linux-t2 は T2 パッチを当てたカーネルで、nixpkgs を上げるときの最大のリスクになる。
+upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当てるため、nixpkgs が先に進むと
+パッチが当たらなくなる (nixos-hardware#2027。PR #202 で落ち、PR #205 で nixpkgs を固定した)。
+現在は、カーネルのバージョンもパッチと一緒に固定する nixos-hardware#1934 の fork
+(`github:soopyc/nixos-hardware/<rev>`) にコミットで固定している (PR #229、issue #227)。
+**#1934 がマージされたら `github:NixOS/nixos-hardware` に戻す。** fork の rev は flake.nix の URL に
+書いているので、`nix flake update` では動かない (上げるときは URL を書き換える)。
+
+1. **入力を更新**: worktree で `nix flake update nixpkgs` (k-2 が目的なら他の input は後回しでよい)。
+2. **カーネルのキャッシュを確認** (自前ビルドは 4 コアで数時間):
+   ```bash
+   K=$(nix eval --raw '.#nixosConfigurations.k-2.config.boot.kernelPackages.kernel.outPath')
+   curl -s -o /dev/null -w '%{http_code}\n' "https://cache.soopy.moe/$(basename $K | cut -d- -f1).narinfo"
+   nix build --no-link '.#nixosConfigurations.k-2.config.boot.kernelPackages.kernel.configfile'
+   ```
+   fork でもカーネルの drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
+   404 になる** (PR #229 では `3ec6363` は 200、1 つ前のチャネル tip の `fe13242` は 404 だった)。
+   404 なら別のチャネル tip を試すか、数日待つ。`configfile` が `Hunk #N FAILED` で落ちたら、
+   原因になった input (fork の rev か nixpkgs) を直前に成功した rev に戻す。
+3. **nixpkgs 側のパッケージが壊れていたら、そのパッケージだけ古い rev から取る**。nixpkgs 全体を
+   古い rev に揃えるとカーネルがキャッシュから外れるため。PR #229 の azure-cli
+   (fabric が invoke 3 非対応で broken、NixOS/nixpkgs#575989) が先例で、`nixpkgs-azure-cli` input と
+   `azureCliPinModule` (overlay) を全ホストの home-manager に入れている。上流の修正が
+   nixos-unstable に入ったら外す。最後に壊れていなかったチャネル tip は次で探す:
+   ```bash
+   # nixos-unstable が進んだ履歴 (各行がチャネル tip = Hydra でビルド済み)
+   gh api 'repos/NixOS/nixpkgs/activity?ref=refs/heads/nixos-unstable&per_page=20' \
+     --jq '.[]|"\(.timestamp[0:16]) \(.after[0:12])"'
+   # 壊した commit を含むか (diverged = 含まない / ahead = 含む)
+   gh api "repos/NixOS/nixpkgs/compare/<壊した commit>...<tip>" --jq .status
+   ```
+   `nix flake lock --override-input nixpkgs github:nixos/nixpkgs/<rev>` なら、`original` を
+   `nixos-unstable` のまま rev だけ固定できる。
+4. **toplevel をビルド**: k-2 上なら `nix build '.#nixosConfigurations.k-2.config.system.build.toplevel'`。
+   ログに `copying path '...-linux-t2-<ver>' from 'https://cache.soopy.moe'` が出ていればカーネルは
+   キャッシュから取れている。自作 derivation (`pkgs/chatgpt` など) の autoPatchelf は、nixpkgs の更新で
+   他の buildInputs 経由の間接依存が消えると落ちる (PR #229 では `tpm2-tss` / `openssl`)。旧ビルドの
+   rpath (`patchelf --print-rpath`) と比べ、不足分を buildInputs に明示する。
+5. **他ホストの検証**: `nix flake check`、wsl-gentoo / wsl-nixos の activationPackage。
+   ubuntu の activationPackage は Ghostty とその依存 (zig 等) がソースからのビルドになり時間がかかる
+   ので、k-2 が目的ならユーザーに確認したうえでスキップして CI に任せてよい。
+6. **closure の差分**: `nix store diff-closures /run/current-system <toplevel>` で linux-t2 /
+   t2bce-* / pipewire / wireplumber / xremap の変化を PR 本文に書く。
+7. **実機確認はユーザーが行う**: カーネルが変わるので `switch` ではなく
+   `sudo nixos-rebuild boot --flake .#k-2` + 再起動 (sudo は Claude からは通らない)。確認項目:
+   `uname -r`、内蔵キーボード / トラックパッド、内蔵スピーカー / マイク / Bluetooth オーディオ、
+   蓋閉じ suspend からの復帰 (キーボード / トラックパッド / Touch Bar)、xremap (Chrome の
+   Ctrl+H / Ctrl+L)。ロールバックは GRUB で前の世代を選ぶか `nixos-rebuild switch --rollback`。
+
+fork (#1934) では内蔵キーボード / トラックパッドのモジュール名が `apple-bce` → `t2bce-vhci` に、
+オーディオが t2-better-audio → `t2bce-alsa-ucm` に変わった。`boot.initrd.kernelModules` に
+`apple_bce` を直書きしている設定は書き換えが要る (k-2 はモジュール任せなので影響なし)。
+6.18.55 で上記の確認項目がすべて問題ないことを確認済み (2026-10-28)。
+
 ### 移行元リポジトリ (TODO)
 
 以下のリポジトリからの移行状況。段階的にこのリポジトリへ統合する。
@@ -253,6 +309,6 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/ibus-skk.md](docs/ibus-skk.md) | apt 版 1.4.3 のバグ、`IBUS_COMPONENT_PATH` によるエンジン登録、反映手順 | `pkgs/ibus-skk.nix`, `modules/ibus-skk/` (ubuntu) |
 | [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、XKB レイヤとの関係、GNOME Wayland でのアプリ判定、root 作業 | `modules/xremap/` (ubuntu) |
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | Claude Code への画像貼り付け。`Ctrl+V` が正解な理由、WSLg の BMP 問題と `wl-paste` shim、切り分け手順 | `modules/wsl` (WSL ホスト共通) |
-| [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
+| [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS (nixpkgs の更新手順は上記「k-2 (T2) の nixpkgs / nixos-hardware の更新手順」)。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
 | [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |
 | [docs/restic-nas.md](docs/restic-nas.md) | restic → Synology NAS。DSM の SFTP 仮想ルート (`/restic/...`)、backup 専用ユーザーと `authorized_keys` の置き方、`/root/secrets/` の運用、復旧手順 | `hosts/k-2/configuration.nix` (バックアップ) |
