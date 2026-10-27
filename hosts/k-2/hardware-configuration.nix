@@ -10,7 +10,7 @@
 {
   imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
 
-  # apple-bce (内蔵キーボード / トラックパッド) は nixos-hardware の apple-t2 が
+  # t2bce-vhci (旧 apple-bce。内蔵キーボード / トラックパッド) は nixos-hardware の apple-t2 が
   # initrd.kernelModules に足す。ここは NVMe とストレージ周りのみ。
   boot.initrd.availableKernelModules = [ "xhci_pci" "nvme" "usbhid" "usb_storage" "sd_mod" ];
   boot.initrd.kernelModules = [ ];

@@ -42,10 +42,19 @@ nix build '.#nixosConfigurations.k-2.config.boot.kernelPackages.kernel.configfil
 ```
 
 **`kernel.configfile` が `Hunk #N FAILED` で落ちたら nixpkgs は上げない。**
-nixos-hardware の `apple/t2/pkgs/linux-t2/stable.json` (T2 パッチ集) は nixpkgs の `linux_6_18` の
-patch リリースに追従しておらず、nixpkgs を上げるとパッチが当たらなくなる (nixos-hardware#2027)。
-その場合は `nix flake update home-manager nixos-hardware` のように nixpkgs 以外に絞るか、
-nixpkgs を現 rev に戻す (`nix flake update nixpkgs --override-input nixpkgs github:nixos/nixpkgs/<現 rev>`)。
+upstream の nixos-hardware の `apple/t2/pkgs/linux-t2/stable.json` (T2 パッチ集) は nixpkgs の
+`linux_6_18` の patch リリースに追従しておらず、nixpkgs を上げるとパッチが当たらなくなる
+(nixos-hardware#2027)。現在はカーネルのバージョンも固定する fork (nixos-hardware#1934、
+issue #227) に向けているので起きにくいが、fork の rev を上げたときは同じ確認をする。
+fork でも、カーネルの drv は nixpkgs のツールチェーンに依存するため、nixpkgs の rev によっては
+cache.soopy.moe に無く自前ビルドになる。上記のキャッシュ確認は省略しない。
+落ちたら原因になった input を戻す:
+- **fork の rev を上げて落ちた** → fork はカーネルソースとパッチ集を `stable.json` でまとめて固定して
+  いるので、nixpkgs を据え置いても直らない。`flake.nix` の `nixos-hardware` の URL を直前に成功した
+  rev に戻し、`nix flake update nixos-hardware` する。
+- **nixpkgs を上げて落ちた / キャッシュに無い** → `nix flake update home-manager` のように nixpkgs
+  以外に絞るか、nixpkgs を現 rev に戻す
+  (`nix flake update nixpkgs --override-input nixpkgs github:nixos/nixpkgs/<現 rev>`)。
 実例: PR #202 で 6.18.46 → 6.18.54 に上がり `3001-applesmc-*.patch` が当たらず、PR #205 で戻した。
 
 CI の build matrix (`.github/workflows/check.yml`) と `flake.nix` の `homeConfigurations` が

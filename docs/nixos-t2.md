@@ -14,7 +14,7 @@ T2 チップが NVMe / キーボード / トラックパッド / Touch Bar / オ
 | 領域 | 仕組み | 設定 |
 |---|---|---|
 | カーネル | linux-t2 (t2linux パッチ済み) | モジュールが `boot.kernelPackages` を差し替える |
-| キーボード / トラックパッド | `apple-bce` | initrd に組み込み済み |
+| キーボード / トラックパッド | `t2bce-vhci` (旧 `apple-bce`。nixos-hardware#1934 で改名) | initrd に組み込み済み |
 | Touch Bar | tiny-dfr | `hardware.apple.touchBar.enable` (nixpkgs 本体のモジュール) |
 | オーディオ | t2-better-audio の UCM / udev | pipewire / wireplumber を override |
 | WiFi / Bluetooth (BCM4364) | Apple 復旧イメージからファームウェア抽出 | `hardware.apple-t2.firmware.enable` |

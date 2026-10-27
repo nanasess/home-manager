@@ -35,10 +35,12 @@
 , libxshmfence
 , nspr
 , nss
+, openssl
 , pango
 , pciutils
 , pipewire
 , systemd
+, tpm2-tss
 , vulkan-loader
 , wayland
 , xdg-utils
@@ -96,6 +98,11 @@ stdenv.mkDerivation {
     libxrandr
     nspr
     nss
+    # resources/native/remote-control-device-key.node (libcrypto.so.3 / libtss2-*.so.0)。
+    # 以前は他の buildInputs 経由で見つかっていたが、nixpkgs 3ec6363 (2026-10-23) では
+    # autoPatchelf が解決できなくなったので明示する。
+    openssl
+    tpm2-tss
     pango
     stdenv.cc.cc.lib # libstdc++ (cua_node/bin/node, *.node)
     systemd # libudev
