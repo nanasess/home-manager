@@ -29,7 +29,11 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 - **機能ライフサイクル完結を期待**: 調査 → 実装 → テスト → PR 作成 → レビュー対応 → 本番検証 → Issue クローズまでを 1 セッションで連鎖実行する。「ローカルで動く」で止めない。ただし CI / デプロイの完了待ちだけは例外で、後述「Commits & PRs」の規約どおり前景では待たずにバックグラウンドで監視し、成功通知を受けた場合だけレビュー対応・本番検証・Issue クローズを続行する。失敗通知の場合は結果と原因の見立てを報告し、指示を受けるまで後続工程を停止する。
 - **簡潔な指示を好む**: 「PR 化して」「CLAUDE.md に記録」のような短い指示でも、完成形まで自走することを期待する。
-- **並列作業時は git worktree**: PR ごとや実験ごとに worktree で分離する。`worktree-create` Skill は `disable-model-invocation: true` でユーザー起動専用 (`/worktree-create`) なので、Claude が切るときは `EnterWorktree` ツールか `git worktree add` を使う。
+- **並列作業時は git worktree**: PR ごとや実験ごとに worktree で分離する。**worktree の作成・削除は必ず git-worktree-manager の `worktree` コマンドで行う。** `git worktree add` / `git worktree remove`、`EnterWorktree` ツール、Agent ツールの `isolation: "worktree"` は使わない。これらで作ると `worktree list` / `switch` / `cleanup` の管理外になり、`~/git-repos/aka-bane/aka-bane.com.worktrees/239-setenv` のような野良 worktree が溜まる (実際に大量発生した)。
+  - **作成**: プロジェクトルートで `worktree create <task-name>` (ブランチに接頭辞が要るなら `--branch-prefix feat/`)。Issue / PR から切るなら `worktree checkout <issue または PR の URL>`。作る前に `worktree list` で同じタスクの worktree が既に無いか確認し、あれば再利用する。
+  - **プロジェクトルートの取り違えに注意**: `~/git-repos/aka-bane/` のように git 管理外のディレクトリが複数リポジトリを束ねている場合は、**子リポジトリ (`aka-bane.com/`) ではなく親ディレクトリで実行する**。正しい配置は `~/git-repos/aka-bane.worktrees/<task>/aka-bane.com/` で、`<子リポジトリ>.worktrees/` がワークスペース内にできていたら誤り。単一リポジトリなら `<repo>.worktrees/<task>/` になる。
+  - **削除**: `worktree cleanup <task-name>` (マージ済みの一括削除は `worktree cleanup --merged`)。破壊的操作なので、先に `--dry-run` で対象を示して承認を得る。`rm -rf` や `git worktree remove` で消さない。
+  - `/worktree-create` などの Skill は `disable-model-invocation: true` でユーザー起動専用だが、`worktree` コマンド自体は Claude が Bash から直接実行してよい。
 - **コミットメッセージは Conventional Commits 形式 + 日本語**: `feat: ...`, `fix: ...`, `chore: ...` などのプレフィックスを使い、本文は日本語で書く (`/commit` Skill を活用)。
 - **メモリへの永続化を重視**: 学んだ規約・判断基準・例外運用は `projects/<encoded-path>/memory/` 配下の `feedback_*.md` / `project_*.md` に保存する。
 
