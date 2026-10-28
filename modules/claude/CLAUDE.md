@@ -61,6 +61,11 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
     -c mise install php@<要求バージョン>
   ```
   インストール後は `php -v` と `php -r 'echo ini_get("memory_limit"),"\n";'` (`512M` なら home-manager の conf.d が効いている) で確認する。インストール済みの PHP が `error while loading shared libraries` で起動しないときは GC でリンク先が消えているので、同じ devShell で `mise install php@<ver> --force` する。wsl-gentoo は devShell 不要で、失敗したら portage のビルド依存 (`hosts/wsl-gentoo.nix`) の不足を疑う。詳細はリポジトリの README「mise PHP のセットアップ」。
+- **Azure CLI (`az`) は mise の `pipx:azure-cli` を使う。** nixpkgs の `azure-cli` は依存の破損で評価ごと止まるので Nix からは外してある (home-manager#231)。バージョンは `~/.config/home-manager/home.nix` の `programs.mise.globalConfig.tools` で固定している。`az` が見つからないときに **`pip install azure-cli` / `uv tool install` / `nix shell nixpkgs#azure-cli` / Microsoft のインストールスクリプト / apt で別途入れない** (どの `az` が動いているか分からなくなる)。次の順で対処する:
+  1. `mise ls pipx:azure-cli` で入っているか確認し、未インストールなら `mise install pipx:azure-cli`。
+  2. Claude Code の Bash は PATH がセッション開始時に固定されるので、入っていても PATH に無いことがある。そのときは `mise exec -- az ...` で実行する。
+  3. それでも動かなければ、自分で直そうとせず状況を報告して指示を待つ。
+  バージョンを上げるときは `home.nix` を書き換えて PR にする (mise のグローバル設定は home-manager 管理のシンボリックリンクなので、`mise use -g` / `mise upgrade` で書き換えない)。
 
 ## 行動規範
 

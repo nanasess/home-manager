@@ -170,6 +170,23 @@ k-2 の注意点:
 - gettext / readline / gmp は `configure` が `/usr` 直下しか探さないため、devShell が
   `PHP_EXTRA_CONFIGURE_OPTIONS` でストアパスを渡している (詳細は `shells/php-build.nix`)。
 
+### Azure CLI のセットアップ（全ホスト共通）
+
+Azure CLI は Nix ではなく mise の `pipx:azure-cli` (uv tool で PyPI の wheel を venv に入れる) で
+管理する。バージョンは `home.nix` の `programs.mise.globalConfig.tools` で固定しており、
+home-manager の適用だけではインストールされない。初回とバージョンを上げた後に実行する:
+
+```bash
+# home.nix で固定したバージョンを入れる
+mise install pipx:azure-cli
+
+# 確認 (新しいシェルで。既存のシェルは PATH が古いままなので mise exec -- az version)
+az version
+```
+
+`with` などのオプションを変えたときは、既存の venv に反映されないので
+`mise install --force pipx:azure-cli` で作り直す。
+
 ## ディレクトリ構成
 
 ```text

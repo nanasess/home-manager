@@ -160,6 +160,7 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 | Bluetooth オーディオ | home-manager (xdg.configFile) + pavucontrol | WirePlumber の HFP 自動切替を無効化し、A2DP (ステレオ) / HFP (マイク) は pavucontrol で手動切替。プロファイルの記憶 (`~/.local/state/wireplumber/`) はランタイム状態のため管理外 |
 | クリップボード画像 (WSL) | `wl-paste` shim (`modules/wsl`) | WSLg が `image/bmp` しか出さず Claude Code が扱えないため、`image/png` を追加広告して ImageMagick で変換（`docs/clipboard-image-paste.md`） |
 | PHP (mise) | mise php プラグイン (ソースビルド) + ビルド依存はホスト別 | wsl-gentoo は portage、k-2 は `nix develop .#php-build` (`shells/php-build.nix`)。gettext / readline / gmp の `configure` は `/usr` 直下しか探さないので devShell が `PHP_EXTRA_CONFIGURE_OPTIONS` でストアパスを渡す。RPATH に `/nix/store` が焼き込まれるため `--profile` で GC root を作る (README「mise PHP のセットアップ」) |
+| Azure CLI | mise `pipx:azure-cli` (uv tool で PyPI の wheel を venv に入れる、`home.nix` の `programs.mise`)。zsh 補完は `modules/zsh` がビルド時に生成 | nixpkgs の azure-cli は Python の依存木が大きく、無関係なパッケージの broken で評価ごと止まる (NixOS/nixpkgs#575989、issue #231)。PyPI の wheel は Microsoft 公式で、NixOS では uv の Python を nix-ld で動かす。awscli2 は壊れていないので Nix のまま |
 | Playwright ブラウザ (k-2) | 公式配布バイナリ (`playwright install`) + `programs.nix-ld.libraries` (`hosts/k-2/configuration.nix`) | nixpkgs の `playwright-driver` (1.61) はプロジェクト側 (`@playwright/test` 1.63) とブラウザリビジョンが合わず、nixpkgs 側で追従すると更新のたびに hash 更新が要る。Chromium の実行時ライブラリだけ nix-ld に載せて公式バイナリを使う (`playwright install-deps` 相当)。nixpkgs に依存ライブラリのみのパッケージは無い (2026-09 時点) |
 | バックアップ (k-2) | restic (`services.restic.backups.nas`) → Synology DS720+ の SFTP、秘密情報は `/root/secrets/` (正本は 1Password) | flake で再現できない状態 (`~`、VPN 定義、BT ペアリング) だけを毎時送る。NAS 側は DSM 組み込み SFTP のみで追加ソフト不要、Btrfs の変更不可スナップショットで履歴を保護。ディスクイメージは取らず、復旧は再インストール + `restic-nas restore` (`docs/restic-nas.md`) |
 
@@ -252,8 +253,8 @@ upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当て�
 3. **nixpkgs 側のパッケージが壊れていたら、そのパッケージだけ古い rev から取る**。nixpkgs 全体を
    古い rev に揃えるとカーネルがキャッシュから外れるため。PR #229 の azure-cli
    (fabric が invoke 3 非対応で broken、NixOS/nixpkgs#575989) が先例で、`nixpkgs-azure-cli` input と
-   `azureCliPinModule` (overlay) を全ホストの home-manager に入れている。上流の修正が
-   nixos-unstable に入ったら外す。最後に壊れていなかったチャネル tip は次で探す:
+   overlay で古い rev から取っていた (その後 issue #231 で mise の `pipx:azure-cli` に移して Nix から外した)。
+   上流の修正が nixos-unstable に入ったら外す。最後に壊れていなかったチャネル tip は次で探す:
    ```bash
    # nixos-unstable が進んだ履歴 (各行がチャネル tip = Hydra でビルド済み)
    gh api 'repos/NixOS/nixpkgs/activity?ref=refs/heads/nixos-unstable&per_page=20' \
