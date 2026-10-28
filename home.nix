@@ -150,9 +150,14 @@
         # nix-ld で動かす。バージョンは固定し、上げるときはここを書き換える。
         # uv tool の venv には pip が入らず、`az extension add` (内部で `python -m pip`) が
         # 失敗するので pip を同じ venv に入れる。
+        # uv は自前の Python が未導入だとシステムの Python (NixOS は
+        # /run/current-system/sw/bin/python) で venv を作り、nixpkgs の更新で
+        # マイナーバージョンが変わると site-packages と合わずに起動しなくなる。
+        # uv 管理の Python に固定する。
         "pipx:azure-cli" = {
           version = "2.91.0";
           "with" = [ "pip" ];
+          uvx_args = "--managed-python";
         };
       };
     };
