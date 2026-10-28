@@ -148,7 +148,12 @@
         # broken になると評価ごと止まる (NixOS/nixpkgs#575989、issue #231)。Microsoft が
         # PyPI に出す wheel を uv tool で venv に入れる。NixOS では uv が取る Python を
         # nix-ld で動かす。バージョンは固定し、上げるときはここを書き換える。
-        "pipx:azure-cli" = "2.91.0";
+        # uv tool の venv には pip が入らず、`az extension add` (内部で `python -m pip`) が
+        # 失敗するので pip を同じ venv に入れる。
+        "pipx:azure-cli" = {
+          version = "2.91.0";
+          "with" = [ "pip" ];
+        };
       };
     };
   };
