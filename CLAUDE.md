@@ -168,11 +168,19 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 ### Emacs パッケージ (elpaca) の更新手順
 
 `modules/emacs/elpaca.lock` は全パッケージを `:ref` でピン留めしており (`elpaca-menu-lock-file`)、
-`~/.emacs.d/elpaca/sources/*` はすべて detached HEAD になっている。このため
-**`M-x elpaca-pull-all` / `elpaca-merge-all` は使えない**。`elpaca-fetch` はピン留めを検出して
-スキップするが、merge 側にはそのチェックが無く、`elpaca-git--merge` が引数なしの
-`git merge --ff-only` を実行して `fatal: No current branch.` (exit 128) で全パッケージが
-「Subprocess error」になる。更新は lock の `:ref` を書き換える。
+lock から入れた `~/.emacs.d/elpaca/sources/*` は detached HEAD になっている。elpaca の merge は
+引数なしの `git merge --ff-only` なので、**そのまま `M-x elpaca-pull-all` / `elpaca-merge-all` を
+実行すると `fatal: No current branch.` (exit 128) で「Subprocess error」になる**。
+
+- **全パッケージを最新化する**: README「Emacs パッケージの更新 (elpaca)」の標準手順
+  (`M-x elpaca-checkout-branches` → `M-x elpaca-pull-all` → `M-x elpaca-write-lock-file`)。
+  `elpaca-checkout-branches` (init.el) はレシピの `:branch`、無ければ `origin/HEAD` のブランチへ戻し、
+  失敗したパッケージを `*Warnings*` に出す。`Missing dependency <pkg>` は上流で依存が増えたもので、
+  pull の経路では依存が自動で入らない (対処は README)。lock は `elpaca-lock-file` が
+  `~/.config/home-manager/modules/emacs/elpaca.lock` を指すので main の作業ツリーに書かれる。
+  worktree で PR にするときは `emacsclient --eval '(elpaca-write-lock-file "<worktree>/modules/emacs/elpaca.lock")'`
+  で書き出し先を指定する。
+- **特定パッケージだけ上げる**: 以下の手順で lock の `:ref` を書き換える。
 
 1. **上流を取る**: `git -C ~/.emacs.d/elpaca/sources/<Repo> fetch origin` して新しい rev を決める
    (デフォルトブランチは上流により `master` / `main`。`origin/HEAD` を見る)。
