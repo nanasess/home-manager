@@ -1,6 +1,14 @@
 { config, pkgs, lib, ... }:
 
 let
+  # az (mise の pipx:azure-cli、home.nix) の zsh 補完。同梱の az.completion.sh は venv 内の
+  # register-python-argcomplete を PATH から呼ぶが、mise が PATH に載せるのは venv の外の
+  # bin だけなので動かない。生成されるスクリプトは az を環境変数付きで呼び出すだけで、
+  # az 側の argcomplete (2.91.0 時点で 3.5.3) と 3.x 同士なら通じるので、ビルド時に生成しておく。
+  azCompletion = pkgs.runCommand "az-zsh-completion" { } ''
+    ${pkgs.python3Packages.argcomplete}/bin/register-python-argcomplete --shell zsh az > $out
+  '';
+
   # Ghostty の zsh shell integration から「複数行 PS1 への OSC 133 継続マーク挿入」を
   # 取り除いたコピー。
   #
@@ -110,9 +118,7 @@ in
 
       autoload -U +X bashcompinit && bashcompinit
 
-      if [ -f "$HOME/.config/azure-cli-env/az.completion" ]; then
-        source "$HOME/.config/azure-cli-env/az.completion"
-      fi
+      source ${azCompletion}
 
       zstyle ':completion:*:default' menu select=1
       zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'

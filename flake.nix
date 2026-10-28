@@ -25,11 +25,6 @@
       url = "github:soopyc/nixos-hardware/7082b484432124bd8d53790a11b808429b73fb6b";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # azure-cli だけ fabric が壊れる前の nixos-unstable (2026-10-17) から取る一時措置。
-    # invoke 3.0 への更新で fabric が broken になり azure-cli が評価できない
-    # (NixOS/nixpkgs#575989)。修正 PR NixOS/nixpkgs#576874 が nixos-unstable に
-    # 入ったら、この input と azureCliPinModule を削除する。
-    nixpkgs-azure-cli.url = "github:nixos/nixpkgs/fe13242281a67641c0102cdb1087f0ebe586c7df";
     # WSL2 上の NixOS (wsl-nixos、Issue #183)。
     nixos-wsl = {
       url = "github:nix-community/NixOS-WSL";
@@ -37,25 +32,14 @@
     };
   };
 
-  outputs = { self, nixpkgs, home-manager, nixgl, nixos-hardware, nixpkgs-azure-cli, nixos-wsl, ... }:
+  outputs = { self, nixpkgs, home-manager, nixgl, nixos-hardware, nixos-wsl, ... }:
     let
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
-      # azure-cli を nixpkgs-azure-cli から取る (inputs のコメント参照)。home.nix と一緒に
-      # 全ホストの home-manager に読み込む。
-      azureCliPinModule = {
-        nixpkgs.overlays = [
-          (final: prev: {
-            azure-cli = nixpkgs-azure-cli.legacyPackages.${prev.stdenv.hostPlatform.system}.azure-cli;
-          })
-        ];
-      };
-
       # GNOME デスクトップを持つホスト (ubuntu / k-2) 共通の home-manager モジュール。
       gnomeHomeModules = [
         ./home.nix
-        azureCliPinModule
         ./modules/onedrive.nix
         ./modules/yaskkserv2.nix
         ./modules/bluetooth-audio
@@ -72,7 +56,7 @@
       homeConfigurations = {
         "nanasess@wsl-gentoo" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
-          modules = [ ./home.nix azureCliPinModule ./hosts/wsl-gentoo.nix ./modules/wsl ./modules/onedrive.nix ./modules/portage.nix ./modules/yaskkserv2.nix ./modules/emacs ./modules/zsh ./modules/ghostty ./modules/wakatime ./modules/claude ];
+          modules = [ ./home.nix ./hosts/wsl-gentoo.nix ./modules/wsl ./modules/onedrive.nix ./modules/portage.nix ./modules/yaskkserv2.nix ./modules/emacs ./modules/zsh ./modules/ghostty ./modules/wakatime ./modules/claude ];
         };
         "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -130,7 +114,6 @@
               home-manager.backupFileExtension = "hm-backup";
               home-manager.users.nanasess.imports = [
                 ./home.nix
-                azureCliPinModule
                 ./hosts/wsl-nixos/home.nix
                 ./modules/wsl
                 ./modules/onedrive.nix

@@ -51,7 +51,6 @@
     gh
     uv
     terraform
-    azure-cli
     awscli2
     # MFA 必須 (EnforceMFAPolicy) の IAM ユーザーで STS セッションを作り、環境変数で
     # コンテナ等に渡す (例: `aws-vault exec <profile> -- docker compose up`)。
@@ -145,6 +144,11 @@
         node = "lts";
         php = "8.5";
         bun = "latest";
+        # nixpkgs の azure-cli は Python の依存木が大きく、無関係なパッケージ (fabric 等) が
+        # broken になると評価ごと止まる (NixOS/nixpkgs#575989、issue #231)。Microsoft が
+        # PyPI に出す wheel を uv tool で venv に入れる。NixOS では uv が取る Python を
+        # nix-ld で動かす。バージョンは固定し、上げるときはここを書き換える。
+        "pipx:azure-cli" = "2.91.0";
       };
     };
   };
