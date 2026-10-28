@@ -72,24 +72,43 @@
 
 ;; elpaca-pull 前に detached HEAD を解消するコマンド
 ;; ロックファイル復元後は全パッケージが detached HEAD になるため、
-;; pull 前にブランチに戻す必要がある
+;; pull 前にブランチに戻す必要がある (merge は `git merge --ff-only' なので
+;; detached のままだと "No current branch" で失敗する)。
+;; ブランチはレシピの :branch を優先する。gnu_elpa ミラー (externals/<pkg>) は
+;; origin/HEAD が作られず、fork (web-mode の eccube-engine) も pull の fetch までは
+;; origin/HEAD が無いことがあるため。
+(defun my/git-remote-default-branch ()
+  "Return origin's default branch of the repo in `default-directory'.
+Set origin/HEAD from the remote when it is missing."
+  (let ((ref (lambda ()
+               (with-temp-buffer
+                 (when (zerop (call-process "git" nil t nil "symbolic-ref" "-q" "--short"
+                                            "refs/remotes/origin/HEAD"))
+                   (string-remove-prefix "origin/" (string-trim (buffer-string))))))))
+    (or (funcall ref)
+        (and (zerop (call-process "git" nil nil nil "remote" "set-head" "origin" "--auto"))
+             (funcall ref)))))
+
 (defun elpaca-checkout-branches ()
-  "Checkout the default branch for all elpaca source repos."
+  "Checkout the branch to pull for all queued elpaca source repos.
+Use the recipe's :branch, falling back to the remote default branch."
   (interactive)
-  (let ((sources-dir (expand-file-name "sources" (expand-file-name "elpaca" user-emacs-directory)))
-        (count 0))
-    (dolist (dir (directory-files sources-dir t "^[^.]"))
-      (when (file-directory-p (expand-file-name ".git" dir))
-        (let* ((default-directory dir)
-               (branch (string-trim
-                        (shell-command-to-string
-                         "git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'")))
-               (branch (if (string-empty-p branch) "main" branch)))
-          (when (not (string-empty-p
-                      (shell-command-to-string "git symbolic-ref HEAD 2>&1 | grep -q fatal && echo detached")))
-            (shell-command-to-string (format "git checkout %s 2>/dev/null" branch))
-            (setq count (1+ count))))))
-    (message "Checked out branches for %d packages" count)))
+  (let ((count 0) failed seen)
+    (dolist (q (reverse (elpaca--queued)))
+      (let* ((e (cdr q))
+             (default-directory (elpaca<-source-dir e)))
+        (unless (or (member default-directory seen)
+                    (not (file-exists-p (expand-file-name ".git" default-directory)))
+                    (zerop (call-process "git" nil nil nil "symbolic-ref" "-q" "HEAD")))
+          (push default-directory seen)
+          (let ((branch (or (plist-get (elpaca<-recipe e) :branch)
+                            (my/git-remote-default-branch))))
+            (if (and branch (zerop (call-process "git" nil nil nil "checkout" "-q" branch)))
+                (setq count (1+ count))
+              (push (car q) failed))))))
+    (if failed
+        (warn "elpaca-checkout-branches: failed for %s" (nreverse failed))
+      (message "Checked out branches for %d packages" count))))
 
 ;;;; ============================================================
 ;;;; Base libraries (wait for completion before dependents)

@@ -379,7 +379,7 @@ elpaca はロックファイルの `:ref` で各パッケージを特定コミ�
 #### 標準手順
 
 ```bash
-# 1. 全パッケージを default branch に戻す（detached HEAD 解消）
+# 1. 全パッケージを pull 先ブランチに戻す（detached HEAD 解消）
 M-x elpaca-checkout-branches
 
 # 2. 全パッケージを更新
@@ -397,23 +397,26 @@ git commit -m "chore(emacs): elpaca パッケージ更新"
 home-manager switch --flake '.#nanasess@wsl-gentoo'
 ```
 
-#### 既知の制約: 一部パッケージは手動 checkout が必要
+#### `elpaca-checkout-branches` のブランチ判定
 
-`elpaca-checkout-branches` は `git symbolic-ref refs/remotes/origin/HEAD` で default branch を判定するため、
-以下のような GNU ELPA mirror 由来でリモートに `origin/HEAD` シンボリックリンクがなく、
-かつ default が `main` / `master` でないパッケージでは復帰できない:
+レシピに `:branch` があればそれを使い、無ければ `origin/HEAD` の指すブランチを使う
+(`origin/HEAD` が無ければ `git remote set-head origin --auto` でリモートから取る)。
+GNU ELPA mirror の `csv-mode` / `queue` (`externals/<pkg>`) や fork の `web-mode`
+(`eccube-engine`) は `origin/HEAD` が無いか初回 fetch まで作られないので、`:branch` で判定する。
+checkout できなかったパッケージは `*Warnings*` に出るので、`elpaca-pull-all` の前に解消する。
 
-- `csv-mode` (default branch: `externals/csv-mode`)
-- `queue` (default branch: `externals/queue`)
+#### pull 後に `Missing dependency <pkg>` で失敗する場合
 
-これらは `elpaca-pull-all` のログでエラーになっていれば手動で checkout する:
+上流の更新で `Package-Requires` に新しい依存が増えると、pull の経路では依存が自動で
+キューに入らず失敗する (例: nix-mode の `reformatter`)。依存を入れてから merge し直す:
 
-```bash
-cd ~/.emacs.d/elpaca/sources/csv-mode && git checkout externals/csv-mode
-cd ~/.emacs.d/elpaca/sources/queue    && git checkout externals/queue
+```elisp
+(elpaca reformatter)                  ; M-: で評価してから M-x elpaca-process-queues
+(elpaca-merge 'nix-mode nil t)        ; status が failed なので rebuild ではなく merge で再処理
 ```
 
-その後あらためて `M-x elpaca-pull-all` を実行する。
+依存は lock に書き出されるので、`init.el` に `use-package` を足す必要は無い
+(新規インストールでは依存として自動で入る)。
 
 #### lock のリビジョンに追従する（composer install / npm ci 相当）
 
