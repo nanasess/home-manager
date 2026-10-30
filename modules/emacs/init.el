@@ -265,29 +265,15 @@ wsl-gentoo の非 pgtk 構成に読み込まれても無害。"
   :demand t
   ;; ddskk の (global-set-key "\C-x\C-j" 'skk-mode) と等価。
   ;; C-j はグローバルに束縛しない: nskk 無効時は素の改行に戻る。
-  ;; nskk 有効時の C-j は nskk-mode-map で my/nskk-kakutei に差し替える。
-  :preface
-  (defun my/nskk-kakutei ()
-    "ddskk の `skk-kakutei' 相当の確定キー。
-
-▽/▼ 変換中は確定、ASCII/全英モードではかなモードへ復帰し、
-■かな/■カナ待機中は何もしない (改行もモード切り替えもしない)。
-
-ddskk では `skk-compile-rule-list' がルール
-`(skk-kakutei-key nil skk-kakutei)' から skk-j-mode-map の C-j を
-`skk-insert' に束縛し、■モードの `skk-kakutei' は確定対象が無く
-skk-j-mode も既に ON なので何も起きない (カナもカナのまま)。
-一方 nskk 既定の `nskk-kakutei' は hiragana-idle で改行を挿入し、
-katakana-idle ではひらがなへ戻す (nskk-input.el の kakutei-action/2)。
-この 2 状態だけ握り潰し、それ以外 (確定・ローマ字ペンディングの破棄・
-direct-idle からのかな復帰) は `nskk-kakutei' に委譲する。"
-    (interactive)
-    (pcase (nskk--current-kakutei-state)
-      ((or 'hiragana-idle 'katakana-idle) nil)
-      (_ (nskk-kakutei))))
+  ;; nskk 有効時の C-j は nskk-mode-map で nskk-kakutei に差し替える。
+  ;;
+  ;; 以前は ■かな/■カナ待機中の改行挿入・ひらがな復帰を握り潰す
+  ;; my/nskk-kakutei を挟んでいたが、upstream の ddskk 互換対応
+  ;; (kakutei-action/2 の hiragana-idle / katakana-idle が no-action) で
+  ;; `nskk-kakutei' 自体が ddskk の `skk-kakutei' と同じ挙動になったため撤去した。
   :bind (("C-x C-j" . nskk-toggle-mode)
          :map nskk-mode-map
-         ("C-j" . my/nskk-kakutei))
+         ("C-j" . nskk-kakutei))
   :custom
   (nskk-dict-user-dictionary-file (concat external-directory "nskk/jisyo"))
   ;; ddskk の skk-mode 同様、有効化したら直接ひらがな入力に入る (既定は 'ascii)。
@@ -1762,9 +1748,9 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
 ;;;; ============================================================
 ;; ddskk の skk-define-minibuffer-maps 相当: ミニバッファでも確定キーは
 ;; C-j (本体の nskk-mode-map と同じ) に統一する。
-(bind-key "C-j" #'my/nskk-kakutei minibuffer-local-map)
-(bind-key "C-j" #'my/nskk-kakutei minibuffer-local-completion-map)
-(bind-key "C-j" #'my/nskk-kakutei minibuffer-local-ns-map)
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-map)
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-completion-map)
+(bind-key "C-j" #'nskk-kakutei minibuffer-local-ns-map)
 
 ;; npm i -g vscode-json-languageserver
 ;; for json format
