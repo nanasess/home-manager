@@ -185,6 +185,9 @@
   programs.ssh = {
     enable = true;
     enableDefaultConfig = false;
+    # ホストごとの設定は private リポジトリ nanasess/ssh_conf.d を ~/.ssh/conf.d に
+    # clone して読ませる。顧客名・接続先を含むので、このリポジトリ (public) には
+    # submodule や flake input としても入れない (docs/ssh-conf-d.md)。
     includes = [
       "~/.ssh/conf.d/*.conf"
     ];
@@ -199,6 +202,16 @@
       SetEnv.TERM = "xterm-256color";
     };
   };
+
+  # ~/.ssh/conf.d が無くても ssh は Include を黙って無視するので、新しいホストで
+  # clone し忘れると「ホスト別名が解決できない」まで気づかない。警告だけ出す。
+  # activation では clone しない (switch のたびにネットワークと SSH agent に依存するため)。
+  home.activation.sshConfDCheck = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    if [ ! -d "$HOME/.ssh/conf.d/.git" ]; then
+      warnEcho "~/.ssh/conf.d がありません。ホスト別の ssh 設定を使うには clone してください:"
+      warnEcho "  git clone git@github.com:nanasess/ssh_conf.d.git ~/.ssh/conf.d"
+    fi
+  '';
 
   # 区切りは RFC 3676 の "-- " (末尾空白あり)。'' 文字列だと末尾空白が
   # フォーマッタやエディタで消されやすいので通常の文字列で書く。

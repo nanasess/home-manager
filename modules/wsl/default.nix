@@ -112,6 +112,27 @@
       install -Dm644 ${ghostty.nocttyConfigFile} "$noctty_dir/config.ghostty"
     '';
 
+    # Windows の ssh.exe (稀に直接使う) 向けに %USERPROFILE%\.ssh\config と conf.d を配置する
+    #
+    # WSL からは Linux の ssh + WSL 側 1Password の agent を使う (docs/ssh-conf-d.md)。
+    # Windows 側は以前 ssh_conf.d を別途 clone していたが、更新が止まり CRLF 化もしていたので、
+    # WSL の ~/.ssh/conf.d (正本) から *.conf だけを毎回ミラーする。
+    # IdentityAgent は書かない。Windows の 1Password は OpenSSH の既定の名前付きパイプ
+    # (\\.\pipe\openssh-ssh-agent) で鍵を提供するので、既定のままで繋がる。
+    # ~/.1password/agent.sock は WSL 用のパスで、Windows では意味を持たない。
+    home.activation.windowsSshConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      win_ssh_dir="/mnt/c/Users/${config.home.username}/.ssh"
+      install -Dm644 ${pkgs.writeText "windows-ssh-config" ''
+        Include ~/.ssh/conf.d/*.conf
+      ''} "$win_ssh_dir/config"
+      if [ -d "$HOME/.ssh/conf.d" ]; then
+        mkdir -p "$win_ssh_dir/conf.d"
+        ${pkgs.rsync}/bin/rsync -rt --delete --delete-excluded \
+          --include='*.conf' --exclude='*' \
+          "$HOME/.ssh/conf.d/" "$win_ssh_dir/conf.d/"
+      fi
+    '';
+
     # noctty の同梱 ConPTY (conpty.dll + OpenConsole.exe) を自前ビルドへ配置するヘルパー
     #
     # noctty は in-box conhost の代わりに Microsoft の ConPTY 再頒布物を使う機構を持つ
