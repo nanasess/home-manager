@@ -237,6 +237,23 @@ in
           cd "$EMACS_CWD"
         }
 
+        # 1Password の SSH Key に登録できない古い鍵で ssh する
+        #
+        # 公開指数 (exponent) が 35 の RSA 鍵 (2010 年頃以前の ssh-keygen の既定) は
+        # 1Password が "RSA public exponent or modulus is too small" で拒否する。
+        # 指数は鍵生成時に決まるので形式変換でも直らない。鍵ファイルを Document
+        # アイテム "legacy id_rsa" に置き、使うたびに使い捨ての ssh-agent へ標準入力で
+        # 読み込む (復号値をディスクに書かない)。サブシェルを抜けると agent ごと消える。
+        # ~/.ssh/config の IdentityAgent (1Password) はコマンドラインの -o が優先する。
+        function ssh-legacy () {
+          (
+            eval "$(ssh-agent -s)" > /dev/null || exit 1
+            trap 'ssh-agent -k > /dev/null' EXIT
+            op document get 'legacy id_rsa' < /dev/null | ssh-add -q - || exit 1
+            ssh -o IdentityAgent="$SSH_AUTH_SOCK" "$@"
+          )
+        }
+
         # Powerlevel10k theme
         [[ ! -f ${./.p10k.zsh} ]] || source ${./.p10k.zsh}
 
