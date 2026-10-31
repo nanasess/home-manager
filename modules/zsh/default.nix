@@ -247,7 +247,10 @@ in
         # ~/.ssh/config の IdentityAgent (1Password) はコマンドラインの -o が優先する。
         function ssh-legacy () {
           (
-            eval "$(ssh-agent -s)" > /dev/null || exit 1
+            # ssh-agent が失敗して空出力でも eval は成功するので、終了状態を先に見る。
+            # 見ないと継承した SSH_AGENT_PID の既存 agent を trap の -k が止めてしまう
+            agent_env="$(ssh-agent -s)" || exit 1
+            eval "$agent_env" > /dev/null || exit 1
             trap 'ssh-agent -k > /dev/null' EXIT
             op document get 'legacy id_rsa' < /dev/null | ssh-add -q - || exit 1
             ssh -o IdentityAgent="$SSH_AUTH_SOCK" "$@"
