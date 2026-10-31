@@ -17,6 +17,23 @@ CI と第三者の clone が取得に失敗する)。
 (ssh_config は最初に得た値を採用する)。conf.d が無くても `Include` はエラーにならず黙って
 無視されるため、activation (`home.nix` の `sshConfDCheck`) が clone 漏れを警告する。
 
+### WSL ホストと Windows 側の ssh.exe
+
+- **WSL からは Linux の ssh を使う。** WSL 内で Linux 版 1Password Desktop を起動しており、
+  `~/.1password/agent.sock` を直接使える。`alias ssh=ssh.exe` で Windows の ssh.exe を使う方法も
+  あるが、この環境には向かないので採らない。
+  - その方法は、WSL 側で 1Password の agent を使えない環境のためのもの。
+  - ssh.exe は `%USERPROFILE%\.ssh\config` を読むので、home-manager の設定 (`SetEnv TERM` 等) が効かない。
+  - alias は対話シェルにしか効かず、gcloud / git / rsync は Linux の ssh を呼ぶ。2 つの ssh が混在すると、問題の切り分けが難しくなる。
+  - `ssh-legacy` が使う Linux の ssh-agent に、ssh.exe からはつながらない。
+- **Windows から直接 ssh.exe を使う場合 (稀)**: `modules/wsl` の `windowsSshConfig` が、activation のたびに
+  `%USERPROFILE%\.ssh\config` を書き出し、WSL の `~/.ssh/conf.d/*.conf` を
+  `%USERPROFILE%\.ssh\conf.d\` にミラーする。Windows 側では conf.d を clone も編集もしない
+  (編集は WSL の clone で行い、`home-manager switch` で反映する)。config に `IdentityAgent` を
+  書かないのは、Windows の 1Password が既定の名前付きパイプ (`\\.\pipe\openssh-ssh-agent`)
+  で鍵を提供しているため。
+- Windows 側に秘密鍵のファイルを置かない (鍵は 1Password に置く)。
+
 ## セットアップ (ホストごとに 1 回)
 
 ```bash
