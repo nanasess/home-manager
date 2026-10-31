@@ -162,6 +162,7 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 | PHP (mise) | mise php プラグイン (ソースビルド) + ビルド依存はホスト別 | wsl-gentoo は portage、k-2 は `nix develop .#php-build` (`shells/php-build.nix`)。gettext / readline / gmp の `configure` は `/usr` 直下しか探さないので devShell が `PHP_EXTRA_CONFIGURE_OPTIONS` でストアパスを渡す。RPATH に `/nix/store` が焼き込まれるため `--profile` で GC root を作る (README「mise PHP のセットアップ」) |
 | Azure CLI | mise `pipx:azure-cli` (uv tool で PyPI の wheel を venv に入れる、`home.nix` の `programs.mise`)。zsh 補完は `modules/zsh` がビルド時に生成 | nixpkgs の azure-cli は Python の依存木が大きく、無関係なパッケージの broken で評価ごと止まる (NixOS/nixpkgs#575989、issue #231)。PyPI の wheel は Microsoft 公式で、NixOS では uv の Python を nix-ld で動かす。awscli2 は壊れていないので Nix のまま |
 | Playwright ブラウザ (k-2) | 公式配布バイナリ (`playwright install`) + `programs.nix-ld.libraries` (`hosts/k-2/configuration.nix`) | nixpkgs の `playwright-driver` (1.61) はプロジェクト側 (`@playwright/test` 1.63) とブラウザリビジョンが合わず、nixpkgs 側で追従すると更新のたびに hash 更新が要る。Chromium の実行時ライブラリだけ nix-ld に載せて公式バイナリを使う (`playwright install-deps` 相当)。nixpkgs に依存ライブラリのみのパッケージは無い (2026-09 時点) |
+| ホスト別 ssh 設定 | private リポジトリ `nanasess/ssh_conf.d` を `~/.ssh/conf.d` に clone、`programs.ssh.includes` で読む。未 clone は activation (`sshConfDCheck`) が警告 | 顧客名・接続先の一覧なので public のこのリポジトリには submodule / flake input でも入れない。1Password に登録できない古い鍵 (RSA の exponent 35 等) は Document に置き `ssh-legacy` (`modules/zsh`) で一時 agent に読み込む (`docs/ssh-conf-d.md`) |
 | バックアップ (k-2) | restic (`services.restic.backups.nas`) → Synology DS720+ の SFTP、秘密情報は `/root/secrets/` (正本は 1Password) | flake で再現できない状態 (`~`、VPN 定義、BT ペアリング) だけを毎時送る。NAS 側は DSM 組み込み SFTP のみで追加ソフト不要、Btrfs の変更不可スナップショットで履歴を保護。ディスクイメージは取らず、復旧は再インストール + `restic-nas restore` (`docs/restic-nas.md`) |
 
 **プラットフォーム非依存化の判断基準**: portage / apt など特定ホストのパッケージマネージャに依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で wsl-gentoo (旧 portage) と ubuntu を統一した先例 (PR #110)。
@@ -285,6 +286,13 @@ fork (#1934) では内蔵キーボード / トラックパッドのモジュー�
 `apple_bce` を直書きしている設定は書き換えが要る (k-2 はモジュール任せなので影響なし)。
 6.18.55 で上記の確認項目がすべて問題ないことを確認済み (2026-10-28)。
 
+### ssh 接続のトラブル
+
+「ssh で繋がらない」「ssh のエラーが出る」と相談されたら、`docs/ssh-conf-d.md` の
+「ssh で問題が起きたときの切り分け」に従う。ホスト別設定はこのリポジトリではなく
+`~/.ssh/conf.d` (private の `nanasess/ssh_conf.d` の clone) にあるので、修正と PR は
+ssh_conf.d 側に出す。このリポジトリの Issue / PR / コミットにはホスト名・IP・顧客名を書かない。
+
 ### 移行元リポジトリ (TODO)
 
 以下のリポジトリからの移行状況。段階的にこのリポジトリへ統合する。
@@ -321,3 +329,4 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS (nixpkgs の更新手順は上記「k-2 (T2) の nixpkgs / nixos-hardware の更新手順」)。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
 | [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |
 | [docs/restic-nas.md](docs/restic-nas.md) | restic → Synology NAS。DSM の SFTP 仮想ルート (`/restic/...`)、backup 専用ユーザーと `authorized_keys` の置き方、`/root/secrets/` の運用、復旧手順 | `hosts/k-2/configuration.nix` (バックアップ) |
+| [docs/ssh-conf-d.md](docs/ssh-conf-d.md) | ホスト別 ssh 設定 (private の ssh_conf.d) の構成、**ssh 接続トラブルの切り分け手順** (`ssh -v` の `Applying options` で conf.d のファイルと行を特定 → 症状別の原因表 → ssh_conf.d に PR)、棚卸し手順 | `home.nix` (`programs.ssh`)、`~/.ssh/conf.d` |
