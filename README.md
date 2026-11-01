@@ -187,6 +187,19 @@ az version
 `with` などのオプションを変えたときは、既存の venv に反映されないので
 `mise install --force pipx:azure-cli` で作り直す。
 
+### ホスト別 ssh 設定のセットアップ（全ホスト共通）
+
+ホスト別の ssh 設定 (`Host` / `HostName` / `User` 等) は private リポジトリ
+`nanasess/ssh_conf.d` で管理し、`~/.ssh/config` の `Include ~/.ssh/conf.d/*.conf` で読む。
+home-manager の適用では入らないので、ホストごとに 1 回 clone する (未 clone だと
+`home-manager switch` が警告を出す):
+
+```bash
+git clone git@github.com:nanasess/ssh_conf.d.git ~/.ssh/conf.d
+```
+
+接続トラブルの切り分けと棚卸しの手順は [docs/ssh-conf-d.md](docs/ssh-conf-d.md)。
+
 ## ディレクトリ構成
 
 ```text
