@@ -16,6 +16,8 @@
   };
 
   config = {
+    # コミット署名は Windows 版 1Password (Windows Hello) が行う。ssh / op run は Linux 版。
+    # 役割分担の全体は docs/1password-wsl.md
     programs.git.signing.signer = "/mnt/c/Users/${config.home.username}/AppData/Local/Microsoft/WindowsApps/op-ssh-sign.exe";
 
     # ~/.gnupg/gpg-agent.conf を宣言する (旧: 手書きで portage の /usr/bin/pinentry-tty を参照)。
@@ -485,6 +487,8 @@
       '';
     };
 
+    # op シム: op run は Linux 版の op (wsl.opLinux)、それ以外は Windows の op.exe に回す
+    # (docs/1password-wsl.md)
     home.file.".local/bin/op" = {
       executable = true;
       text = ''

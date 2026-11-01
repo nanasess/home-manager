@@ -21,7 +21,7 @@ Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-mana
 | WSL ホームディレクトリ | `/home/nanasess` |
 | CPU | AMD Ryzen Zen 3 (`-march=znver3`) |
 | ロケール | `ja_JP.UTF-8` |
-| SSH | 1Password SSH Agent (`~/.1password/agent.sock`) |
+| SSH | 1Password SSH Agent (`~/.1password/agent.sock`)。WSL での Windows 版 / Linux 版の役割分担は `docs/1password-wsl.md` |
 
 ## コマンド
 
@@ -330,3 +330,4 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |
 | [docs/restic-nas.md](docs/restic-nas.md) | restic → Synology NAS。DSM の SFTP 仮想ルート (`/restic/...`)、backup 専用ユーザーと `authorized_keys` の置き方、`/root/secrets/` の運用、復旧手順 | `hosts/k-2/configuration.nix` (バックアップ) |
 | [docs/ssh-conf-d.md](docs/ssh-conf-d.md) | ホスト別 ssh 設定 (private の ssh_conf.d) の構成、**ssh 接続トラブルの切り分け手順** (`ssh -v` の `Applying options` で conf.d のファイルと行を特定 → 症状別の原因表 → ssh_conf.d に PR)、棚卸し手順 | `home.nix` (`programs.ssh`)、`~/.ssh/conf.d` |
+| [docs/1password-wsl.md](docs/1password-wsl.md) | WSL での Windows 版 / Linux 版 1Password の併用。用途別の担当表 (ssh = Linux 版 agent、コミット署名 = Windows 版 `op-ssh-sign.exe`、`op` = シム → `op.exe`、`op run` = Linux 版、Environments = Linux 版)、アプリ側の手作業設定、`op` シム、トラブルシュート、Zenn 記事との差分 | `modules/wsl`、`home.nix`、`hosts/wsl-*/` |
