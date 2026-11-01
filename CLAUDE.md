@@ -107,7 +107,7 @@ modules/
   xremap/
     default.nix        -- キーリマッパー（Chrome のタブ移動を Ctrl+H / Ctrl+L に。GNOME ホスト共通）
   nixos/
-    common.nix         -- NixOS ホスト共通のシステム設定（zsh、nix-ld + Playwright 用ライブラリ、1Password、Chrome の 1Password 拡張）。unfree 許可は各ホスト
+    common.nix         -- NixOS ホスト共通のシステム設定（zsh、nix-ld + Playwright / mise の dotnet (ICU) 用ライブラリ、1Password、Chrome の 1Password 拡張）。unfree 許可は各ホスト
   wsl/
     default.nix        -- WSL ホスト共通（Windows 側への noctty / Ghostty 設定・ssh config + conf.d ミラー・UDEV Gothic・mackerel のコピー、op シム、wl-paste shim、gpg-agent、WSLg X11/Wayland）
   portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
