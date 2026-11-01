@@ -61,6 +61,13 @@
     pango
     pciutils
     vulkan-loader
+    # mise の dotnet (EcAuth の mise.toml、公式バイナリ) は起動時に libicuuc.so を
+    # dlopen し、見つからないと "Couldn't find a valid ICU package" で即終了する
+    # (issue #235)。nixpkgs の icu (78 系) を載せれば CLR_ICU_VERSION_OVERRIDE なしで
+    # 読まれる。DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 はカルチャ依存の挙動
+    # (日本語の比較・書式) が変わるので使わない。
+    # 検証: dotnet 10.0.403 で ja-JP の日付書式と IgnoreKanaType 比較 (2026-11-01)。
+    icu
   ];
 
   # 1Password。SSH agent (~/.1password/agent.sock) と commit 署名 (op-ssh-sign) は

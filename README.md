@@ -222,7 +222,7 @@ modules/
   ghostty/             -- Ghostty 共有設定（Linux native / noctty / Windows port を同一 attrset から生成）
   claude/              -- Claude Code のユーザー設定（CLAUDE.md、PreToolUse hook）
   wakatime/            -- WakaTime CLI（API キーは 1Password から実行時に解決）
-  nixos/common.nix     -- NixOS ホスト共通のシステム設定（zsh、nix-ld + Playwright 用ライブラリ、1Password、Chrome の 1Password 拡張）
+  nixos/common.nix     -- NixOS ホスト共通のシステム設定（zsh、nix-ld + Playwright / mise の dotnet (ICU) 用ライブラリ、1Password、Chrome の 1Password 拡張）
   wsl/                 -- WSL ホスト共通（Windows 側への noctty / Ghostty 設定・UDEV Gothic・Mackerel のコピー、op / wl-paste シム、gpg-agent、WSLg）
   mackerel/            -- LibreHardwareMonitor → Mackerel カスタムメトリック（modules/wsl が Windows 側へ配置）
   bluetooth-audio/     -- WirePlumber の HFP 自動切替無効化 + pavucontrol（GNOME ホスト共通）
