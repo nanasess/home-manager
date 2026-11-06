@@ -22,13 +22,13 @@ let
 in
 stdenv.mkDerivation rec {
   pname = "mew-bin";
-  version = "6.11-unstable-2026-10-24";
+  version = "6.11-unstable-2026-11-06";
 
   src = fetchFromGitHub {
     owner = "kazu-yamamoto";
     repo = "Mew";
-    rev = "a9a82848cd125ef8aa1404b05f2ce15cfc8dddf1";
-    hash = "sha256-nna2CQOScoy4eG3Om40WqTz5IEl+jRjVuhJlEp8IaQc=";
+    rev = "92dd698f73d8b855fbe540f5dc12a262af260208";
+    hash = "sha256-m3KbUhjDlBG34qadGF+3/BlrY0Z+TJKDK8QhKUFW3i8=";
   };
 
   # bin/ は独立した configure (autoconf 生成済み) を持つのでそこだけビルドする。
