@@ -65,7 +65,7 @@
             ./modules/t2-suspend
             ./modules/ibus-skk/ubuntu.nix
             {
-              nixGL.packages = nixgl.packages;
+              targets.genericLinux.nixGL.packages = nixgl.packages;
             }
           ];
         };
