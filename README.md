@@ -448,6 +448,34 @@ checkout できなかったパッケージは `*Warnings*` に出るので、`el
 依存は lock に書き出されるので、`init.el` に `use-package` を足す必要は無い
 (新規インストールでは依存として自動で入る)。
 
+#### pull 後に `refusing to merge unrelated histories` で失敗する場合
+
+`--depth 1` で clone されたリポジトリ (elpaca 本体など) は、fetch した先と共通の祖先を
+ローカルに持たないため ff-only の merge が拒否される。履歴を取ってから merge し直す:
+
+```bash
+git -C ~/.emacs.d/elpaca/sources/<Repo> fetch --unshallow origin
+```
+
+#### 上流がデフォルトブランチを変えた場合
+
+`elpaca-checkout-branches` はローカルの `origin/HEAD` を見るが、`origin/HEAD` は clone 時のまま
+自動では更新されない。上流が `master` → `main` に移ると、pull で古い `master` の先頭に
+**巻き戻る** (2026-11 の Mew がこれだった)。lock の差分で日付が古くなったパッケージがあれば疑い、
+対象のリポジトリで `origin/HEAD` を取り直して新しいブランチへ切り替え、merge し直す:
+
+```bash
+git -C ~/.emacs.d/elpaca/sources/<Repo> remote set-head origin --auto
+git -C ~/.emacs.d/elpaca/sources/<Repo> checkout main
+```
+
+```elisp
+(elpaca-merge '<pkg> nil t)           ; M-: で評価してから M-x elpaca-process-queues
+```
+
+その後 `elpaca-write-lock-file` で lock を書き出し直す。Mew の場合は `pkgs/mew.nix` の
+`rev` / `hash` / `version` も lock の `mew` の `:ref` と同じコミットに揃える (`docs/mew.md`)。
+
 #### lock のリビジョンに追従する（composer install / npm ci 相当）
 
 上記「標準手順」はパッケージを最新化して lock を書き直す **更新**手順（`composer update` / `npm update` 相当）。

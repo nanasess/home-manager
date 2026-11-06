@@ -43,6 +43,8 @@ let
   # wsl.conf で hostname を変えている wsl-nixos からの報告は全て捨てられ、新規タブが
   # 親の cwd を継承できなくなる。modules/wsl が _ghostty_osc7_host=localhost を置く
   # (経緯はそちらのコメント)。未設定なら上流どおり $HOST を送る。
+  # 1.4.0 で上流が host / cwd から制御文字を除くようになった (ディレクトリ名経由の
+  # エスケープシーケンス注入対策) ので、差し替えた host にも同じ除去を掛けたままにする。
   # _ghostty_report_pwd は precmd の _ghostty_deferred_init で定義されるため .zshrc から
   # 関数を再定義しても間に合わない。変数は呼び出し時に読まれるので .zshrc で置けばよい。
   ghosttyZshIntegration =
@@ -51,7 +53,7 @@ let
         ${pkgs.ghostty}/share/ghostty/shell-integration/zsh/ghostty-integration \
         $out \
         --replace-fail 'builtin local ps1_changed=0' 'builtin local ps1_changed=1' \
-        --replace-fail '"$HOST""$PWD"' '"''${_ghostty_osc7_host:-$HOST}""$PWD"'
+        --replace-fail '"''${HOST//[[:cntrl:]]}"' '"''${''${_ghostty_osc7_host:-$HOST}//[[:cntrl:]]}"'
     '';
 in
 {
