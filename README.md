@@ -187,6 +187,22 @@ az version
 `with` などのオプションを変えたときは、既存の venv に反映されないので
 `mise install --force pipx:azure-cli` で作り直す。
 
+### Terraform のセットアップ（全ホスト共通）
+
+Terraform は Nix ではなく mise の `aqua:hashicorp/terraform` (releases.hashicorp.com の公式 zip を
+`SHA256SUMS` で検証して入れる) で管理する。nixpkgs の terraform は unfree (BSL 1.1) で
+cache.nixos.org に無く、nixpkgs を上げるたびにソースビルドになるため。バージョンは `home.nix` の
+`programs.mise.globalConfig.tools` で固定しており、home-manager の適用だけではインストールされない。
+初回とバージョンを上げた後に実行する:
+
+```bash
+# home.nix で固定したバージョンを入れる
+mise install aqua:hashicorp/terraform
+
+# 確認 (新しいシェルで。既存のシェルは PATH が古いままなので mise exec -- terraform version)
+terraform version
+```
+
 ### ホスト別 ssh 設定のセットアップ（全ホスト共通）
 
 ホスト別の ssh 設定 (`Host` / `HostName` / `User` 等) は private リポジトリ

@@ -66,6 +66,11 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
   2. Claude Code の Bash は PATH がセッション開始時に固定されるので、入っていても PATH に無いことがある。そのときは `mise exec -- az ...` で実行する。
   3. それでも動かなければ、自分で直そうとせず状況を報告して指示を待つ。
   バージョンを上げるときは `home.nix` を書き換えて PR にする (mise のグローバル設定は home-manager 管理のシンボリックリンクなので、`mise use -g` / `mise upgrade` で書き換えない)。
+- **Terraform (`terraform`) は mise の `aqua:hashicorp/terraform` を使う。** nixpkgs の `terraform` は unfree (BSL 1.1) で cache.nixos.org に無く、nixpkgs を上げるたびにソースビルドになるので Nix からは外してある (home-manager#241)。バージョンは `~/.config/home-manager/home.nix` の `programs.mise.globalConfig.tools` で固定している。`terraform` が見つからないときに **`nix shell nixpkgs#terraform` / `nixpkgs#opentofu` / HashiCorp の apt リポジトリ / zip の手動配置 / tfenv で別途入れない** (どの `terraform` が動いているか分からなくなる)。次の順で対処する:
+  1. `mise ls aqua:hashicorp/terraform` で入っているか確認し、未インストールなら `mise install aqua:hashicorp/terraform`。
+  2. PATH に無ければ `mise exec -- terraform ...` で実行する (Azure CLI と同じ理由)。
+  3. それでも動かなければ、自分で直そうとせず状況を報告して指示を待つ。
+  バージョンを上げるときは Azure CLI と同じく `home.nix` を書き換えて PR にする。プロジェクトが別バージョンを要求する場合 (CI の `terraform_version` 等) も、グローバル設定は書き換えず、そのプロジェクト内で `mise exec aqua:hashicorp/terraform@<ver> -- terraform ...` を使う。
 
 ## 行動規範
 
