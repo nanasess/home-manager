@@ -145,7 +145,7 @@ Use the recipe's :branch, falling back to the remote default branch."
                     (font-spec :family "Hiragino Kaku Gothic ProN"))
   (setq face-font-rescale-alist '((".*Hiragino.*" . 1.2))))
 
-;; GNU/Linux (WSL2, Ubuntu)
+;; GNU/Linux (WSL2, NixOS)
 ;; JPDOC をプライマリフォントに使用 (East Asian Ambiguous 文字が全角グリフ)
 (when (eq system-type 'gnu/linux)
   ;; variable-pitch / fixed-pitch も静的フォントに固定する。
@@ -231,7 +231,7 @@ Emacs 既定 (East Asian Ambiguous はすべて幅 1) を使う。"
     (add-hook 'after-make-frame-functions #'my/apply-char-width-table)
   (my/apply-char-width-table))
 
-;; Ubuntu (GNOME + Wayland) では ibus が常駐しており、入力ソースに ibus-skk が
+;; GNOME + Wayland (k-2) では ibus が常駐しており、入力ソースに ibus-skk が
 ;; 選ばれた状態だと Emacs にプリエディットが送り込まれて nskk が使えなくなる。
 ;; emacs-wrapper が設定する GTK_IM_MODULE / XMODIFIERS はそれぞれ GTK の IM モジュール
 ;; 選択と X11 の XIM 用で、pgtk ビルド (emacs30-pgtk) + Wayland では GNOME Shell が
@@ -246,7 +246,7 @@ Emacs 既定 (East Asian Ambiguous はすべて幅 1) を使う。"
 (defun my/pgtk-disable-im-context (&optional frame)
   "FRAME (既定は選択中のフレーム) の GtkIMContext を無効化する。
 pgtk フレーム以外 (X11 の `x' や tty の `t') では何もしないので、
-wsl-gentoo の非 pgtk 構成に読み込まれても無害。"
+WSL の非 pgtk 構成に読み込まれても無害。"
   (let ((frame (or frame (selected-frame))))
     (when (and (fboundp 'pgtk-use-im-context)
                (eq (framep frame) 'pgtk))
@@ -537,8 +537,8 @@ wsl-gentoo の非 pgtk 構成に読み込まれても無害。"
   ;; WSL では browse-url の既定経路 (browse-url-default-browser → xdg-open) が
   ;; WSLg 上の Linux ブラウザを起動してしまい、Windows 側の既定ブラウザに渡らない。
   ;; xdg-open は DE を検出できた場合 $BROWSER を見ずに .desktop 側へ振るため。
-  ;; そこで BROWSER が指すコマンド (wsl-gentoo.nix では wsl-open) を
-  ;; browse-url から直接叩く。BROWSER 未設定のホスト (ubuntu 等) では既定のまま。
+  ;; そこで BROWSER が指すコマンド (modules/wsl では wsl-open) を
+  ;; browse-url から直接叩く。BROWSER 未設定のホスト (k-2 等) では既定のまま。
   ;; BROWSER は XDG 仕様上 ":" 区切りのリストになり得るので xdg-open と同じく
   ;; 順に試し、実体のあるものを採る (wslview が消えていた事例があるため
   ;; executable-find は必須)。どれも無ければ既定経路にフォールバックする。
@@ -1483,11 +1483,6 @@ JSON からはグループを特定できないため。"
   :bind (:map mermaid-mode-map
          ("TAB" . mermaid-indent-line)
          ("<tab>" . mermaid-indent-line)))
-
-;;; ebuild-mode (Gentoo)
-(use-package ebuild-mode
-  :ensure (:url "https://anongit.gentoo.org/git/proj/ebuild-mode.git"
-           :pre-build (("make"))))
 
 ;;;; ============================================================
 ;;;; Email (Mew)

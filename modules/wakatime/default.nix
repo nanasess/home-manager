@@ -7,7 +7,7 @@ let
   #
   # 優先順:
   #   1. $XDG_RUNTIME_DIR (Linux systemd-logind / Wayland 環境で設定済み)
-  #   2. /run/user/$UID (Linux 標準の per-user tmpfs。Gentoo / Ubuntu)
+  #   2. /run/user/$UID (Linux 標準の per-user tmpfs)
   #   3. $TMPDIR (macOS の /var/folders/.../T/ 等。user-private、再起動で消去)
   #
   # 結果は変数 _wakatime_cache に格納される。

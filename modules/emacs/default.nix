@@ -63,14 +63,14 @@ in
     (callPackage ../../pkgs/mew.nix { })
     # Mew の master password 方式 (init.el の mew-use-master-passwd t) は
     # ~/Mail/.mew-passwd.gpg を `gpg -c` で読み書きする (mew-prog-passwd の既定は
-    # "gpg"、gpg-connect-agent も呼ぶ)。wsl-gentoo / ubuntu はシステム側の gnupg で
+    # "gpg"、gpg-connect-agent も呼ぶ)。旧 wsl-gentoo / ubuntu はシステム側の gnupg で
     # 動いていたが、NixOS (k-2) には無く M-x mew が "Searching for program gpg" で
     # 止まるので、mew-bin と同じくここで揃える。
     gnupg
   ];
 
   # GTK_IM_MODULE は GTK の IM モジュール選択、XMODIFIERS は X11 の XIM 用。
-  # どちらも pgtk ビルド (ubuntu の emacs31-pgtk) + Wayland では効かない
+  # どちらも pgtk ビルド (emacs31-pgtk) + Wayland では効かない
   # (GNOME Shell が text-input-v3 で直接繋ぐため)。そちらは init.el の
   # my/pgtk-disable-im-context が pgtk-use-im-context で無効化している。
   # ここの 2 行は X11 (WSLg / XWayland) 経由で起動した場合の保険として残す。

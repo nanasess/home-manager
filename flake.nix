@@ -12,10 +12,6 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nixgl = {
-      url = "github:nix-community/nixGL";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     # T2 Mac (k-2) 用: linux-t2 カーネル / apple-bce / WiFi・BT ファームウェア。
     # upstream の apple/t2 は nixpkgs のカーネル更新でパッチが当たらなくなるため
     # (nixos-hardware#2027)、カーネルのバージョンを固定する PR #1934 の head に一時的に向ける。
@@ -32,12 +28,12 @@
     };
   };
 
-  outputs = { self, nixpkgs, home-manager, nixgl, nixos-hardware, nixos-wsl, ... }:
+  outputs = { self, nixpkgs, home-manager, nixos-hardware, nixos-wsl, ... }:
     let
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
-      # GNOME デスクトップを持つホスト (ubuntu / k-2) 共通の home-manager モジュール。
+      # GNOME デスクトップを持つホスト (k-2) の home-manager モジュール。
       gnomeHomeModules = [
         ./home.nix
         ./modules/onedrive.nix
@@ -53,27 +49,9 @@
       ];
     in
     {
-      homeConfigurations = {
-        "nanasess@wsl-gentoo" = home-manager.lib.homeManagerConfiguration {
-          pkgs = nixpkgs.legacyPackages.x86_64-linux;
-          modules = [ ./home.nix ./hosts/wsl-gentoo.nix ./modules/wsl ./modules/onedrive.nix ./modules/portage.nix ./modules/yaskkserv2.nix ./modules/emacs ./modules/zsh ./modules/ghostty ./modules/wakatime ./modules/claude ];
-        };
-        "nanasess@ubuntu" = home-manager.lib.homeManagerConfiguration {
-          pkgs = nixpkgs.legacyPackages.x86_64-linux;
-          modules = gnomeHomeModules ++ [
-            ./hosts/ubuntu.nix
-            ./modules/t2-suspend
-            ./modules/ibus-skk/ubuntu.nix
-            {
-              targets.genericLinux.nixGL.packages = nixgl.packages;
-            }
-          ];
-        };
-      };
-
       # NixOS ホスト。home-manager は NixOS モジュールとして読み込む (issue #151)。
       nixosConfigurations = {
-        # Intel MacBook Pro 13" 2020 (MacBookPro16,2, T2)。Ubuntu 24.04 からの移行先。
+        # Intel MacBook Pro 13" 2020 (MacBookPro16,2, T2)。Ubuntu 24.04 から移行した (issue #151)。
         "k-2" = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           modules = [
@@ -100,7 +78,7 @@
           ];
         };
 
-        # WSL2 上の NixOS (NixOS-WSL)。wsl-gentoo からの移行先 (issue #183)。
+        # WSL2 上の NixOS (NixOS-WSL)。wsl-gentoo から移行した (issue #183)。
         # 初回導入用の tarball は config.system.build.tarballBuilder で作る (README)。
         "wsl-nixos" = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";

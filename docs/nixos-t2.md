@@ -64,7 +64,7 @@ Ubuntu と同じ。内蔵カメラ、Touch ID。
 
 ### サスペンド
 
-Ubuntu では `deep` (S3) で動作していた。`modules/t2-suspend` が sudo で配置していた
+Ubuntu では `deep` (S3) で動作していた。旧 `modules/t2-suspend` が sudo で配置していた
 logind / sleep.conf の設定は `configuration.nix` の `services.logind.settings` /
 `systemd.sleep.settings` に移した。
 
@@ -450,7 +450,7 @@ Ubuntu の fallback (`fbx64.efi`) が走って BootOrder が Ubuntu 先頭に戻
 
 ## Ubuntu 版との差分 (home-manager 側)
 
-`hosts/ubuntu.nix` にあった以下は NixOS では不要:
+`hosts/ubuntu.nix` (issue #183 で撤去) にあった以下は NixOS では不要:
 
 - nixGL wrap — GPU ライブラリがシステムと同じ nixpkgs から来る
 - `.desktop` / アイコンの手動配置 — `XDG_DATA_DIRS` に `/etc/profiles/per-user/<user>/share`

@@ -10,7 +10,7 @@
 |---|---|---|
 | elisp (Mew 本体) | elpaca (`use-package mew`、上流 kazu-yamamoto/Mew) | MELPA の recipe (`elisp/*.el` `etc` `info/*.info*`) を継承。nixpkgs の `emacsPackages.mew` は elisp のみで `bin/` を含まないので使わない |
 | 外部コマンド (`mewl` `mewencode` `incm` `cmew` `smew` `mew-pinentry`) | Nix (`pkgs/mew.nix`、`modules/emacs/default.nix` の `home.packages`) | `bin/` だけを configure + make。`cmew` / `smew` は Ruby + sqlite3 gem 付きの ruby に shebang を差し替える。nixpkgs の `mew` は無関係な dmenu の Wayland 移植 |
-| gpg (master password ファイルの暗号化) | Nix (`gnupg`、`modules/emacs/default.nix` の `home.packages`) | `mew-prog-passwd` の既定 `gpg` と `gpg-connect-agent`。wsl-gentoo (portage) / ubuntu (apt) はシステム側にもあるが、NixOS (k-2) には無いので Nix で揃える |
+| gpg (master password ファイルの暗号化) | Nix (`gnupg`、`modules/emacs/default.nix` の `home.packages`) | `mew-prog-passwd` の既定 `gpg` と `gpg-connect-agent`。NixOS (k-2 / wsl-nixos) のシステムには無いので Nix で揃える |
 | 秘密情報 | 1Password (`op://Personal/Mew Gmail XOAUTH2/…`) | Emacs からは `op read` で実行時に解決 (`my/op-read`)。init.el に残るのは op:// 参照だけ |
 | メール本体 / トークン | `~/Mail` (管理外) | IMAP キャッシュ、下書き、`.mew-passwd.gpg` (OAuth2 トークン) |
 
@@ -33,11 +33,10 @@ elisp と bin は **同じ上流コミット** に固定する (`modules/emacs/e
 - `op read` が失敗 (1Password 未起動 / ロック中 / アイテム無し) すると `M-x mew` が
   `user-error` で止まる。1Password 側を直してもう一度 `M-x mew` すればよい。
   フィールドが未入力でも `op read` は exit 0 で空文字を返すので、`my/op-read` が空を弾く。
-- wsl-gentoo の `op` は `~/.local/bin/op` ラッパー → Windows 側 `op.exe`。Emacs の
+- WSL (wsl-nixos) の `op` は `~/.local/bin/op` シム → Windows 側 `op.exe` (`docs/1password-wsl.md`)。Emacs の
   `exec-path` に `~/.local/bin` が入っているので Emacs からも同じ経路で解決できる。
 - k-2 は `programs._1password.enable` (NixOS) が setgid wrapper 付きの `op` を systemPackages に
   入れる。home-manager 側で `_1password-cli` を足すと wrapper を隠して GUI 連携が壊れるので足さない。
-  ubuntu は apt の `1password-cli` (aptPackages 未宣言、要確認)。
 
 ### 認可 URL に access_type=offline / prompt=consent を足す
 
@@ -71,8 +70,7 @@ init.el では `mew-oauth2-get-auth-code` を `:override` で置き換え、`&ac
 
 その代わり `curl` への実行時依存は残る。Mew は `mew-prog-curl` (既定 `"curl"`) を
 `mew-which-exec` で `exec-path` から探し、無ければ `"curl does not exist"` と表示してトークン取得を
-諦める。wsl-gentoo は portage の、NixOS / Ubuntu は既定のシステム `curl` を使う (Nix では
-明示していない)。
+諦める。NixOS は既定のシステム `curl` を使う (Nix では明示していない)。
 
 上流へ還元する価値が残るのは `access_type=offline` / `prompt=consent` (または追加パラメータ用の変数)
 の 1 点。
@@ -142,7 +140,7 @@ vault `Personal` に `Mew Gmail XOAUTH2` (Login) を作り、以下のフィー�
 参照は init.el の `my/mew-op-item` (`op://Personal/Mew Gmail XOAUTH2`)。アイテム名や vault を
 変えたらそこも直す。
 
-作成例 (Linux 側の `/usr/bin/op`。wsl-gentoo の `~/.local/bin/op` ラッパー経由だと
+作成例 (Linux 側の op (`wsl.opLinux`)。WSL の `~/.local/bin/op` シム経由だと
 op.exe が stdin のテンプレートを "invalid JSON in piped input" で受け取れない):
 
 ```bash
@@ -166,7 +164,7 @@ mv ~/Mail/.mew-passwd.gpg ~/Mail/.mew-passwd.gpg.2024-09-04
 
 ### 4. 初回起動
 
-`home-manager switch` 後に Emacs を再起動し (elpaca が Mew を取得・ビルドする)、`M-x mew`。
+`nixos-rebuild switch` 後に Emacs を再起動し (elpaca が Mew を取得・ビルドする)、`M-x mew`。
 
 1. 1Password の承認ダイアログ (client-id / client-secret / password の順に `op read`)
 2. ブラウザで Google の認可画面が開く → 許可 → `http://localhost:28080/?code=…` に戻り、
@@ -243,7 +241,7 @@ Emacs 側は `M-x elpaca-checkout-branches` → `M-x elpaca-pull-all` → `M-x e
 | `Master password is wrong!` | 旧 `.mew-passwd.gpg` が残っている (手順 3)。または 1Password の `password` を変えた |
 | 認可後にブラウザが `localhost:28080` に繋がらない | Emacs 側でリスナが立っているか (`M-x list-processes` に `oauth2-redirect-handler:28080`)。WSL の `networkingMode` |
 | `Must issue a STARTTLS command first` | `smtp-ssl-port` が 587 になっている。465 に戻す |
-| `M-x mew` で `mewl` が無いと言われる | `home-manager switch` 後に Emacs を再起動したか (`exec-path` は起動時の PATH) |
-| `Searching for program … "gpg"` (`mew-passwd-save`) | `gpg` が PATH に無い。`modules/emacs/default.nix` の `gnupg` が入っているか、`home-manager switch` (NixOS は `nixos-rebuild switch`) 後に Emacs を再起動したか |
+| `M-x mew` で `mewl` が無いと言われる | `nixos-rebuild switch` 後に Emacs を再起動したか (`exec-path` は起動時の PATH) |
+| `Searching for program … "gpg"` (`mew-passwd-save`) | `gpg` が PATH に無い。`modules/emacs/default.nix` の `gnupg` が入っているか、`nixos-rebuild switch` 後に Emacs を再起動したか |
 | 1 時間ごとにブラウザ認可が出る | リフレッシュ トークンが無い。`(gethash :refresh_token (mew-passwd-get-passwd (car (mew-passwd-get-keys))))` が nil なら、認可 URL の override (`my/mew-oauth2-get-auth-code`) が効いているか確認し、`(mew-passwd-set-passwd k nil)` + `(mew-passwd-save)` で消してから再認可する |
 | `All members of mew-thread-indent-strings must have the same length` | `mew-lang-jp.el` の罫線インデント `["┣" "┗" "┃" "　"]` が、この環境の文字幅 (罫線 1 / U+3000 2) で揃わない。init.el の `:init` で ASCII に固定してある。`:custom` に移すと効かない (defvar が先に束縛し defcustom は現在値を優先) |

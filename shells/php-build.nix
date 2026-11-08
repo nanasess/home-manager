@@ -4,8 +4,7 @@
 #     -c mise install php@8.5
 #
 # NixOS (k-2) には cc / make / /usr/include といった FHS 前提のビルド環境が無く、
-# mise install php が「missing system dependencies」で止まる。wsl-gentoo では
-# 同じ依存を portage (hosts/wsl-gentoo.nix) で入れている。
+# mise install php が「missing system dependencies」で止まる (k-2 / wsl-nixos 共通)。
 #
 # プラグインが要求するもの (plugins/php/metadata.lua の systemDependencies):
 #   - 必須ツール: cc, make, autoconf, bison >= 3.0, re2c, pkg-config

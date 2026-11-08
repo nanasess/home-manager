@@ -1,6 +1,6 @@
 { config, pkgs, ... }:
 # Walker (アプリケーションランチャー) + Elephant (データプロバイダ) の共通モジュール。
-# GNOME セッションを持つホスト (ubuntu / k-2) で共有する。
+# GNOME セッションを持つホスト (現在は k-2) で使う。
 let
   # GNOME のカスタムキーバインドから起動するとき、コマンドの環境には Nix プロファイルの
   # bin が無い場合がある (Ubuntu のセッションでは ~/.nix-profile/bin が PATH に入らない)。

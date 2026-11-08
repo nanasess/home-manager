@@ -58,14 +58,13 @@ let
 
   # Windows port (PR #12167) 固有の追加設定
   # - command: 起動時に WSL の NixOS ディストリ (wsl-nixos) をログインシェルで立ち上げる。
-  #   Issue #183 で既定を Gentoo-systemd から移した。設定は wsl-gentoo / wsl-nixos 共通なので
-  #   どちらのホストで switch しても NixOS が起動する (Gentoo は wsl.exe -d Gentoo-systemd で入る)
+  #   Issue #183 で既定を Gentoo-systemd から移した (wsl-gentoo は撤去済み)。
   #   "direct:" プレフィックスを付けて /bin/sh -c ラップを回避 (Windows には sh が無い)
   #   --cd ~ でホームディレクトリに入る
   # - env = WSLENV=TERM: ConPTY 経由で wsl.exe を起動する構成では、Windows 側
   #   プロセスの env は WSL のシェルに届かない。TERM も例外ではなく、何もしないと
   #   WSL 側の既定である xterm-256color になる。実測:
-  #     TERM=probe wsl.exe -d Gentoo-systemd -- sh -c 'echo $TERM'  → xterm-256color
+  #     TERM=probe wsl.exe -d <distro> -- sh -c 'echo $TERM'  → xterm-256color
   #     TERM=probe WSLENV=TERM wsl.exe ... 同上                      → probe
   #   WSLENV は wsl.exe 自身の env から読まれるので、ghostty の env オプションで
   #   注入すれば Windows 側のユーザー環境変数 (setx) を触らずに伝播できる。これで
@@ -195,7 +194,7 @@ in
 
   # xterm-ghostty の terminfo を ~/.terminfo に配置する。
   #
-  # wsl-gentoo は端末が Windows 側で動く (noctty / Ghostty Windows port /
+  # WSL ホストは端末が Windows 側で動く (noctty / Ghostty Windows port /
   # GhostInTheWSL) ため WSL 側に ghostty パッケージを入れておらず、
   # TERM=xterm-ghostty だけが渡ってくる。ConPTY 経由の noctty / Windows port では
   # それも自動では渡らないので、上の env = WSLENV=TERM で明示的に伝播させている
@@ -203,7 +202,7 @@ in
   # terminfo が無いと zsh/readline が行編集・履歴表示を崩すので、terminfo だけを
   # 独立 output (クロージャ 4.9 KiB、ghostty 本体を引き込まない) から供給する。
   #
-  # 配置先を ~/.terminfo にする理由: ncurses は system 版 (Gentoo/Ubuntu の
+  # 配置先を ~/.terminfo にする理由: ncurses は system 版 (非 NixOS ディストリの
   # /usr/bin) と Nix 版のどちらも ~/.terminfo を無条件に検索するため、
   # TERMINFO_DIRS の設定なしで確実に引ける。home.packages 経由だと
   # ~/.nix-profile/share/terminfo が検索パスに入る保証がない (非 NixOS のため)。

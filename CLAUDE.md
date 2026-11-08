@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 概要
 
-Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。WSL2 (Gentoo Linux / NixOS), Ubuntu, NixOS の環境を1リポジトリで宣言的に管理する。
+Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。WSL2 (NixOS-WSL) と NixOS (T2 Mac) の環境を1リポジトリで宣言的に管理する。wsl-gentoo / ubuntu の standalone home-manager 設定は issue #183 で撤去した。
 
 ### 目標
 
-- 1リポジトリで WSL2 Gentoo + Ubuntu の設定を管理
+- 1リポジトリで WSL2 (wsl-nixos) と NixOS (k-2) の設定を管理
 - Nix Flakes による宣言的な構成管理
 - GitHub Actions CI で設定の乖離を防止
 - Emacs + elpaca 環境の管理
@@ -29,12 +29,6 @@ Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-mana
 # flake の検証（CI でも実行される）
 nix flake check
 
-# wsl-gentoo の設定をビルド（ローカル確認用）
-nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
-
-# Ubuntu の設定をビルド
-nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage'
-
 # k-2 (NixOS, T2 Mac) のシステム設定を評価 / ビルド
 # toplevel は linux-t2 カーネルと Apple 復旧イメージ (KVM 必須) を抱えるので、
 # 他ホストでは評価 + home-manager 部分のビルドまでに留める (docs/nixos-t2.md)
@@ -46,8 +40,6 @@ nix eval --raw '.#nixosConfigurations.wsl-nixos.config.system.build.toplevel.drv
 nix build '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage'
 
 # 設定を適用
-home-manager switch --flake '.#nanasess@wsl-gentoo'
-home-manager switch --flake '.#nanasess@ubuntu'
 sudo nixos-rebuild switch --flake '.#k-2'   # NixOS ホスト (home-manager も同時に適用)
 sudo nixos-rebuild switch --flake '.#wsl-nixos'
 
@@ -58,10 +50,10 @@ nix fmt
 nix flake update
 
 # ビルドログ確認
-nix log '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
+nix log '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage'
 
-# ドライラン
-home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
+# ドライラン (sudo 不要)
+nixos-rebuild dry-build --flake '.#wsl-nixos'
 ```
 
 ## アーキテクチャ
@@ -69,17 +61,15 @@ home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
 ### ディレクトリ構成
 
 ```text
-flake.nix              -- エントリポイント（inputs、homeConfigurations、nixosConfigurations）
+flake.nix              -- エントリポイント（inputs、nixosConfigurations、packages、devShells）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
-  wsl-gentoo.nix       -- WSL Gentoo 固有設定（gentooPackages と check-system-packages、op の setgid バイナリのパス）。WSL 共通部分は modules/wsl
-  ubuntu.nix           -- Ubuntu 固有設定（Ghostty (nixGL)、apt 差分チェック、GNOME 拡張）
-  k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu からの移行先 (docs/nixos-t2.md)
+  k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu から移行 (docs/nixos-t2.md)
     configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager + l2tp、usbmuxd (iPhone テザリング)、1Password、ibus、nix-ld + Playwright 用ライブラリ、蓋閉じ suspend + Touch Bar 復帰フック、restic → NAS バックアップ）
     hardware-configuration.nix -- ディスク (LABEL 参照) / カーネルモジュール
-    home.nix           -- ユーザー環境（hosts/ubuntu.nix の NixOS 版）
+    home.nix           -- ユーザー環境（GNOME / Ghostty / 開発ツール）
     scripts/backup-before-install.sh -- インストール前の退避（ファームウェア / ESP イメージ / システム情報）
-  wsl-nixos/           -- NixOS-WSL。wsl-gentoo からの移行先 (issue #183。導入手順は README)
+  wsl-nixos/           -- NixOS-WSL。wsl-gentoo から移行 (issue #183。導入手順は README)
     configuration.nix  -- システム設定（NixOS-WSL の wsl.*、Docker Desktop 統合、sudo はパスワード必須、DNS は WSL 生成の resolv.conf）
     home.nix           -- ユーザー環境（WSL 共通は modules/wsl、wsl.opLinux = /run/wrappers/bin/op、WSLg スタートメニュー用の 1Password / Chrome の .desktop）
 modules/
@@ -97,11 +87,9 @@ modules/
     default.nix        -- Ghostty 共有設定（Linux native / Windows port (PR #12167) 両対応、_module.args で公開）
   bluetooth-audio/
     default.nix        -- Bluetooth オーディオ（HFP 自動切替の無効化 + pavucontrol。GNOME ホスト共通）
-    51-disable-headset-autoswitch.lua -- WirePlumber 0.4 (ubuntu) の自動プロファイル切替を無効化
-    51-disable-headset-autoswitch.conf -- 同 0.5 以降 (NixOS) 用
+    51-disable-headset-autoswitch.conf -- WirePlumber 0.5 以降の自動プロファイル切替を無効化
   ibus-skk/
-    default.nix        -- ibus-skk の辞書設定 (dconf、ホスト共通)
-    ubuntu.nix         -- IBus SKK エンジン登録（Nix ビルドの 1.4.4 + IBUS_COMPONENT_PATH。ubuntu 用）
+    default.nix        -- ibus-skk の辞書設定 (dconf)。エンジン登録は hosts/k-2/configuration.nix
   walker/
     default.nix        -- Walker / Elephant ランチャー（systemd ユーザーサービス + GNOME キーバインド。GNOME ホスト共通）
   xremap/
@@ -109,13 +97,12 @@ modules/
   nixos/
     common.nix         -- NixOS ホスト共通のシステム設定（zsh、nix-ld + Playwright / mise の dotnet (ICU) 用ライブラリ、1Password、Chrome の 1Password 拡張）。unfree 許可は各ホスト
   wsl/
-    default.nix        -- WSL ホスト共通（Windows 側への noctty / Ghostty 設定・ssh config + conf.d ミラー・UDEV Gothic・mackerel のコピー、op シム、wl-paste shim、gpg-agent、WSLg X11/Wayland）
-  portage.nix          -- Portage 設定（WSL Gentoo 用、xdg.configFile で ~/.config/portage/ に書き出し）
-  onedrive.nix         -- OneDrive 設定（WSL Gentoo 用）
-  yaskkserv2.nix       -- SKK 辞書サーバ（systemd ユーザーサービス。wsl-gentoo / ubuntu 共通）
+    default.nix        -- WSL ホスト（Windows 側への noctty / Ghostty 設定・ssh config + conf.d ミラー・UDEV Gothic・mackerel のコピー、op シム、wl-paste shim、gpg-agent、WSLg X11/Wayland）
+  onedrive.nix         -- OneDrive 設定（systemd ユーザーサービス。全ホスト共通）
+  yaskkserv2.nix       -- SKK 辞書サーバ（systemd ユーザーサービス。全ホスト共通）
 pkgs/
   yaskkserv2.nix       -- yaskkserv2 の自作 Nix derivation（buildRustPackage、nixpkgs 未収録のため）
-  ibus-skk.nix         -- ibus-skk 1.4.4 の自作 Nix derivation（nixpkgs 未収録 + apt は 1.4.3 で停滞）
+  ibus-skk.nix         -- ibus-skk 1.4.4 の自作 Nix derivation（nixpkgs 未収録 + Debian は 1.4.3 で停滞）
   mew.nix              -- Mew (Emacs メーラ) の外部コマンド mewl / mewencode / incm / cmew / smew（emacsPackages.mew は elisp のみで bin/ を含まない）
   chatgpt/             -- ChatGPT デスクトップアプリ (Linux 版) の deb 再パッケージ（nixpkgs の chatgpt は Darwin 専用。source.nix + update.sh でバージョン固定 / 追従）
 shells/
@@ -127,8 +114,10 @@ docs/                  -- 領域別の詳細ドキュメント（下記「詳細
 
 ### ホスト設定の追加パターン
 
+非 NixOS (standalone home-manager) のホストは現在無い。足すときは:
+
 1. `hosts/<hostname>.nix` を作成（ホスト固有の設定）
-2. `flake.nix` の `homeConfigurations` にエントリを追加（`modules = [ ./home.nix ./hosts/<hostname>.nix ./modules/emacs ./modules/zsh ]`）
+2. `flake.nix` に `homeConfigurations` を作り直してエントリを追加（`modules = [ ./home.nix ./hosts/<hostname>.nix ./modules/emacs ./modules/zsh ]`）
 
 NixOS ホストは `hosts/<hostname>/{configuration,hardware-configuration,home}.nix` を作り、
 `flake.nix` の `nixosConfigurations` に `nixpkgs.lib.nixosSystem` で追加する。home-manager は
@@ -150,23 +139,21 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 | Emacs ネイティブ依存 | Nix (cmigemo 等) | ビルド依存の解決 |
 | Ghostty 設定 | 共有 Nix attrset + renderer | `programs.ghostty.settings` (Linux native) と `%LOCALAPPDATA%\{noctty,ghostty}\config.ghostty` (Windows 側、activation でコピー) を同一 attrset から生成 |
 | East Asian Ambiguous 文字幅 | Emacs GUI のみ locale-eaw `eaw-console.el` | ターミナル (noctty / Ghostty 系) は Ambiguous を幅 1 に固定していて変更不可。glibc / ターミナル側は素の幅 1 に統一し、独立レンダラの Emacs GUI だけ幅 2 を維持。Emacs tty フレームは `use-default-char-width-table` で幅 1 に戻す (既定は罫線まで幅 2 になる) |
-| Portage 設定 | home-manager (xdg.configFile) | `~/.config/portage/` に書き出し、`/etc/portage/` から個別にシンボリックリンク |
-| システムパッケージ一覧 | Nix リスト + チェックスクリプト | 各ホストの nix ファイルで宣言、`check-system-packages` で差分確認 |
-| SKK 辞書サーバ (yaskkserv2) | Nix ビルド (`pkgs/yaskkserv2.nix`) + systemd ユーザーサービス (`modules/yaskkserv2.nix`) | nixpkgs / apt に無いため上流を `buildRustPackage`。全ホスト同一バイナリ + ユーザーパス辞書 (`~/.local/share/yaskkserv2/all`) で sudo 不要・共通化 |
-| IBus SKK エンジン | Nix ビルド (`pkgs/ibus-skk.nix`) + `IBUS_COMPONENT_PATH` (`modules/ibus-skk/`) | apt / nixpkgs とも 1.4.4 未提供。apt 版 1.4.3 は変換確定が壊れる（`docs/ibus-skk.md`）。IBus は `XDG_DATA_DIRS` を見ないため `systemd.user.sessionVariables` でエンジンを登録する |
+| SKK 辞書サーバ (yaskkserv2) | Nix ビルド (`pkgs/yaskkserv2.nix`) + systemd ユーザーサービス (`modules/yaskkserv2.nix`) | nixpkgs に無いため上流を `buildRustPackage`。全ホスト同一バイナリ + ユーザーパス辞書 (`~/.local/share/yaskkserv2/all`) で sudo 不要・共通化 |
+| IBus SKK エンジン | Nix ビルド (`pkgs/ibus-skk.nix`) + `i18n.inputMethod.ibus.engines` (`hosts/k-2/configuration.nix`)、辞書設定は `modules/ibus-skk/` | Debian / nixpkgs とも 1.4.4 未提供。1.4.3 は変換確定が壊れる（`docs/ibus-skk.md`） |
 | Mew (Emacs メーラ、Gmail XOAUTH2) | elisp は elpaca (`use-package mew`)、外部コマンドは Nix (`pkgs/mew.nix`)、秘密情報は 1Password (`op://Personal/Mew Gmail XOAUTH2/…` を `M-x mew` 初回に `op read`) | `emacsPackages.mew` は elisp のみで `bin/` を含まず、nixpkgs の `mew` は無関係 (dmenu の Wayland 移植)。OAuth2 トークンは master password 方式 (`~/Mail/.mew-passwd.gpg`) でしか永続化されないため master password も 1Password から供給する（`docs/mew.md`）。elisp と bin は同じ上流コミットに固定する |
 | ChatGPT デスクトップアプリ | Nix ビルド (`pkgs/chatgpt/`) + `hosts/k-2/configuration.nix` の systemPackages | nixpkgs の `chatgpt` は Darwin 専用。OpenAI 公式 deb (Electron) を dpkg 展開 + autoPatchelf で包む。`latest` URL は中身が変わるので apt pool のバージョン付き URL + SHA256 に固定し、`pkgs/chatgpt/update.sh` が Packages インデックスから `source.nix` を更新。同梱プラグインの `~/.codex/.tmp/` へのコピーが Nix ストアの 555 モードを写して EACCES になるため app.asar を展開 → chmod 挿入 → 再パックしている（詳細は `default.nix` のコメント）。Codex ランタイム (`~/.codex/`) はアプリが自己更新する管理外状態 |
 | キーリマップ (xremap) | Nix (`xremap` gnome variant) + systemd ユーザーサービス (`modules/xremap/`) | Chrome にキーバインド変更機能が無いため evdev/uinput レベルで置換。アプリ判定に GNOME Shell 拡張が要る。`input` グループ / udev ルールのみ root 作業として残る |
 | Bluetooth オーディオ | home-manager (xdg.configFile) + pavucontrol | WirePlumber の HFP 自動切替を無効化し、A2DP (ステレオ) / HFP (マイク) は pavucontrol で手動切替。プロファイルの記憶 (`~/.local/state/wireplumber/`) はランタイム状態のため管理外 |
 | クリップボード画像 (WSL) | `wl-paste` shim (`modules/wsl`) | WSLg が `image/bmp` しか出さず Claude Code が扱えないため、`image/png` を追加広告して ImageMagick で変換（`docs/clipboard-image-paste.md`） |
-| PHP (mise) | mise php プラグイン (ソースビルド) + ビルド依存はホスト別 | wsl-gentoo は portage、k-2 は `nix develop .#php-build` (`shells/php-build.nix`)。gettext / readline / gmp の `configure` は `/usr` 直下しか探さないので devShell が `PHP_EXTRA_CONFIGURE_OPTIONS` でストアパスを渡す。RPATH に `/nix/store` が焼き込まれるため `--profile` で GC root を作る (README「mise PHP のセットアップ」) |
+| PHP (mise) | mise php プラグイン (ソースビルド) + ビルド依存は devShell | NixOS ホスト (k-2 / wsl-nixos) は `nix develop .#php-build` (`shells/php-build.nix`)。gettext / readline / gmp の `configure` は `/usr` 直下しか探さないので devShell が `PHP_EXTRA_CONFIGURE_OPTIONS` でストアパスを渡す。RPATH に `/nix/store` が焼き込まれるため `--profile` で GC root を作る (README「mise PHP のセットアップ」) |
 | Azure CLI | mise `pipx:azure-cli` (uv tool で PyPI の wheel を venv に入れる、`home.nix` の `programs.mise`)。zsh 補完は `modules/zsh` がビルド時に生成 | nixpkgs の azure-cli は Python の依存木が大きく、無関係なパッケージの broken で評価ごと止まる (NixOS/nixpkgs#575989、issue #231)。PyPI の wheel は Microsoft 公式で、NixOS では uv の Python を nix-ld で動かす。awscli2 は壊れていないので Nix のまま |
 | Terraform | mise `aqua:hashicorp/terraform` (HashiCorp 公式の zip を SHA256SUMS で検証、`home.nix` の `programs.mise` でバージョン固定) | nixpkgs の terraform は unfree (BSL 1.1) のため Hydra がビルドせず cache.nixos.org に無い。nixpkgs を上げるたびに Go のソースビルドになっていた。OpenTofu (キャッシュあり) は CI の terraform とロックファイル / state の互換を確かめる手間があるので採らない。`home.nix` の `allowUnfreePredicate` は空でも残す (`useGlobalPkgs` を使わない理由のため) |
 | Playwright ブラウザ (k-2) | 公式配布バイナリ (`playwright install`) + `programs.nix-ld.libraries` (`hosts/k-2/configuration.nix`) | nixpkgs の `playwright-driver` (1.61) はプロジェクト側 (`@playwright/test` 1.63) とブラウザリビジョンが合わず、nixpkgs 側で追従すると更新のたびに hash 更新が要る。Chromium の実行時ライブラリだけ nix-ld に載せて公式バイナリを使う (`playwright install-deps` 相当)。nixpkgs に依存ライブラリのみのパッケージは無い (2026-09 時点) |
 | ホスト別 ssh 設定 | private リポジトリ `nanasess/ssh_conf.d` を `~/.ssh/conf.d` に clone、`programs.ssh.includes` で読む。未 clone は activation (`sshConfDCheck`) が警告。WSL ホストは Windows の ssh.exe 用に `%USERPROFILE%\.ssh\` へミラー (`modules/wsl` の `windowsSshConfig`) | 顧客名・接続先の一覧なので public のこのリポジトリには submodule / flake input でも入れない。1Password に登録できない古い鍵 (RSA の exponent 35 等) は Document に置き `ssh-legacy` (`modules/zsh`) で一時 agent に読み込む。WSL からは Windows の ssh.exe を使わない (理由は `docs/ssh-conf-d.md`) |
 | バックアップ (k-2) | restic (`services.restic.backups.nas`) → Synology DS720+ の SFTP、秘密情報は `/root/secrets/` (正本は 1Password) | flake で再現できない状態 (`~`、VPN 定義、BT ペアリング) だけを毎時送る。NAS 側は DSM 組み込み SFTP のみで追加ソフト不要、Btrfs の変更不可スナップショットで履歴を保護。ディスクイメージは取らず、復旧は再インストール + `restic-nas restore` (`docs/restic-nas.md`) |
 
-**プラットフォーム非依存化の判断基準**: portage / apt など特定ホストのパッケージマネージャに依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で wsl-gentoo (旧 portage) と ubuntu を統一した先例 (PR #110)。
+**プラットフォーム非依存化の判断基準**: 特定ディストリのパッケージマネージャ (旧 portage / apt など) に依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で当時の wsl-gentoo (portage) と ubuntu を統一した先例 (PR #110)。
 
 ### Emacs パッケージ (elpaca) の更新手順
 
@@ -191,7 +178,7 @@ lock から入れた `~/.emacs.d/elpaca/sources/*` は detached HEAD になっ�
    derivation が `pkgs/` にある場合 (Mew など) は rev / version / hash も同じコミットに揃える。
    hash は `nix flake prefetch --json github:<owner>/<repo>/<rev>` で取り、`nix build` で確認する。
 3. **検証**: `nix flake check` と対象ホストの `activationPackage` ビルド。
-4. **適用**: `home-manager switch` (lock は activation で `~/.emacs.d/elpaca.lock` に install される)。
+4. **適用**: `sudo nixos-rebuild switch --flake .#<host>` (lock は home-manager の activation で `~/.emacs.d/elpaca.lock` に install される)。
 5. **ソースを切り替える**: `git -C ~/.emacs.d/elpaca/sources/<Repo> checkout <rev>`。
    `elpaca-rebuild` のビルドステップに checkout は含まれない (`elpaca-check-version` /
    `elpaca-build-link` / `-autoloads` / `-compile` / `-docs` のみ) ので手動で行う。
@@ -271,9 +258,7 @@ upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当て�
    キャッシュから取れている。自作 derivation (`pkgs/chatgpt` など) の autoPatchelf は、nixpkgs の更新で
    他の buildInputs 経由の間接依存が消えると落ちる (PR #229 では `tpm2-tss` / `openssl`)。旧ビルドの
    rpath (`patchelf --print-rpath`) と比べ、不足分を buildInputs に明示する。
-5. **他ホストの検証**: `nix flake check`、wsl-gentoo / wsl-nixos の activationPackage。
-   ubuntu の activationPackage は Ghostty とその依存 (zig 等) がソースからのビルドになり時間がかかる
-   ので、k-2 が目的ならユーザーに確認したうえでスキップして CI に任せてよい。
+5. **他ホストの検証**: `nix flake check`、wsl-nixos の toplevel の評価と activationPackage。
 6. **closure の差分**: `nix store diff-closures /run/current-system <toplevel>` で linux-t2 /
    t2bce-* / pipewire / wireplumber / xremap の変化を PR 本文に書く。
 7. **実機確認はユーザーが行う**: カーネルが変わるので `switch` ではなく
@@ -301,7 +286,6 @@ ssh_conf.d 側に出す。このリポジトリの Issue / PR / コミットに�
 | リポジトリ | 移行対象 | 状態 |
 |-----------|---------|------|
 | `~/.config/dotfiles` | Zsh 設定、エイリアス、1Password SSH 連携 | 移行済み |
-| `~/git-repos/gentoo-ansible` | Portage 設定 (make.conf, package.use 等) | 移行済み (`modules/portage.nix`) |
 
 ### フォーマッター
 
@@ -312,8 +296,7 @@ ssh_conf.d 側に出す。このリポジトリの Issue / PR / コミットに�
 GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行:
 - **check** — `nix flake check`
 - **emacs** — `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
-- **build** — 各ホストの `activationPackage` ビルド（matrix: ubuntu-latest）
-- **nixos** — `nixosConfigurations` (k-2 / wsl-nixos) の toplevel 評価 + home-manager 部分のビルド（k-2 のカーネルとファームウェアは CI で作らない）
+- **build** — `nixosConfigurations` (k-2 / wsl-nixos) の toplevel 評価 + home-manager 部分の `activationPackage` ビルド（1 ジョブ。k-2 のカーネルとファームウェアは CI で作らない）
 
 ## 詳細ドキュメント (`docs/`)
 
@@ -322,10 +305,10 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | ドキュメント | 内容 | 主な対象 |
 |---|---|---|
 | [docs/eaw-width.md](docs/eaw-width.md) | East Asian Ambiguous 文字幅の方針 (ターミナル系は幅 1、Emacs GUI のみ幅 2)、noctty が幅 1 固定である理由 | `modules/emacs/site-lisp/eaw-console.el` |
-| [docs/bluetooth-audio.md](docs/bluetooth-audio.md) | 接続不安定 (マルチポイント / discovery 枯渇 / WiFi 2.4GHz) の切り分け、A2DP と HFP の排他、自動切替の無効化 | `modules/bluetooth-audio/` (ubuntu) |
-| [docs/nix-desktop-integration.md](docs/nix-desktop-integration.md) | nixpkgs の GUI アプリがランチャー/アイコンに出ない `XDG_DATA_DIRS` 問題と対処 | `hosts/ubuntu.nix`, 各 GUI モジュール |
-| [docs/ibus-skk.md](docs/ibus-skk.md) | apt 版 1.4.3 のバグ、`IBUS_COMPONENT_PATH` によるエンジン登録、反映手順 | `pkgs/ibus-skk.nix`, `modules/ibus-skk/` (ubuntu) |
-| [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、XKB レイヤとの関係、GNOME Wayland でのアプリ判定、root 作業 | `modules/xremap/` (ubuntu) |
+| [docs/bluetooth-audio.md](docs/bluetooth-audio.md) | 接続不安定 (マルチポイント / discovery 枯渇 / WiFi 2.4GHz) の切り分け、A2DP と HFP の排他、自動切替の無効化 | `modules/bluetooth-audio/` (k-2) |
+| [docs/nix-desktop-integration.md](docs/nix-desktop-integration.md) | 非 NixOS (旧 Ubuntu) で nixpkgs の GUI アプリがランチャー/アイコンに出ない `XDG_DATA_DIRS` 問題と対処 (記録) | 各 GUI モジュール |
+| [docs/ibus-skk.md](docs/ibus-skk.md) | 1.4.3 のバグ、エンジン登録、反映手順 | `pkgs/ibus-skk.nix`, `modules/ibus-skk/` (k-2) |
+| [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、XKB レイヤとの関係、GNOME Wayland でのアプリ判定、root 作業 | `modules/xremap/` (k-2) |
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | Claude Code への画像貼り付け。`Ctrl+V` が正解な理由、WSLg の BMP 問題と `wl-paste` shim、切り分け手順 | `modules/wsl` (WSL ホスト共通) |
 | [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS (nixpkgs の更新手順は上記「k-2 (T2) の nixpkgs / nixos-hardware の更新手順」)。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
 | [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |

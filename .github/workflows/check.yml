@@ -63,8 +63,6 @@ jobs:
     env:
       # ビルド対象。1 行 1 ホストで「表示名 activationPackage の attr」。ビルドと結果集計で共有する
       HM_TARGETS: |
-        nanasess@wsl-gentoo homeConfigurations."nanasess@wsl-gentoo".activationPackage
-        nanasess@ubuntu homeConfigurations."nanasess@ubuntu".activationPackage
         k-2 nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage
         wsl-nixos nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage
       # toplevel を評価する NixOS ホスト (HM_TARGETS の表示名と揃える)

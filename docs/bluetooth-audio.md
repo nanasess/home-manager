@@ -1,6 +1,6 @@
 # Bluetooth オーディオ (T2 Mac + Bose QC Earbuds)
 
-設定: `modules/bluetooth-audio/`（`nanasess@ubuntu` と NixOS `k-2`。WirePlumber 0.4 / 0.5 の両形式を置いている）。2026-08-12 / 08-13 の実機調査に基づく。
+設定: `modules/bluetooth-audio/`（NixOS `k-2`。WirePlumber 0.5 の `.conf` 形式。0.4 系 (Ubuntu) 用の Lua 形式は ubuntu ホストと一緒に issue #183 で外した）。2026-08-12 / 08-13 の実機調査に基づく。
 
 接続不安定の原因は実際に 3 種類あった。いずれも「電波が弱い」「混線」ではなく、**単一コントローラ（Bluetooth / WiFi ワンチップ・アンテナ共用）の奪い合い**である。切り分けは下記 3 節の順で行う。
 
@@ -96,7 +96,7 @@ A2DP は片方向でマイクの戻りチャンネルを持たず、マイクに
 
 WirePlumber の既定では、`/usr/share/wireplumber/policy.lua.d/10-default-policy.lua` の `media-role.applications` に載ったアプリが**実際にマイクを掴んだ**時点で A2DP → HFP へ自動切替する。`"Google Chrome input"` が含まれるため、Chrome のどこか 1 タブがマイク権限を使っているだけで、同じブラウザで再生している音楽まで mSBC 16kHz モノラルに巻き添えになる。
 
-`51-disable-headset-autoswitch.lua` でこれを無効化し、**運用は pavucontrol での手動切替**（音楽 = `a2dp-sink` / 会議 = `headset-head-unit-msbc`）に統一した。
+`51-disable-headset-autoswitch.conf` (当時は 0.4 系の `.lua`) でこれを無効化し、**運用は pavucontrol での手動切替**（音楽 = `a2dp-sink` / 会議 = `headset-head-unit-msbc`）に統一した。
 
 現在のプロファイルの確認（`select` を `Device` 型に絞らないと、同じ `device.api` を持つ
 Node オブジェクト 2 件を拾って `null` 行が混ざる）:
@@ -128,4 +128,4 @@ GNOME Settings (46) にプロファイルのドロップダウンはない。A2D
 
 ## WirePlumber 0.4 の Lua 設定形式
 
-`51-disable-headset-autoswitch.lua` は WirePlumber 0.4 系の Lua 形式。**0.5 以降は `.conf` ベースの新形式になり本ファイルは無視される**ため、Ubuntu 側の wireplumber を上げるときは要追従。
+当時の `51-disable-headset-autoswitch.lua` は WirePlumber 0.4 系 (Ubuntu 24.04) の Lua 形式で、**0.5 以降は `.conf` ベースの新形式になり無視される**。現在は `.conf` だけを置いている (ubuntu ホストの撤去で Lua 版は外した)。

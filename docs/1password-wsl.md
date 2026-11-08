@@ -1,6 +1,6 @@
 # WSL での 1Password (Windows 版と Linux 版の併用)
 
-WSL ホスト (wsl-nixos / wsl-gentoo) では、Windows 版と Linux 版 (WSLg 上の GUI) の 1Password を
+WSL ホスト (wsl-nixos) では、Windows 版と Linux 版 (WSLg 上の GUI) の 1Password を
 両方起動し、用途ごとに使い分けている。npiperelay のような中継ツールは使わない。
 
 経緯は Zenn の記事
@@ -15,7 +15,7 @@ WSL ホスト (wsl-nixos / wsl-gentoo) では、Windows 版と Linux 版 (WSLg �
 | ssh (WSL の Linux ssh、gcloud `--plain`、git over ssh) | `SSH_AUTH_SOCK` / `IdentityAgent` = `~/.1password/agent.sock` | **Linux 版**の SSH agent | Linux 版の承認 | `home.nix` (`home.sessionVariables`、`programs.ssh`) |
 | git のコミット署名 | `gpg.ssh.program` = Windows の `op-ssh-sign.exe` | **Windows 版** | Windows Hello | `modules/wsl` (`programs.git.signing.signer`)。鍵と `format = ssh` は `home.nix` |
 | `op` コマンド (`op read` / `op item ...` など) | `~/.local/bin/op` シム → Windows の `op.exe` | **Windows 版**の CLI 連携 | Windows Hello | `modules/wsl` (`home.file.".local/bin/op"`) |
-| `op run` | シムが Linux 版の op (`wsl.opLinux`) に回す | **Linux 版**の CLI 連携 | Linux 版の承認 | `hosts/wsl-nixos/home.nix` / `hosts/wsl-gentoo.nix` の `wsl.opLinux` |
+| `op run` | シムが Linux 版の op (`wsl.opLinux`) に回す | **Linux 版**の CLI 連携 | Linux 版の承認 | `hosts/wsl-nixos/home.nix` の `wsl.opLinux` |
 | シェル起動時の秘密情報 (`GITHUB_TOKEN` 等) | `$ZDOTDIR/.env.local` (名前付きパイプ) | **Linux 版**の 1Password Environments | 無し (起動中なら読める) | `modules/zsh` (`envExtra`) |
 | gh / git の HTTPS 認証 | `gh auth git-credential` | (上の `GITHUB_TOKEN`) | — | `home.nix` (`credential."https://github.com".helper`) |
 | Windows の ssh.exe (稀) | OpenSSH の既定の名前付きパイプ (`\\.\pipe\openssh-ssh-agent`) | **Windows 版**の SSH agent | Windows Hello | `modules/wsl` (`windowsSshConfig`、`docs/ssh-conf-d.md`) |
@@ -70,8 +70,7 @@ op その他   → OP_* を WSLENV に載せて Windows の op.exe (WinGet) を 
   起動できないため。
 - Linux 版の op は、Linux 版 1Password との通信に setgid `onepassword-cli` が必要になる。
   `/nix/store` のバイナリには setgid を付けられないので、ディストリが用意したものを使う。
-  wsl-nixos は `programs._1password` の security wrapper (`/run/wrappers/bin/op`)、
-  wsl-gentoo は portage (`/usr/bin/op`)。
+  wsl-nixos は `programs._1password` の security wrapper (`/run/wrappers/bin/op`)。
 - `OP_ACCOUNT` (`home.nix`) は、シムが WSLENV に載せるので `op.exe` にも届く。
 - `op.exe` は WinGet で入れていて、Nix で管理していない。バージョンは Linux 版と揃っていない
   (2026-11 時点で `op.exe` 2.30.3、Linux 版 2.41.0)。上げるときは Windows 側で
@@ -99,7 +98,7 @@ op その他   → OP_* を WSLENV に載せて Windows の op.exe (WinGet) を 
 | Linux 版の op で `op whoami` だけが `account is not signed in` になる | `whoami` は CLI 連携の認証を始めないため。`op run` は同じ状態でも動く (2026-11 に確認) | 連携が有効かの判定には `whoami` を使わず、`op run` か `op read` で確かめる |
 | `op run` で秘密情報が入らない / `op run` だけ失敗する | Linux 版の CLI 連携が無効、または Linux 版が起動していない | Linux 版の「1Password CLI と連携」を有効にする |
 | シェル起動時に `[WARNING] Could not load secrets: 1Password is not running.` | Linux 版が起動していない (Environments の FIFO を読めない) | Linux 版を起動して新しいシェルを開く |
-| wsl-gentoo で `op item create` が `invalid JSON in piped input` | `op.exe` が WSL から渡した標準入力のテンプレートを受け付けない | Linux 版の op (`wsl.opLinux`) で実行する |
+| `op item create` が `invalid JSON in piped input` | `op.exe` が WSL から渡した標準入力のテンプレートを受け付けない | Linux 版の op (`wsl.opLinux`) で実行する |
 
 ## Zenn 記事との差分 (2026-11 時点)
 

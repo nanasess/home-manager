@@ -285,8 +285,8 @@ in
         # Linux ネイティブの ghostty も同じスクリプトを手動ロードする。あちらは ZDOTDIR
         # 差し替えによる自動注入を持つが、注入されるのは Nix ストアの素のスクリプトで、
         # p10k と組み合わせるとプロンプトに `}` が漏れる (let の ghosttyZshIntegration の
-        # コメント参照)。自動注入を hosts/ubuntu.nix の shell-integration = none で止め、
-        # 全ホストでパッチ済みスクリプトに一本化している。
+        # コメント参照)。旧 hosts/ubuntu.nix は shell-integration = none で自動注入を止め、
+        # パッチ済みスクリプトに一本化していた。k-2 の programs.ghostty は未設定 (要確認)。
         if [[ "$TERM" == xterm-ghostty ]]; then
           export GHOSTTY_SHELL_FEATURES="''${GHOSTTY_SHELL_FEATURES:-cursor}"
           source ${ghosttyZshIntegration}

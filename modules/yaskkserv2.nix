@@ -1,8 +1,8 @@
 { config, pkgs, ... }:
 let
   # nixpkgs / apt には無いため上流をローカルでビルドする (pkgs/yaskkserv2.nix)。
-  # これにより wsl-gentoo と ubuntu で同一バイナリを共有し、両ホストとも
-  # sudo emerge / apt を経ずに yaskkserv2 + yaskkserv2_make_dictionary を得る。
+  # これにより全ホストで同一バイナリを共有し、sudo を経ずに
+  # yaskkserv2 + yaskkserv2_make_dictionary を得る。
   yaskkserv2 = pkgs.callPackage ../pkgs/yaskkserv2.nix { };
   # 配信辞書はユーザーパスに置く (sudo 不要)。yaskkserv2_make_dictionary で
   # SKK-JISYO.all.utf8 からビルドする (詳細は README.md「SKK 辞書サーバ」節)。
@@ -16,14 +16,13 @@ in
   #
   # systemd ユーザーサービスなので /etc 書き込みも sudo も OpenRC も不要。ユーザー
   # 権限で動き ~/.config / ~/.local/share を直接読む。バイナリは Nix ビルド
-  # (pkgs/yaskkserv2.nix) なので wsl-gentoo でも portage は不要。
+  # (pkgs/yaskkserv2.nix) なのでディストリのパッケージは不要。
   #
   # 事前準備 (sudo 不要。詳細は README.md「SKK 辞書サーバ」節):
-  #   nix build '.#homeConfigurations."nanasess@<host>".activationPackage'
   #   yaskkserv2_make_dictionary \             # 配信辞書を SKK-JISYO.all.utf8 から
   #     --dictionary-filename ~/.local/share/yaskkserv2/all \   # ビルド (辞書更新時のみ)
   #     --utf8 "$HOME/OneDrive - Skirnir Inc/emacs/ddskk/SKK-JISYO.all.utf8"
-  # その後 `home-manager switch` でサービスが起動する。
+  # その後 `nixos-rebuild switch` (home-manager も同時に適用) でサービスが起動する。
 
   # yaskkserv2_make_dictionary を PATH に通し、辞書の (再) ビルドを手元で行えるように。
   home.packages = [ yaskkserv2 ];

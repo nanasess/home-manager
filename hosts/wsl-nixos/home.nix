@@ -18,8 +18,6 @@ in
   # ~/.local/share/wslg/applications しか見ない。NixOS の .desktop は
   # /run/current-system/sw/share/applications にあって読まれないので、ここに置き直す。
   # Icon= の相対名も /usr/share/icons と /usr/share/pixmaps しか探さないため絶対パスにする。
-  # wsl-gentoo は portage 版が /usr/share/applications にあるので、こちらだけに置く
-  # (共通の modules/wsl に置くと Gentoo では二重に登録される)。
   # ファイル名から .desktop を除いた部分が WSLg のキーで、ウィンドウの WM_CLASS と一致すると
   # タスクバーのアイコンにも使われる (Chrome は google-chrome で一致する。1Password の
   # WM_CLASS は com.onepassword.OnePassword で一致しないので modules/wsl の

@@ -203,13 +203,6 @@
                       :host github :type git :protocol https :inherit
                       t :depth treeless :ref
                       "98cbae5d8c378ad14d612d7c88a78484c49a80b8"))
- (ebuild-mode :source "elpaca-menu-lock-file" :recipe
-              (:source "elpaca-menu-lock-file" :package "ebuild-mode"
-                       :id ebuild-mode :url
-                       "https://anongit.gentoo.org/git/proj/ebuild-mode.git"
-                       :pre-build (("make")) :type git :protocol https
-                       :inherit t :depth treeless :ref
-                       "17ac68dd00304151bf903068242f901806acb323"))
  (elpaca :source
    "elpaca-menu-lock-file" :recipe
    (:source nil :package "elpaca" :id elpaca :repo
