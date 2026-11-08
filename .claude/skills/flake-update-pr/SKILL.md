@@ -31,8 +31,9 @@ CI 任せにせず、ローカルで実行できるものは実行する。
 
 ```bash
 nix flake check
-nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage' --no-link --print-out-paths
-nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage' --no-link
+# wsl-nixos (NixOS-WSL): カーネルを持たないので toplevel もビルドできる
+nix eval --raw '.#nixosConfigurations.wsl-nixos.config.system.build.toplevel.drvPath'
+nix build '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage' --no-link --print-out-paths
 # k-2 (NixOS): 評価 + home-manager 部分。toplevel の丸ごとビルドは k-2 実機で行う
 # (linux-t2 カーネルは cache.soopy.moe から取る。README「NixOS (k-2) の更新」のキャッシュ確認を先に)
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
@@ -57,16 +58,16 @@ cache.soopy.moe に無く自前ビルドになる。上記のキャッシュ確�
   (`nix flake update nixpkgs --override-input nixpkgs github:nixos/nixpkgs/<現 rev>`)。
 実例: PR #202 で 6.18.46 → 6.18.54 に上がり `3001-applesmc-*.patch` が当たらず、PR #205 で戻した。
 
-CI の build matrix (`.github/workflows/check.yml`) と `flake.nix` の `homeConfigurations` が
-一致しているとは限らない。**PR 本文に検証状況を書く前に workflow を読んで確認する**こと。
+CI の build 対象 (`.github/workflows/check.yml` の `HM_TARGETS` / `NIXOS_HOSTS`) と `flake.nix` の
+`nixosConfigurations` が一致しているとは限らない。**PR 本文に検証状況を書く前に workflow を読んで確認する**こと。
 
 - 時間がかかるのでバックグラウンド実行を推奨。
-- 対象は `x86_64-linux` のみ (macOS 設定は削除済み)。homeConfigurations 2 ホストはどこでも検証できる。
-  k-2 の toplevel (カーネル / ファームウェア) はキャッシュとホスト制約があるので実機で確認する。
+- 対象は `x86_64-linux` のみ (macOS / wsl-gentoo / ubuntu の設定は削除済み)。両ホストの home-manager
+  部分はどこでも検証できる。k-2 の toplevel (カーネル / ファームウェア) はキャッシュとホスト制約があるので実機で確認する。
 
 ### `nix flake check` が上流の破壊的変更で落ちた場合
 
-`homeConfigurations` は**実行中のシステムに関係なく全エントリが評価される**。
+`nix flake check` は**実行中のシステムに関係なく flake の全出力 (`nixosConfigurations` を含む) を評価する**。
 そのため、あるホストが使えなくなったプラットフォームを参照していると Linux ランナー上でも失敗する。
 
 過去の実例: nixpkgs 26.11 が x86_64-darwin のサポートを打ち切り、
@@ -94,15 +95,15 @@ chore(deps): nix flake update (nixpkgs, home-manager)
 ## 5. 更新パッケージ一覧の生成 [必須]
 
 新旧両方の `activationPackage` をビルドして `nix store diff-closures` で比較する。
-比較対象は代表ホストとして `nanasess@wsl-gentoo` を使う。
+比較対象は代表ホストとして wsl-nixos の home-manager 部分を使う。
 
 ```bash
 # 旧 lock 側は main の worktree を一時的に作って評価する
 git worktree add /tmp/hm-old main
 OLD=$(nix build --no-link --print-out-paths \
-  '/tmp/hm-old#homeConfigurations."nanasess@wsl-gentoo".activationPackage')
+  '/tmp/hm-old#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage')
 NEW=$(nix build --no-link --print-out-paths \
-  '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage')
+  '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage')
 
 # closure サイズの比較
 nix path-info -Sh "$OLD" "$NEW"
@@ -121,7 +122,7 @@ git worktree remove /tmp/hm-old
 差分は数百件になるため、`home.packages` で宣言しているパッケージを抜き出して表にする。
 
 ```bash
-nix eval --raw '.#homeConfigurations."nanasess@wsl-gentoo".config.home.packages' \
+nix eval --raw '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.packages' \
   --apply 'ps: builtins.concatStringsSep "\n" (map (p: p.name or "?") ps)' \
   | sed -E 's/-(unstable.*|[0-9].*)$//' | sort -u > /tmp/declared-names.txt
 

@@ -81,8 +81,8 @@
     # Fonts
     # noto-fonts (字形本体) はホスト側で管理する。Nix の noto-fonts は可変フォント版
     # (NotoSans[wdth,wght].ttf) で、Linux の Emacs ftcrhb バックエンドが realize できず
-    # 各スクリプトが豆腐になるため。Ubuntu は OS の静的 Noto (272本) に委譲し、
-    # noto-fonts を入れない。WSL Gentoo はホスト側で追加する。
+    # 各スクリプトが豆腐になるため。WSL は modules/wsl で入れ、k-2 は NixOS の
+    # システムフォントに任せる (CJK は hosts/k-2/configuration.nix の fonts.packages)。
     noto-fonts-color-emoji
     udev-gothic
     udev-gothic-nf

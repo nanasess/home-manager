@@ -10,7 +10,7 @@ Claude Code (claude.ai/code) のユーザーレベル設定 — 全プロジェ�
 - **EC-CUBE 開発者**。EC-CUBE 2 系 / 4 系の保守・モダナイゼーションに従事 (詳細は下記「EC-CUBE への目線」参照)。本家リポジトリは `~/git-repos/ec-cube`、Enterprise 版は `~/git-repos/enterprise`。
 - **元寿司職人**。技術職への転身組で、現場叩き上げの経験を持つ。
 - **GNU Emacs アイコン (23 / 24) のコントリビューター**。Emacs は長年のヘビーユーザー。Elisp は基本的な設定記述程度なので、複雑な実装の議論よりも設定 (`init.el` / `use-package` / elpaca) や運用面の議論を好む。
-- **主環境**: WSL2 (Gentoo Linux。NixOS-WSL へ移行中) と Intel MacBook Pro 2020 (T2、NixOS。Ubuntu から移行) を 1 リポジトリ (`~/.config/home-manager`) で宣言的に管理。ホスト一覧と移行状況はリポジトリの `CLAUDE.md` が正本。
+- **主環境**: WSL2 (NixOS-WSL。Gentoo Linux から移行) と Intel MacBook Pro 2020 (T2、NixOS。Ubuntu から移行) を 1 リポジトリ (`~/.config/home-manager`) で宣言的に管理。ホスト一覧と移行状況はリポジトリの `CLAUDE.md` が正本。
 - **システム設定**: Nix Flake + home-manager (NixOS ホストは `nixosConfigurations` + home-manager の NixOS モジュール)。
 - **エディタ**: GNU Emacs (elpaca によるパッケージ管理、tree-sitter モード、lsp-bridge を採用)。
 
@@ -53,14 +53,14 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 - (WSL ホスト) Windows 側ファイルへのアクセスは `/mnt/c/` 経由 (例: noctty 設定は `/mnt/c/Users/nanasess/AppData/Local/noctty/config.ghostty` にコピー)。
 - 1Password CLI のセッションはデスクトップアプリ連携 (`op signin` で確立)。SSH エージェントソケットは `~/.1password/agent.sock`。
 - ロケールは `ja_JP.UTF-8`。East Asian Ambiguous 文字 (`△` `○` `■` 等) はターミナル (noctty / Ghostty 系) も glibc も**幅 1 (半角) 扱い**。Emacs GUI だけ `eaw-console.el` + UDEV Gothic JPDOC で幅 2 にしている。
-- CPU はホストで異なる。WSL ホストは AMD Ryzen Zen 3 (`-march=znver3`、Gentoo の Portage 設定の前提)、k-2 は Intel (MacBook Pro 2020)。パフォーマンスの議論では作業中のホストを `hostname` / `/etc/os-release` で確認してから前提を置く。
+- CPU はホストで異なる。WSL ホストは AMD Ryzen Zen 3 (`-march=znver3`)、k-2 は Intel (MacBook Pro 2020)。パフォーマンスの議論では作業中のホストを `hostname` / `/etc/os-release` で確認してから前提を置く。
 - **ローカルの Web サーバは symfony-cli (`symfony serve -d --port=<port>`、HTTPS) で起動する。`php -S` は使わない。** EC-CUBE のセッション cookie は SameSite / Secure 属性の制約で http:// ではブラウザに保存されず、管理画面ログインが `POST /admin/login` → 302 → `/admin/login` に戻るループになる。Playwright には `BASE_URL=https://127.0.0.1:<port>` を渡す。CI の `e2e-test.yml` が `php -S` で動くのは CI 専用の `e2e` 環境設定があるためで、ローカルの根拠にしない。何度も指摘済みの規約なので、`php -S` を選んだ時点で規約違反と扱う。
 - **mise の PHP はソースビルドで、NixOS ホスト (k-2 / wsl-nixos) では devShell の外では入らない。** `mise run` / `mise exec` / `mise install` が `missing system dependencies` (`cc` / `make` / `autoconf` / `re2c` 等) の警告の後に `buildconf: autoconf not found` → `Failed to run buildconf` で止まるのは、要求バージョンが未インストールで、自動インストールが devShell の外で走ったため (設定の不具合ではない)。`hostname` と `mise ls php` で状況を確かめ、次のコマンドを `run_in_background` で実行してから (数分〜10 分) 元のコマンドを再実行する。`--profile` は GC root なので省略しない。
   ```bash
   nix develop "$HOME/.config/home-manager#php-build" --profile ~/.local/state/nix/profiles/php-build \
     -c mise install php@<要求バージョン>
   ```
-  インストール後は `php -v` と `php -r 'echo ini_get("memory_limit"),"\n";'` (`512M` なら home-manager の conf.d が効いている) で確認する。インストール済みの PHP が `error while loading shared libraries` で起動しないときは GC でリンク先が消えているので、同じ devShell で `mise install php@<ver> --force` する。wsl-gentoo は devShell 不要で、失敗したら portage のビルド依存 (`hosts/wsl-gentoo.nix`) の不足を疑う。詳細はリポジトリの README「mise PHP のセットアップ」。
+  インストール後は `php -v` と `php -r 'echo ini_get("memory_limit"),"\n";'` (`512M` なら home-manager の conf.d が効いている) で確認する。インストール済みの PHP が `error while loading shared libraries` で起動しないときは GC でリンク先が消えているので、同じ devShell で `mise install php@<ver> --force` する。詳細はリポジトリの README「mise PHP のセットアップ」。
 - **Azure CLI (`az`) は mise の `pipx:azure-cli` を使う。** nixpkgs の `azure-cli` は依存の破損で評価ごと止まるので Nix からは外してある (home-manager#231)。バージョンは `~/.config/home-manager/home.nix` の `programs.mise.globalConfig.tools` で固定している。`az` が見つからないときに **`pip install azure-cli` / `uv tool install` / `nix shell nixpkgs#azure-cli` / Microsoft のインストールスクリプト / apt で別途入れない** (どの `az` が動いているか分からなくなる)。次の順で対処する:
   1. `mise ls pipx:azure-cli` で入っているか確認し、未インストールなら `mise install pipx:azure-cli`。
   2. Claude Code の Bash は PATH がセッション開始時に固定されるので、入っていても PATH に無いことがある。そのときは `mise exec -- az ...` で実行する。
@@ -141,7 +141,7 @@ op read --account skirnir 'op://skirnir-common/claude-1password-conventions/note
 
 ### Build & Test Verification
 
-- Nix 設定変更後は完了を宣言する前に `nix build` あるいは `home-manager switch --dry-run` を実行する。NixOS ホストの設定は `nix eval` による toplevel の評価 + home-manager 部分のビルドで確認する (具体的なコマンドはリポジトリの `CLAUDE.md`)。`default.nix` の dangling 参照は静かに失敗を引き起こす。
+- Nix 設定変更後は完了を宣言する前に `nix build` あるいは `nixos-rebuild dry-build` を実行する。NixOS ホストの設定は `nix eval` による toplevel の評価 + home-manager 部分のビルドで確認する (具体的なコマンドはリポジトリの `CLAUDE.md`)。`default.nix` の dangling 参照は静かに失敗を引き起こす。
 - tree-sitter 文法のリネーム後は、対応する `*-ts-mode` が期待する正確なシンボル名を検証する (例: `csharp` ではなく `c-sharp`)。
 - PR 作成前に lint、型チェック、テストを実行する。モック/テストコードが本番ビルドに漏れていないか確認する。
 - TypeScript の型定義ファイル (`.d.ts`) に実装コードを書かない。型と実装の境界を厳守する。

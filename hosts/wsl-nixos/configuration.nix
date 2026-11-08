@@ -1,4 +1,4 @@
-# wsl-nixos: WSL2 上の NixOS (NixOS-WSL)。wsl-gentoo からの移行先 (Issue #183)。
+# wsl-nixos: WSL2 上の NixOS (NixOS-WSL)。wsl-gentoo から移行した (Issue #183)。
 #
 # WSL 固有の部分 (/init からの起動、wsl.conf、WSLg の X11 ソケット、/bin の populate) は
 # NixOS-WSL の wsl.* モジュールが担う。k-2 と共通のシステム設定は modules/nixos/common.nix、

@@ -33,7 +33,7 @@
     options = [ "fmask=0077" "dmask=0077" ];
   };
 
-  # ハイバネーションは使わない (T2 では復帰に失敗する。modules/t2-suspend 参照) ので
+  # ハイバネーションは使わない (T2 では復帰に失敗する。configuration.nix のサスペンド設定参照) ので
   # スワップパーティションは切らず zram で済ませる。
   swapDevices = [ ];
   zramSwap.enable = true;

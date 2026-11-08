@@ -1,27 +1,24 @@
 # home-manager
 
 Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-manager) 設定リポジトリ。
-WSL2 (Gentoo Linux / NixOS), Ubuntu, NixOS の環境を1リポジトリで宣言的に管理する。
+WSL2 (NixOS-WSL) と NixOS (T2 Mac) の環境を1リポジトリで宣言的に管理する。
 
 ## 対応ホスト
 
 | ホスト名 | OS | 適用方法 | 設定ファイル |
 |---------|-----|---------|------------|
-| `nanasess@wsl-gentoo` | WSL2 Gentoo Linux | `home-manager switch` (standalone) | `hosts/wsl-gentoo.nix` |
-| `nanasess@ubuntu` | Ubuntu 24.04 (Wayland) | `home-manager switch` (standalone) | `hosts/ubuntu.nix` |
 | `k-2` | NixOS (Intel MacBook Pro 2020, T2) | `nixos-rebuild switch` (home-manager は NixOS モジュール) | `hosts/k-2/` |
 | `wsl-nixos` | WSL2 NixOS ([NixOS-WSL](https://github.com/nix-community/NixOS-WSL)) | `nixos-rebuild switch` (home-manager は NixOS モジュール) | `hosts/wsl-nixos/` |
 
-k-2 は Ubuntu からの移行先 (issue #151)。T2 固有の事情 (linux-t2 カーネル、ファームウェア、
+k-2 は Ubuntu から移行した (issue #151)。T2 固有の事情 (linux-t2 カーネル、ファームウェア、
 ESP と GRUB) とインストール手順は [docs/nixos-t2.md](docs/nixos-t2.md) にまとめてある。
-wsl-nixos は wsl-gentoo からの移行先 (issue #183)。WSL 共通の設定は `modules/wsl` で両者が共有する。
+wsl-nixos は wsl-gentoo から移行した (issue #183)。WSL 固有の home-manager 設定は `modules/wsl` にある。
+wsl-gentoo と ubuntu の standalone home-manager 設定は issue #183 で撤去した。
 
 ## セットアップ
 
 ### 前提条件
 
-- wsl-gentoo / ubuntu: [Nix](https://nixos.org/download/) (Flakes 有効) と
-  [Home Manager](https://github.com/nix-community/home-manager) がインストール済みであること
 - k-2 / wsl-nixos: NixOS 本体。home-manager は `flake.nix` の `nixosConfigurations` に組み込まれているので
   standalone の `home-manager` コマンドは使わない (入っていない)
 
@@ -33,8 +30,6 @@ git clone https://github.com/nanasess/home-manager.git ~/.config/home-manager
 cd ~/.config/home-manager
 
 # 設定を適用（ホスト名は環境に合わせて変更）
-home-manager switch --flake '.#nanasess@wsl-gentoo'
-home-manager switch --flake '.#nanasess@ubuntu'
 sudo nixos-rebuild switch --flake '.#k-2'    # NixOS (home-manager も同時に適用)
 sudo nixos-rebuild switch --flake '.#wsl-nixos'
 ```
@@ -46,7 +41,7 @@ k-2 の初回インストール (パーティション作成、`nixos-install`�
 
 公式の `nixos.wsl` (既定ユーザー `nixos`) ではなく、この flake の設定を焼き込んだ tarball を
 作って導入する。最初から `nanasess` で起動し、home-manager も適用済みの状態になる。
-Nix が動く既存の WSL ディストリ (wsl-gentoo 等) で作る。
+Nix が動く既存の WSL ディストリ (作り直すときは wsl-nixos 自身) で作る。
 
 ```bash
 # 1. tarball を作る (root が必要。出力先は Windows 側から見える場所)
@@ -66,41 +61,19 @@ wsl -d NixOS -u root passwd nanasess
 Docker Desktop は Settings > Resources > WSL integration で NixOS を有効にする。
 問題があれば `wsl --set-default` で既存ディストリに戻し、`wsl --unregister NixOS` で作り直せる。ただし、unregister はディストリのファイルと設定を完全に削除するため、必要なデータは事前にバックアップする（例: `wsl --export NixOS NixOS-backup.tar`）。
 
-### Portage 設定のセットアップ（WSL Gentoo のみ）
-
-Portage 設定は `~/.config/portage/` に書き出され、`/etc/portage/` 内の各ファイルから個別にシンボリックリンクします。
-`gnupg/`, `make.profile`, `profile/` は root 管理のまま `/etc/portage/` に残します。
-
-```bash
-# 1. home-manager switch で ~/.config/portage/ を生成
-home-manager switch --flake '.#nanasess@wsl-gentoo'
-
-# 2. 管理対象ファイルのシンボリックリンクを作成（初回のみ）
-for f in make.conf binrepos.conf package.accept_keywords package.mask package.unmask package.license; do
-  sudo ln -sfn ~/.config/portage/$f /etc/portage/$f
-done
-sudo rm -rf /etc/portage/package.use /etc/portage/repos.conf
-sudo ln -sfn ~/.config/portage/package.use /etc/portage/package.use
-sudo ln -sfn ~/.config/portage/repos.conf /etc/portage/repos.conf
-
-# 3. GnuPG 鍵の取得（未取得の場合）
-sudo getuto
-```
-
 ### SKK 辞書サーバ (yaskkserv2) のセットアップ（全ホスト共通）
 
 Emacs (nskk) の辞書本体を skkserv (yaskkserv2) に逃がし、nskk が全辞書を起動時にトライ索引へ全件展開することで full GC が 20-50 秒かかる問題を回避します。サーバは `modules/yaskkserv2.nix` が **systemd ユーザーサービス**として管理します（`/etc` も sudo も OpenRC も不要）。
 
-バイナリ (`yaskkserv2` / `yaskkserv2_make_dictionary`) は nixpkgs / apt に無いため `pkgs/yaskkserv2.nix` で **Nix ビルド**し、全ホストで同一バイナリを共有します。配信辞書はユーザーパス `~/.local/share/yaskkserv2/all` に置くため、セットアップは **すべて sudo 不要**です。
+バイナリ (`yaskkserv2` / `yaskkserv2_make_dictionary`) は nixpkgs に無いため `pkgs/yaskkserv2.nix` で **Nix ビルド**し、全ホストで同一バイナリを共有します。配信辞書はユーザーパス `~/.local/share/yaskkserv2/all` に置くため、セットアップは **すべて sudo 不要**です。
 
 ```bash
-# 1. home-manager でバイナリ導入 + 設定生成 + ユーザーサービス起動
-#    （<host> は wsl-gentoo または ubuntu。k-2 は sudo nixos-rebuild switch --flake '.#k-2'）
-home-manager switch --flake '.#nanasess@<host>'
+# 1. バイナリ導入 + 設定生成 + ユーザーサービス起動 (home-manager も同時に適用)
+#    （<host> は k-2 または wsl-nixos）
+sudo nixos-rebuild switch --flake '.#<host>'
 
 # 2. 配信辞書を SKK-JISYO.all.utf8 からビルド（初回 + 辞書更新時のみ再実行）
-#    yaskkserv2_make_dictionary は上記で ~/.nix-profile/bin
-#    (k-2 は /etc/profiles/per-user/nanasess/bin) に入る
+#    yaskkserv2_make_dictionary は上記で /etc/profiles/per-user/nanasess/bin に入る
 mkdir -p ~/.local/share/yaskkserv2
 yaskkserv2_make_dictionary \
   --dictionary-filename ~/.local/share/yaskkserv2/all \
@@ -116,37 +89,21 @@ systemctl --user status yaskkserv2
 python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",1178),2); s.sendall("1あい ".encode()); print(s.recv(8192).decode("utf-8","replace"))'
 ```
 
-設定 (`modules/yaskkserv2.nix`) を変更したら `home-manager switch` / `nixos-rebuild switch` で自動反映されます（手動再起動が要る場合は `systemctl --user restart yaskkserv2`）。`listen-address = 127.0.0.1`（LAN へ露出しない）ですが、WSL2 では localhostForwarding 経由で Windows からも `localhost:1178` で接続できます。
+設定 (`modules/yaskkserv2.nix`) を変更したら `nixos-rebuild switch` で自動反映されます（手動再起動が要る場合は `systemctl --user restart yaskkserv2`）。`listen-address = 127.0.0.1`（LAN へ露出しない）ですが、WSL2 では localhostForwarding 経由で Windows からも `localhost:1178` で接続できます。
 
 辞書の元ファイルは OneDrive 上にあるため、辞書が無い間は skkserv が即終了し ibus-skk / nskk とも漢字変換ができない。k-2 初回セットアップでの OneDrive 認可と辞書ビルドの順序は [docs/nixos-t2.md](docs/nixos-t2.md)「起動後」参照。
 
-### システムパッケージの確認（wsl-gentoo / ubuntu）
-
-portage / apt で入れるべきパッケージが揃っているか、Nix 側と衝突するパッケージ (ubuntu の `ibus-skk` 等) が入っていないかを確認できます。
-NixOS (k-2) はシステムパッケージも `configuration.nix` で宣言するので不要。
-
-```bash
-~/.local/bin/check-system-packages
-```
-
 ### mise PHP のセットアップ
 
-mise の php プラグイン (`jdx/vfox-php`) は PHP をソースからビルドする。ビルド依存は
-ホストごとに入手経路が異なる:
-
-| ホスト | ビルド依存の入手 |
-|---|---|
-| wsl-gentoo | portage (`hosts/wsl-gentoo.nix` の `mise PHP ビルド依存`)。`mise install php@8.5` をそのまま実行 |
-| k-2 / wsl-nixos (NixOS) | `nix develop .#php-build` (`shells/php-build.nix`)。FHS 前提のツールチェーンが無いので devShell 経由で実行する |
+mise の php プラグイン (`jdx/vfox-php`) は PHP をソースからビルドする。NixOS (k-2 / wsl-nixos) には
+FHS 前提のツールチェーンが無いので、ビルド依存は `nix develop .#php-build` (`shells/php-build.nix`) の
+devShell 経由で入れる。
 
 ```bash
 # PHP インストール (k-2 / wsl-nixos)。--profile で GC root を作り、リンク先ライブラリが
 # nix-collect-garbage で消えないようにする (RPATH に /nix/store が焼き込まれる)
 nix develop '.#php-build' --profile ~/.local/state/nix/profiles/php-build \
   -c mise install php@8.5
-
-# PHP インストール (wsl-gentoo)
-mise install php@8.5
 
 # カスタム設定（memory_limit 等）は home.nix の xdg.configFile."php/conf.d/*.ini" で管理する。
 # PHP_INI_SCAN_DIR=":~/.config/php/conf.d" で install 先の conf.d の後に読まれるため、
@@ -208,7 +165,7 @@ terraform version
 ホスト別の ssh 設定 (`Host` / `HostName` / `User` 等) は private リポジトリ
 `nanasess/ssh_conf.d` で管理し、`~/.ssh/config` の `Include ~/.ssh/conf.d/*.conf` で読む。
 home-manager の適用では入らないので、ホストごとに 1 回 clone する (未 clone だと
-`home-manager switch` が警告を出す):
+`nixos-rebuild switch` の home-manager activation が警告を出す):
 
 ```bash
 git clone git@github.com:nanasess/ssh_conf.d.git ~/.ssh/conf.d
@@ -219,17 +176,15 @@ git clone git@github.com:nanasess/ssh_conf.d.git ~/.ssh/conf.d
 ## ディレクトリ構成
 
 ```text
-flake.nix              -- エントリポイント（inputs、homeConfigurations、nixosConfigurations、packages、devShells）
+flake.nix              -- エントリポイント（inputs、nixosConfigurations、packages、devShells）
 home.nix               -- 全ホスト共通設定（パッケージ、git、direnv、環境変数）
 hosts/
-  wsl-gentoo.nix       -- WSL Gentoo 固有設定（gentooPackages と check-system-packages、op の setgid バイナリのパス）
-  ubuntu.nix           -- Ubuntu 固有設定（Ghostty (nixGL)、apt 差分チェック、GNOME 拡張）
-  k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu からの移行先 (docs/nixos-t2.md)
+  k-2/                 -- NixOS (Intel MacBook Pro 2020, T2)。Ubuntu から移行 (docs/nixos-t2.md)
     configuration.nix  -- システム設定（apple-t2、GRUB、GNOME、NetworkManager、usbmuxd、1Password、ibus、nix.settings）
     hardware-configuration.nix -- ディスク (LABEL 参照) / カーネルモジュール
-    home.nix           -- ユーザー環境（hosts/ubuntu.nix の NixOS 版）
+    home.nix           -- ユーザー環境
     scripts/backup-before-install.sh -- インストール前の退避
-  wsl-nixos/           -- NixOS-WSL。wsl-gentoo からの移行先 (issue #183)
+  wsl-nixos/           -- NixOS-WSL。wsl-gentoo から移行 (issue #183)
     configuration.nix  -- システム設定（NixOS-WSL の wsl.*、Docker Desktop 統合、sudo、Chrome、plocate）
     home.nix           -- ユーザー環境（WSL 共通は modules/wsl、op は /run/wrappers/bin/op）
 modules/
@@ -239,19 +194,17 @@ modules/
   claude/              -- Claude Code のユーザー設定（CLAUDE.md、PreToolUse hook）
   wakatime/            -- WakaTime CLI（API キーは 1Password から実行時に解決）
   nixos/common.nix     -- NixOS ホスト共通のシステム設定（zsh、nix-ld + Playwright / mise の dotnet (ICU) 用ライブラリ、1Password、Chrome の 1Password 拡張）
-  wsl/                 -- WSL ホスト共通（Windows 側への noctty / Ghostty 設定・UDEV Gothic・Mackerel のコピー、op / wl-paste シム、gpg-agent、WSLg）
+  wsl/                 -- WSL ホスト（Windows 側への noctty / Ghostty 設定・UDEV Gothic・Mackerel のコピー、op / wl-paste シム、gpg-agent、WSLg）
   mackerel/            -- LibreHardwareMonitor → Mackerel カスタムメトリック（modules/wsl が Windows 側へ配置）
   bluetooth-audio/     -- WirePlumber の HFP 自動切替無効化 + pavucontrol（GNOME ホスト共通）
-  ibus-skk/            -- ibus-skk の辞書設定 (dconf) と ubuntu 用エンジン登録
+  ibus-skk/            -- ibus-skk の辞書設定 (dconf)。エンジン登録は hosts/k-2/configuration.nix
   walker/              -- Walker / Elephant ランチャー（GNOME ホスト共通）
   xremap/              -- キーリマッパー（Chrome のタブ移動を Ctrl+H / Ctrl+L に。GNOME ホスト共通）
-  t2-suspend/          -- T2 Mac サスペンド設定の sudo 配置ヘルパー（ubuntu。k-2 は configuration.nix）
-  portage.nix          -- Portage 設定（WSL Gentoo 用、~/.config/portage/ に書き出し）
   onedrive.nix         -- OneDrive クライアント（systemd ユーザーサービス）
   yaskkserv2.nix       -- SKK 辞書サーバ（systemd ユーザーサービス。全ホスト共通）
 pkgs/
   yaskkserv2.nix       -- yaskkserv2 の自作 derivation（nixpkgs 未収録）
-  ibus-skk.nix         -- ibus-skk 1.4.4 の自作 derivation（nixpkgs 未収録 + apt は 1.4.3 で停滞）
+  ibus-skk.nix         -- ibus-skk 1.4.4 の自作 derivation（nixpkgs 未収録 + Debian は 1.4.3 で停滞）
   mew.nix              -- Mew (Emacs メーラ) の外部コマンド（elisp は elpaca。docs/mew.md）
 shells/
   php-build.nix        -- mise php プラグイン (ソースビルド) 用 devShell（NixOS 用）
@@ -271,15 +224,15 @@ PR 化するときは `flake-update-pr` Skill (`.claude/skills/flake-update-pr/`
 (closure 差分から更新パッケージ一覧を生成して PR 本文に載せる)。
 
 ```bash
-# 1. flake.lock を更新（nixpkgs, home-manager, nixgl, nixos-hardware の全 inputs を最新化）
+# 1. flake.lock を更新（nixpkgs, home-manager, nixos-hardware, nixos-wsl の全 inputs を最新化）
 nix flake update
 
 # 2. ビルドして問題がないか確認（ドライラン）
-home-manager switch --flake '.#nanasess@wsl-gentoo' --dry-run
+nixos-rebuild dry-build --flake '.#wsl-nixos'         # sudo 不要
 nixos-rebuild dry-build --flake '.#k-2'               # k-2 (sudo 不要)
 
 # 3. 設定を適用
-home-manager switch --flake '.#nanasess@wsl-gentoo'
+sudo nixos-rebuild switch --flake '.#wsl-nixos'
 sudo nixos-rebuild switch --flake '.#k-2'             # k-2 (下記「NixOS (k-2) の更新」)
 
 # 4. 変更をコミット
@@ -439,8 +392,8 @@ cd ~/.config/home-manager
 git add modules/emacs/elpaca.lock
 git commit -m "chore(emacs): elpaca パッケージ更新"
 
-# 5. home-manager に反映 (k-2 は sudo nixos-rebuild switch --flake '.#k-2')
-home-manager switch --flake '.#nanasess@wsl-gentoo'
+# 5. home-manager に反映 (k-2 は '.#k-2')
+sudo nixos-rebuild switch --flake '.#wsl-nixos'
 ```
 
 #### `elpaca-checkout-branches` のブランチ判定
@@ -508,7 +461,7 @@ elpaca には lock 全体を一括復元する専用コマンドが無いため�
 
 ```bash
 # 1. 最新の init.el / elpaca.lock を反映（PR やブランチを適用済みにしてから）
-home-manager switch --flake '.#nanasess@wsl-gentoo'    # k-2 は sudo nixos-rebuild switch --flake '.#k-2'
+sudo nixos-rebuild switch --flake '.#wsl-nixos'        # k-2 は '.#k-2'
 
 # 2a. 特定パッケージだけ lock の :ref に合わせる場合（推奨・高速）
 rm -rf ~/.emacs.d/elpaca/builds/<pkg> ~/.emacs.d/elpaca/sources/<pkg>
@@ -530,7 +483,7 @@ rm -rf ~/.emacs.d/elpaca/builds ~/.emacs.d/elpaca/sources
 ```bash
 nix flake update
 # Emacs で M-x elpaca-checkout-branches → M-x elpaca-pull-all → M-x elpaca-write-lock-file
-home-manager switch --flake '.#nanasess@wsl-gentoo'    # k-2 は sudo nixos-rebuild switch --flake '.#k-2'
+sudo nixos-rebuild switch --flake '.#wsl-nixos'        # k-2 は '.#k-2'
 git add flake.lock modules/emacs/elpaca.lock
 git commit -m "chore: nix flake update + elpaca パッケージ更新"
 ```
@@ -541,7 +494,6 @@ Nix の設定ファイル (`*.nix`) や dotfiles を編集した後:
 
 ```bash
 # ビルドの確認
-nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
 nixos-rebuild build --flake '.#k-2'                                     # k-2 実機のみ (sudo 不要、./result に toplevel)
 # k-2 以外のホストから k-2 の設定を確認するときは評価 + home-manager 部分に留める
 # (toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージを抱える。「開発コマンド」参照)
@@ -551,7 +503,6 @@ nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.act
 nix build '.#nixosConfigurations.wsl-nixos.config.system.build.toplevel'
 
 # 設定を適用
-home-manager switch --flake '.#nanasess@wsl-gentoo'
 sudo nixos-rebuild switch --flake '.#k-2'                              # k-2
 sudo nixos-rebuild switch --flake '.#wsl-nixos'                        # wsl-nixos
 ```
@@ -565,10 +516,6 @@ nix flake check
 # Nix ファイルのフォーマット (nixpkgs-fmt)
 nix fmt
 
-# 各ホストのビルド
-nix build '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
-nix build '.#homeConfigurations."nanasess@ubuntu".activationPackage'
-
 # k-2: toplevel の評価と home-manager 部分のビルド
 # (toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージ (KVM 必須) を抱えるので、
 #  k-2 以外のホストではここまでに留める)
@@ -580,7 +527,7 @@ nix eval --raw '.#nixosConfigurations.wsl-nixos.config.system.build.toplevel.drv
 nix build '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage'
 
 # ビルドログの確認
-nix log '.#homeConfigurations."nanasess@wsl-gentoo".activationPackage'
+nix log '.#nixosConfigurations.wsl-nixos.config.home-manager.users.nanasess.home.activationPackage'
 ```
 
 ## CI
@@ -589,8 +536,7 @@ GitHub Actions (`.github/workflows/check.yml`) が push / PR 時に以下を実�
 
 - **check** -- `nix flake check`
 - **emacs** -- `emacs --batch` による init.el の読み込みテスト（elpaca キャッシュ付き）
-- **build** -- 各ホストの `activationPackage` ビルド（ubuntu-latest。wsl-gentoo / ubuntu）
-- **nixos** -- `nixosConfigurations` (k-2 / wsl-nixos) の toplevel 評価 + home-manager 部分のビルド（k-2 のカーネルとファームウェアは CI で作らない）
+- **build** -- `nixosConfigurations` (k-2 / wsl-nixos) の toplevel 評価 + home-manager 部分の `activationPackage` ビルド（1 ジョブ。k-2 のカーネルとファームウェアは CI で作らない）
 
 ## East Asian Ambiguous 文字幅 (EAW)
 
@@ -614,8 +560,8 @@ glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcw
 | [docs/nixos-t2.md](docs/nixos-t2.md) | k-2 (T2 Mac) の NixOS。カーネルのバイナリキャッシュ、ファームウェア、ESP と GRUB、インストール手順、NVRAM の整理 |
 | [docs/eaw-width.md](docs/eaw-width.md) | East Asian Ambiguous 文字幅の方針 |
 | [docs/bluetooth-audio.md](docs/bluetooth-audio.md) | Bluetooth の接続不安定の切り分け、A2DP / HFP の排他 |
-| [docs/nix-desktop-integration.md](docs/nix-desktop-integration.md) | Ubuntu で nixpkgs の GUI アプリがランチャーに出ない問題 |
-| [docs/ibus-skk.md](docs/ibus-skk.md) | apt 版 1.4.3 のバグ、Nix ビルド 1.4.4 の登録 |
+| [docs/nix-desktop-integration.md](docs/nix-desktop-integration.md) | 非 NixOS (旧 Ubuntu) で nixpkgs の GUI アプリがランチャーに出ない問題 (記録) |
+| [docs/ibus-skk.md](docs/ibus-skk.md) | 1.4.3 のバグと Nix ビルド 1.4.4 の登録 |
 | [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、GNOME Wayland でのアプリ判定 |
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | WSL から Claude Code への画像貼り付け |
 | [docs/mew.md](docs/mew.md) | Mew (Emacs メーラ) の Gmail XOAUTH2 + 1Password 化。セットアップと初回認可の手順 |
@@ -627,11 +573,13 @@ glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcw
 | リポジトリ | 移行対象 | 状態 |
 |-----------|---------|------|
 | `~/.config/dotfiles` | Zsh 設定、エイリアス、1Password SSH 連携 | 移行済み |
-| `~/git-repos/gentoo-ansible` | Portage 設定 (make.conf, package.use 等) | 移行済み (`modules/portage.nix`) |
 
 ## ホストの追加
 
 ### home-manager standalone ホスト
+
+現在は該当するホストが無い (wsl-gentoo / ubuntu は issue #183 で撤去した)。非 NixOS のホストを
+足すときは `flake.nix` に `homeConfigurations` を作り直す。
 
 1. `hosts/<hostname>.nix` を作成
 2. `flake.nix` の `homeConfigurations` にエントリを追加:
@@ -641,8 +589,8 @@ glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcw
      modules = [ ./home.nix ./hosts/<hostname>.nix ./modules/emacs ./modules/zsh ];
    };
    ```
-   GNOME デスクトップを持つホストは `gnomeHomeModules` を使う (`hosts/ubuntu.nix` 参照)
-3. `.github/workflows/check.yml` の build matrix にエントリを追加
+   GNOME デスクトップを持つホストは `gnomeHomeModules` を使う
+3. `.github/workflows/check.yml` の `HM_TARGETS` にエントリを追加
 
 ### NixOS ホスト
 
@@ -652,4 +600,4 @@ glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcw
    (`useGlobalPkgs` は `home.nix` の `nixpkgs.config` と衝突するので使わない)
 3. home-manager モジュール内で Nix プロファイルのパスが要るときは `config.home.profileDirectory` を使う
    (`~/.nix-profile` を直書きすると NixOS の `/etc/profiles/per-user/<user>` で壊れる)
-4. `.github/workflows/check.yml` の `nixos` ジョブに評価 / ビルドを追加
+4. `.github/workflows/check.yml` の `HM_TARGETS` / `NIXOS_HOSTS` に追加

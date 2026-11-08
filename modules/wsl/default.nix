@@ -1,10 +1,11 @@
 { config, pkgs, lib, ghostty, ... }:
 
-# WSL ホスト共通の home-manager 設定 (wsl-gentoo / wsl-nixos、Issue #183)。
+# WSL ホストの home-manager 設定 (現在は wsl-nixos のみ。wsl-gentoo は Issue #183 で撤去)。
 # Windows 側へのファイル配置、WSLg 向けの shim、1Password CLI の振り分けなど、
 # ディストリに依存しない部分をまとめる。ディストリ固有の設定は hosts/ 側に置く。
 {
-  # 既定値は置かず各ホストで明示する (ディストリごとに入手経路が違うため)。
+  # 既定値は置かず各ホストで明示する (ディストリごとに入手経路が違うため。wsl-nixos は
+  # /run/wrappers/bin/op)。
   options.wsl.opLinux = lib.mkOption {
     type = lib.types.str;
     example = "/run/wrappers/bin/op";
@@ -20,7 +21,7 @@
     # 役割分担の全体は docs/1password-wsl.md
     programs.git.signing.signer = "/mnt/c/Users/${config.home.username}/AppData/Local/Microsoft/WindowsApps/op-ssh-sign.exe";
 
-    # ~/.gnupg/gpg-agent.conf を宣言する (旧: 手書きで portage の /usr/bin/pinentry-tty を参照)。
+    # ~/.gnupg/gpg-agent.conf を宣言する (旧: 手書きでシステムの /usr/bin/pinentry-tty を参照)。
     # Mew は --pinentry-mode loopback でパスフレーズを渡すため allow-loopback-pinentry が必要。
     # GPG_TTY は modules/zsh で export 済みなので zsh 連携は重複させない。
     services.gpg-agent = {
@@ -40,7 +41,7 @@
       # XWayland を経由せず Weston に直接接続する。pgtk ビルドにすることで XWayland の
       # レイヤを外し、GTK の X11 接続喪失クラッシュ (GNOME #85715) を原理的に回避する。
       emacs31-pgtk
-      # 字形本体の Noto。home.nix 共通から移動 (Ubuntu のみ OS 静的 Noto に委譲する方針)。
+      # 字形本体の Noto。home.nix 共通には置かず、ホスト側で入れる (home.nix のコメント参照)。
       noto-fonts
       # 簡体字 / 繁体字 / ハングル。UDEV Gothic は JIS 範囲の漢字しか持たないため、
       # 無いと GUI Emacs (WSLg は Linux 側 fontconfig で解決) で 发 やハングルが豆腐になる。
@@ -48,11 +49,11 @@
       # 可変フォント版は Emacs (ftcrhb) が realize できないので静的版 (k-2 と同じ)。
       noto-fonts-cjk-sans-static
       # WSL から Windows 既定ブラウザを開く opener (内部で powershell.exe Start を呼ぶ)。
-      # BROWSER から参照する。portage の /usr/bin/wsl-open ではなく Nix で宣言して
-      # ホスト間の入手経路を揃える (CLAUDE.md「プラットフォーム非依存化の判断基準」)。
+      # BROWSER から参照する。ディストリのパッケージではなく Nix で宣言して
+      # 入手経路を固定する (CLAUDE.md「プラットフォーム非依存化の判断基準」)。
       wsl-open
       # WSLg クリップボードの BMP を PNG に変換する wl-paste shim (下記) が使う。
-      # portage の /usr/bin/magick に依存させず Nix で入手経路を固定する。
+      # ディストリの magick に依存させず Nix で入手経路を固定する。
       imagemagick
     ];
 
@@ -287,7 +288,7 @@
     # 含むため、上のキー変換ではどの .desktop とも一致しない (WSLg 側の欠陥)。
     # _NET_WM_ICON を自分で付与する。WSLg の XWM は _NET_WM_ICON の PropertyNotify で
     # アイコンを取り直すので、ウィンドウ表示後に設定しても反映される。
-    # アイコンの置き場所は wsl-gentoo (portage) と wsl-nixos (nixpkgs) で違うので両方渡す。
+    # アイコンは NixOS の programs._1password-gui が置くもの (システムプロファイル) を渡す。
     systemd.user.services.wslg-net-wm-icon = {
       Unit = {
         Description = "Set _NET_WM_ICON on X11 windows that WSLg cannot map to an icon";
@@ -299,7 +300,6 @@
         ExecStart = lib.escapeShellArgs [
           "${pkgs.python3.withPackages (ps: [ ps.xlib ])}/bin/python3"
           "${./wslg-net-wm-icon.py}"
-          "com.onepassword.OnePassword=/usr/share/pixmaps/1password.png"
           "com.onepassword.OnePassword=/run/current-system/sw/share/icons/hicolor/512x512/apps/1password.png"
         ];
         Environment = [

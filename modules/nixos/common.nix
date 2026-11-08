@@ -16,9 +16,9 @@
   programs.nix-ld.enable = true;
 
   # Claude Code が Bash から `python3` (heredoc でのファイル加工、JSON 整形等) を
-  # 頻繁に呼ぶため、PATH に素の python3 (標準ライブラリのみ) を置く。他ホスト
-  # (ubuntu / wsl-gentoo) は OS の /usr/bin/python3 があるので NixOS ホストだけ。
-  # home.nix に入れると他ホストで /usr/bin/python3 を隠してしまう
+  # 頻繁に呼ぶため、PATH に素の python3 (標準ライブラリのみ) を置く。NixOS には
+  # /usr/bin/python3 が無いため。home.nix ではなくここに置くのは、非 NixOS ホストを
+  # 足したときに OS の /usr/bin/python3 を隠さないため
   # (docs/nix-desktop-integration.md の gi typelib 問題)。
   # 追加パッケージは pip ではなく `uv run --with <pkg>` で使う (ストアは読み取り専用)。
   # uv は既定で uv 管理の Python を優先するので lsp-bridge の venv には影響しない。

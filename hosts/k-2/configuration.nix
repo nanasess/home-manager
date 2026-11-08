@@ -8,7 +8,7 @@
 
 let
   # nixpkgs / apt には 1.4.4 が無いため上流をローカルでビルドする (pkgs/ibus-skk.nix)。
-  # Ubuntu では IBUS_COMPONENT_PATH で登録していたが (modules/ibus-skk/ubuntu.nix)、
+  # Ubuntu では IBUS_COMPONENT_PATH で登録していたが (旧 modules/ibus-skk/ubuntu.nix)、
   # NixOS は i18n.inputMethod.ibus.engines で ibus 本体ごと束ねるので不要。
   ibus-skk = pkgs.callPackage ../../pkgs/ibus-skk.nix { };
   # ChatGPT デスクトップアプリ (Linux 版)。nixpkgs の chatgpt は Darwin 専用なので
@@ -47,7 +47,7 @@ in
   # モジュールに統合され削除されたため、こちらを使う。
   hardware.apple.touchBar.enable = true;
 
-  # サスペンド (modules/t2-suspend の NixOS 版。Ubuntu では sudo で /etc に配置していた)。
+  # サスペンド (旧 modules/t2-suspend の NixOS 版。Ubuntu では sudo で /etc に配置していた)。
   #  - hibernation は BCE コントローラが電源復帰できず失敗するので封じる
   #  - 蓋閉じ → suspend。外部モニタ接続 (docked) 時は無視 (gsettings と整合)
   systemd.sleep.settings.Sleep = {

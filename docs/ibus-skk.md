@@ -1,6 +1,9 @@
 # ibus-skk (SKK 入力メソッド)
 
-設定: `pkgs/ibus-skk.nix` + `modules/ibus-skk/`（`nanasess@ubuntu` と NixOS `k-2`。エンジン登録経路はホストごとに異なる、後述）。Ubuntu では apt 版 1.4.3 を Nix ビルドの 1.4.4 で置き換えている。
+設定: `pkgs/ibus-skk.nix` + `modules/ibus-skk/` + `hosts/k-2/configuration.nix` の `i18n.inputMethod.ibus.engines`（NixOS `k-2`）。Ubuntu では apt 版 1.4.3 を Nix ビルドの 1.4.4 で置き換えていた。
+
+> **記録**: ubuntu ホスト (`nanasess@ubuntu`) は issue #183 で撤去した。Ubuntu に関する記述は当時の調査記録として残している。
+
 
 ## apt 版 1.4.3 は ▼変換中に母音を打つと確定文字列が消える
 
@@ -24,7 +27,7 @@ libskk 側は 1.0.5 の時点で正しく動作する（`SelectStateHandler` が
 
 (Ubuntu の話。NixOS (k-2) は `i18n.inputMethod.ibus.engines` に `pkgs/ibus-skk.nix` を
 渡すだけで、`ibus-with-plugins` が `IBUS_COMPONENT_PATH` を束ねてくれる。`meta.isIbusEngine`
-がその型チェックの印。辞書設定の dconf は `modules/ibus-skk/default.nix` で両ホスト共通。)
+がその型チェックの印。辞書設定の dconf は `modules/ibus-skk/default.nix`。)
 
 `ibus_registry_load()` の実装:
 
@@ -45,15 +48,15 @@ if (envstr) {
 
 ## apt 版は削除が必須
 
-component 名 (`org.freedesktop.IBus.SKK`) とエンジン名 (`skk`) が apt 版と同一なので、両方が探索対象にあると二重登録になる。`sudo apt remove ibus-skk` すること。`check-system-packages` が競合として検出する。
+component 名 (`org.freedesktop.IBus.SKK`) とエンジン名 (`skk`) が apt 版と同一なので、両方が探索対象にあると二重登録になる。`sudo apt remove ibus-skk` する必要があった (`check-system-packages` が競合として検出していた)。
 
-エンジン名が同一なので、`dconf` の辞書設定 (`desktop/ibus/engine/skk`、`hosts/ubuntu.nix`) はそのまま引き継がれる。`encoding=` の受け渡し (`engine.vala` → `Skk.SkkServ`) も 1.4.4 + libskk 1.1.0 で変わっていない。
+エンジン名が同一なので、`dconf` の辞書設定 (`desktop/ibus/engine/skk`、`modules/ibus-skk/default.nix`) はそのまま引き継がれる。`encoding=` の受け渡し (`engine.vala` → `Skk.SkkServ`) も 1.4.4 + libskk 1.1.0 で変わっていない。
 
 ## layout は default に固定している
 
 上流の `skk.xml.in.in` は `<layout>jp</layout>` で、SKK を有効にすると JIS 配列が強制される。Ubuntu 側では `/usr/share/ibus/component/skk.xml` を手で `default` に書き換えて運用していた（`dpkg --verify ibus-skk` が改変を検出。2026-03-06）ため、`pkgs/ibus-skk.nix` の `postPatch` でその状態を宣言的に再現している。
 
-## 反映手順
+## 反映手順 (旧 Ubuntu)
 
 `home-manager switch` だけでは既存セッションに `IBUS_COMPONENT_PATH` が届かない。
 

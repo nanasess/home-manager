@@ -29,7 +29,7 @@ CI と第三者の clone が取得に失敗する)。
 - **Windows から直接 ssh.exe を使う場合 (稀)**: `modules/wsl` の `windowsSshConfig` が、activation のたびに
   `%USERPROFILE%\.ssh\config` を書き出し、WSL の `~/.ssh/conf.d/*.conf` を
   `%USERPROFILE%\.ssh\conf.d\` にミラーする。Windows 側では conf.d を clone も編集もしない
-  (編集は WSL の clone で行い、`home-manager switch` で反映する)。config に `IdentityAgent` を
+  (編集は WSL の clone で行い、`nixos-rebuild switch` で反映する)。config に `IdentityAgent` を
   書かないのは、Windows の 1Password が既定の名前付きパイプ (`\\.\pipe\openssh-ssh-agent`)
   で鍵を提供しているため。
 - Windows 側に秘密鍵のファイルを置かない (鍵は 1Password に置く)。

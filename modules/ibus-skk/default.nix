@@ -1,8 +1,8 @@
 { config, lib, pkgs, ... }:
 # ibus-skk の辞書設定 (ホスト非依存)。エンジン本体の登録経路はホストごとに異なる:
-#   - Ubuntu: ./ubuntu.nix (Nix ビルドの 1.4.4 を IBUS_COMPONENT_PATH で登録)
 #   - NixOS : hosts/k-2/configuration.nix の i18n.inputMethod.ibus.engines
-# どちらもエンジン名は skk なので、この dconf パス (desktop/ibus/engine/skk) は共通。
+#   (旧 Ubuntu は ./ubuntu.nix で IBUS_COMPONENT_PATH に登録していた。issue #183 で撤去)
+# エンジン名は skk なので、この dconf パス (desktop/ibus/engine/skk) は共通。
 {
   dconf.settings = {
     # GNOME の入力ソースに ibus-skk を登録する (設定 > キーボード > 入力ソース)。
@@ -44,7 +44,7 @@
   # - 復帰時に skk エンジンは作り直されるため、入力モードは initial-input-mode (latin)
   #   に戻る。sudo 前がかなモードでも sudo 後は半角英数になる。
   # - タイムスタンプが有効 (`sudo -n true` 成功) ならプロンプトは出ないので素通し。
-  #   IBus が動いていない環境 (wsl-gentoo 等) も素通し。
+  #   IBus が動いていない環境 (WSL 等) も素通し。
   # - Ctrl-C でプロンプトを抜けても always 節でエンジンを戻す。
   programs.zsh.initContent = ''
     sudo() {

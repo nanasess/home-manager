@@ -1,11 +1,11 @@
-# k-2 (NixOS) のユーザー環境。hosts/ubuntu.nix の NixOS 版。
+# k-2 (NixOS) のユーザー環境。旧 hosts/ubuntu.nix (issue #183 で撤去) の NixOS 版。
 #
 # Ubuntu 版にあった以下は NixOS では不要なので持ち込まない:
 #  - nixGL wrap (GPU ライブラリはシステムと同じ nixpkgs から来る)
 #  - .desktop / アイコンの手動配置 (XDG_DATA_DIRS に /etc/profiles/per-user が入る。
 #    docs/nix-desktop-integration.md の問題は NixOS では起きない)
 #  - apt パッケージの差分チェック (check-system-packages)
-#  - modules/t2-suspend (logind / sleep は configuration.nix で宣言)
+#  - 旧 modules/t2-suspend (logind / sleep は configuration.nix で宣言)
 { config, pkgs, ghostty, ... }:
 
 {
@@ -40,7 +40,8 @@
   };
 
   home.packages = with pkgs; [
-    # Wayland セッションでは pgtk ビルドを使う (理由は hosts/ubuntu.nix 参照)。
+    # Wayland セッションでは pgtk ビルドを使う。XWayland 経由を避けて GTK の X11 接続
+    # 喪失クラッシュ (GNOME #85715) を回避し、HiDPI と IME 連携も Wayland ネイティブにする。
     emacs31-pgtk
     # Ubuntu で apt から入れていた開発ツール。
     dotnet-sdk_10

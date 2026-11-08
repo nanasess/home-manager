@@ -66,7 +66,7 @@ in
     # xremap は「フォーカス中アプリ」を知らないと application.only を判定できない。X11 なら
     # xremap 自身が X から WM_CLASS を読めるが、Wayland ではコンポジタごとの手段が要る。
     # GNOME Wayland には汎用 API が無いため、xremap は Shell 拡張を D-Bus
-    # (com.k0kubun.Xremap) 越しに呼ぶ。Chrome 151 は Ubuntu 24.04 でネイティブ Wayland
+    # (com.k0kubun.Xremap) 越しに呼ぶ。Chrome 151 は GNOME Wayland でネイティブ Wayland
     # 動作 (xprop / xlsclients に現れない) なので、この経路が必須になる。
     #
     # 拡張の置き場所は ~/.local/share/gnome-shell/extensions/。GNOME セッションの
@@ -76,7 +76,7 @@ in
     # ■ 前提となる root 権限の設定 (home-manager では宣言できない)
     #
     # NixOS (hosts/k-2) では hardware.uinput.enable と users.users.<name>.extraGroups
-    # (input / uinput) で宣言済みなので、以下は Ubuntu での手順。
+    # (input / uinput) で宣言済み。以下は非 NixOS ホスト (旧 Ubuntu) で手作業していた手順。
     #
     #   sudo gpasswd -a nanasess input
     #   echo 'KERNEL=="uinput", GROUP="input", TAG+="uaccess", MODE:="0660", OPTIONS+="static_node=uinput"' \
@@ -164,8 +164,8 @@ in
 
     dconf.settings = {
       "org/gnome/shell" = {
-        # このキーは配列まるごと置換される。ホスト既定の拡張 (Ubuntu の ding / dock /
-        # tiling-assistant 等) は各 hosts/*.nix 側で同じキーに併記すること。
+        # このキーは配列まるごと置換される。ホスト既定の拡張 (旧 Ubuntu の ding / dock /
+        # tiling-assistant 等) を使うときは各 hosts/*.nix 側で同じキーに併記すること。
         # home-manager の gvariant 型は配列同士を連結してマージするので、ここでは
         # xremap 拡張だけを宣言する。
         enabled-extensions = [ extensionUuid ];

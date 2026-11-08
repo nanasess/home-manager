@@ -6,11 +6,11 @@ Issue #133 の調査結果。ホストによって前提が異なる。
 
 `Ctrl+Shift+V` は**端末側**のペーストバインド (Ghostty / WezTerm とも)。ターミナルがクリップボードの *テキスト* を bracketed paste で送るだけなので画像は届かない。Claude Code の画像ペーストは端末のペースト機構を使わず、キー入力を受けて自分でクリップボードコマンドを実行する実装のため、**素通しされる `Ctrl+V` が正解**。
 
-## ubuntu (Wayland native)
+## GNOME Wayland (k-2。旧 ubuntu も同じ)
 
 `wl-paste` が `image/png` を直接返すため追加設定は不要。
 
-## wsl-gentoo (WSLg) — `wl-paste` shim が必要
+## WSL (WSLg、wsl-nixos。旧 wsl-gentoo も同じ) — `wl-paste` shim が必要
 
 WSLg のクリップボードブリッジは Windows 側の `CF_PNG` を落とし、DIB を **`image/bmp` としてのみ**広告する。しかもその BMP は `BITMAPINFOHEADER.biCompression == 3` (`BI_BITFIELDS`) で、Claude Code が同梱する sharp/libvips はこれをデコードできない。Claude Code は先頭が `BM` のとき PNG 変換を試み、**失敗した例外を無言で握り潰す**ため、`Ctrl+V` を押しても画面上は完全に無反応になる。
 

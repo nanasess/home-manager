@@ -1,6 +1,6 @@
 # Chrome のタブ移動キーバインド (xremap)
 
-設定: `modules/xremap/`（`nanasess@ubuntu` と NixOS `k-2`。権限周りはホストごとに異なる、後述）。Chrome にフォーカスがある時だけキーを置換する。
+設定: `modules/xremap/`（NixOS `k-2`。ubuntu ホストは issue #183 で撤去。Ubuntu の権限設定の節は記録として残す）。Chrome にフォーカスがある時だけキーを置換する。
 
 | キー | Chrome での動作 |
 |---|---|
@@ -46,15 +46,15 @@ RUST_LOG=debug xremap --watch ~/.config/xremap/config.yml 2>&1 | tee /tmp/xremap
 
 xremap は「フォーカス中アプリ」を知らないと `application.only` を判定できない。X11 なら xremap 自身が `WM_CLASS` を読めるが、Wayland にはその汎用 API がない。GNOME では xremap の Shell 拡張 (`xremap@k0kubun.com`) が D-Bus (`com.k0kubun.Xremap`) で WMClass を渡す。
 
-**Chrome 151 は Ubuntu 24.04 でネイティブ Wayland 動作**（`xprop` / `xlsclients` に現れない）なので、この経路が必須。
+**Chrome 151 は GNOME Wayland でネイティブ Wayland 動作** (Ubuntu 24.04 で確認)（`xprop` / `xlsclients` に現れない）なので、この経路が必須。
 
 - nixpkgs の `pkgs.xremap` 既定は **wlroots build**。`override { withVariant = "gnome"; }` で gnome feature 版に差し替える（variant 名は nixpkgs の `pkgs/by-name/xr/xremap/package.nix` の `variants` 参照）
 - 拡張は `xdg.dataFile` で `~/.local/share/gnome-shell/extensions/` へリンクする。[Nix GUI アプリのランチャー登録](nix-desktop-integration.md) と同じ `XDG_DATA_DIRS` 問題がここにも当てはまる
-- `dconf` の `org/gnome/shell` `enabled-extensions` は**配列まるごと置換**。Ubuntu 既定の `ding` / `ubuntu-dock` / `tiling-assistant` を併記しないと消える
+- `dconf` の `org/gnome/shell` `enabled-extensions` は**配列まるごと置換**。ホスト既定の拡張 (旧 Ubuntu の `ding` / `ubuntu-dock` / `tiling-assistant` など) を併記しないと消える
 - WMClass の実測は `busctl --user call org.gnome.Shell /com/k0kubun/Xremap com.k0kubun.Xremap WMClasses`。GNOME Wayland では `xremap --list-windows` は使えない
 - キー名は `parse_key()` が大文字化して `KEY_` を補うので `pageup` / `pagedown` でよい
 
-## 権限設定は root 作業として残る (Ubuntu)
+## 権限設定は root 作業として残る (旧 Ubuntu)
 
 NixOS (k-2) では `hardware.uinput.enable` と `users.users.nanasess.extraGroups` の
 `input` / `uinput` で宣言している (`hosts/k-2/configuration.nix`) ので、以下は Ubuntu の話。
@@ -120,7 +120,6 @@ xremap を動かすと、GNOME の「入力中はタッチパッドを無効に�
 
 k-2 (T2 Mac) は前者。内蔵キーボード / トラックパッドを apple-bce が USB デバイス (`05ac:027e`) として見せるため udev が external と判定する。`hosts/k-2/home.nix` で `xremap.outputDeviceId = { vendor = "0x05ac"; product = "0x027e"; }` を設定して解決した。
 
-ubuntu (`hosts/ubuntu.nix`) は未対応。内蔵タッチパッドが internal 判定なら後者の quirk が要る (未検証)。
 
 ### 切り分け手順
 

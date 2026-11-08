@@ -29,19 +29,13 @@
 # に記憶して再接続時に復元する。過去に HFP を選んでいると自動切替を止めても HFP が
 # 蘇るため、導入時に当該行を削除した (削除すると優先度による選択にフォールバックする)。
 #
-# 注意 2: WirePlumber は 0.4 系 (Ubuntu 24.04) が Lua 設定、0.5 以降 (NixOS
-# unstable) が .conf 設定で、互いに相手の形式を無視する。両方を置いておき、
-# 動いているバージョンが自分の形式だけを読む。
+# 注意 2: WirePlumber 0.5 以降は .conf 形式だけを読む。0.4 系 (Ubuntu 24.04) 用の
+# Lua 設定 (policy.lua.d) は Ubuntu ホストの撤去 (issue #183) と一緒に外した。
 #
 # 適用範囲: ユーザー空間のみ (sudo 不要)。ロールバックは flake.nix の modules から
 # 本モジュールを外して home-manager switch するだけ。
 {
-  # WirePlumber は $XDG_CONFIG_HOME → /etc → /usr/share の順で *.lua.d を読み、
-  # 同名ファイルは上位が下位を隠す。50 番の既定より後に読ませたいので 51 を付ける。
-  xdg.configFile."wireplumber/policy.lua.d/51-disable-headset-autoswitch.lua".source =
-    ./51-disable-headset-autoswitch.lua;
-
-  # 0.5 以降は wireplumber.conf.d/*.conf を読む (上の注意 2)。
+  # wireplumber.conf.d/*.conf を読む (上の注意 2)。既定の 50 番より後に読ませたいので 51 を付ける。
   xdg.configFile."wireplumber/wireplumber.conf.d/51-disable-headset-autoswitch.conf".source =
     ./51-disable-headset-autoswitch.conf;
 
@@ -58,8 +52,8 @@
   # XDG_DATA_DIRS は /usr/local/share:/usr/share:/var/lib/snapd/desktop だけで
   # ~/.nix-profile/share を含まないため、そのままではランチャーに出てこない
   # (ログインシェルの XDG_DATA_DIRS には入っているので、端末からは起動できる)。
-  # そこで XDG_DATA_HOME 配下に自前のエントリを置く。Ghostty (hosts/ubuntu.nix) と
-  # 同じ回避策。
+  # そこで XDG_DATA_HOME 配下に自前のエントリを置く (Ubuntu 時代からの回避策。
+  # docs/nix-desktop-integration.md)。
   #
   # 副作用として Exec / Icon も解決できないため、いずれも profileDirectory 経由の
   # フルパスで指定する (store パスを直書きすると更新のたびに切れる)。ここを
