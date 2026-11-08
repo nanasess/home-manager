@@ -4,10 +4,13 @@
   home.username = "nanasess";
   home.stateVersion = "24.05";
 
+  # home.packages に入れる unfree パッケージの許可リスト (現在は空)。terraform (BSL 1.1)
+  # はここで許可していたが、unfree は Hydra がビルドせず cache.nixos.org に無いので
+  # nixpkgs を上げるたびにソースビルドになっていた。mise の aqua:hashicorp/terraform
+  # (下の programs.mise) に移した。
+  # 空でも消さない: useGlobalPkgs を使わない理由 (flake.nix) がこの nixpkgs.config。
   nixpkgs.config.allowUnfreePredicate = pkg:
-    builtins.elem (lib.getName pkg) [
-      "terraform"
-    ];
+    builtins.elem (lib.getName pkg) [ ];
 
   programs.home-manager.enable = true;
 
@@ -50,7 +53,7 @@
     # Development
     gh
     uv
-    terraform
+    # terraform は programs.mise (aqua:hashicorp/terraform)
     awscli2
     # MFA 必須 (EnforceMFAPolicy) の IAM ユーザーで STS セッションを作り、環境変数で
     # コンテナ等に渡す (例: `aws-vault exec <profile> -- docker compose up`)。
@@ -159,6 +162,11 @@
           "with" = [ "pip" ];
           uvx_args = "--managed-python";
         };
+        # nixpkgs の terraform は unfree (BSL 1.1) で cache.nixos.org に無く、nixpkgs を
+        # 上げるたびに Go のソースビルドになる。aqua バックエンドは HashiCorp 公式の
+        # releases.hashicorp.com の zip を SHA256SUMS で検証して入れる (CI と同じ配布物)。
+        # Go の静的バイナリなので NixOS でも nix-ld 不要。上げるときはここを書き換える。
+        "aqua:hashicorp/terraform" = "1.17.1";
       };
     };
   };
