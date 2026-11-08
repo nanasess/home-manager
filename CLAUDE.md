@@ -279,14 +279,6 @@ fork (#1934) では内蔵キーボード / トラックパッドのモジュー�
 `~/.ssh/conf.d` (private の `nanasess/ssh_conf.d` の clone) にあるので、修正と PR は
 ssh_conf.d 側に出す。このリポジトリの Issue / PR / コミットにはホスト名・IP・顧客名を書かない。
 
-### 移行元リポジトリ (TODO)
-
-以下のリポジトリからの移行状況。段階的にこのリポジトリへ統合する。
-
-| リポジトリ | 移行対象 | 状態 |
-|-----------|---------|------|
-| `~/.config/dotfiles` | Zsh 設定、エイリアス、1Password SSH 連携 | 移行済み |
-
 ### フォーマッター
 
 `nixpkgs-fmt` を使用。`nix fmt` で実行可能。`supportedSystems` は `x86_64-linux`。
