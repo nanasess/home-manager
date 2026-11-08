@@ -53,6 +53,8 @@
     # Development
     gh
     uv
+    # pre-commit / pre-push フックで秘密情報を検査するプロジェクト向け
+    gitleaks
     # terraform は programs.mise (aqua:hashicorp/terraform)
     awscli2
     # MFA 必須 (EnforceMFAPolicy) の IAM ユーザーで STS セッションを作り、環境変数で
