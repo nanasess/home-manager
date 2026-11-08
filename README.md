@@ -566,14 +566,6 @@ glibc 2.39+ で East Asian Ambiguous 文字 (△→○●■□▲ 等) の `wcw
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | WSL から Claude Code への画像貼り付け |
 | [docs/mew.md](docs/mew.md) | Mew (Emacs メーラ) の Gmail XOAUTH2 + 1Password 化。セットアップと初回認可の手順 |
 
-## TODO: 移行元リポジトリの統合
-
-以下のリポジトリからの移行は未完了。段階的にこのリポジトリへ統合する。
-
-| リポジトリ | 移行対象 | 状態 |
-|-----------|---------|------|
-| `~/.config/dotfiles` | Zsh 設定、エイリアス、1Password SSH 連携 | 移行済み |
-
 ## ホストの追加
 
 ### home-manager standalone ホスト
