@@ -1589,6 +1589,37 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   (browse-url (concat "https://mail.google.com/a/"
                       (mew-mail-domain (mew-sinfo-get-case)))))
 
+(defun my/mew-cite-region-p ()
+  "`mew-draft-cite' が Message バッファのリージョンを引用する状況なら non-nil。
+判定は上流 `mew-draft-cite' (mew-draft.el) の引用元バッファの選び方とリージョン
+条件のコピー。Mew はマークが非アクティブでも、マークがあって point と違えば
+リージョン引用にするので、`region-active-p' では判定しない。Mew を更新したら
+上流の条件と差分が開いていないか確認すること。"
+  (let ((buf (or mew-message-citation-buffer
+                 (if (get-buffer (mew-buffer-message))
+                     (mew-buffer-message)
+                   mew-message-last-buffer))))
+    (and (not mew-cite-ignore-region)
+         buf (get-buffer buf)
+         (with-current-buffer buf
+           (let ((mark-active t))
+             (and (mew-mark)
+                  (/= (point) (mew-mark))
+                  ;; `mew-mouse-region-p' は `mouse-region-match' が無い環境では
+                  ;; マクロなので、関数として呼ばずに元の関数を直接見る。
+                  (not (and mew-cite-ignore-mouse-region
+                            (fboundp 'mouse-region-match)
+                            (mouse-region-match)))))))))
+
+(defun my/mew-draft-cite-region-without-label (orig &rest args)
+  "リージョンを引用するときだけ引用ラベル (From: / Subject: / Date:) を付けない。
+全文引用は帰属表示 (ラベル) 付き、一部を抜き出すインライン返信は `>' だけ、
+という使い分けにする。`mew-cite-strings' は `mew-cite-fields' が nil なら空文字を
+返すので、リージョン引用のときだけ nil に束縛して ORIG を呼ぶ。"
+  (defvar mew-cite-fields)
+  (let ((mew-cite-fields (if (my/mew-cite-region-p) nil mew-cite-fields)))
+    (apply orig args)))
+
 (use-package mew
   :ensure (:host github :repo "kazu-yamamoto/Mew")
   :commands (mew mew-send)
@@ -1671,6 +1702,8 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   ;; `--data @file' で渡す)。値の url-hexify も上流 mew-oauth2-params が行う。
   ;; 認可 URL に access_type=offline / prompt=consent を足す (my/mew-oauth2-get-auth-code 参照)
   (advice-add 'mew-oauth2-get-auth-code :override #'my/mew-oauth2-get-auth-code)
+  ;; C-c C-y: 全文引用はラベル付き、リージョン引用はラベル無し
+  (advice-add 'mew-draft-cite :around #'my/mew-draft-cite-region-without-label)
   ;; macOS (NS) では Finder から draft へファイルをドロップして添付できるようにする
   (when (featurep 'ns)
     (define-key mew-draft-mode-map [ns-drag-file]
