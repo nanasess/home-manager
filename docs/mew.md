@@ -201,6 +201,42 @@ WSL では `browse-url` が `$BROWSER` (wsl-open) 経由で Windows 側ブラウ
 (`mew-lang-jp.el` の `defvar` が `mew-thread.el` の `defcustom` より先に束縛し、defcustom は既存の
 現在値を優先する) ので `:init` の `setq` で読み込み前に束縛している。
 
+## HTML メールを xwidget-webkit で開く (`C-c w`)
+
+通常の表示は上流の既定どおり shr (`shr-render-region`)。表のレイアウトや CSS が要るメールだけ、
+Summary / Message で `C-c w` (`my/mew-html-view-xwidget`) を押すと xwidget-webkit で開く。
+上流 Mew に xwidget 対応は無い (2026-11 時点で `xwidget` / `webkit` を含むコード・PR・Issue なし)。
+
+- **HTML の受け渡し**: `mew-prog-text/html` を `my/mew-html-render-and-keep` に差し替え、shr で描画した
+  範囲にデコード済みの元 HTML をテキストプロパティ `my/mew-html` として残す。`C-c w` はそれを
+  一時ファイル (mode 600、次に開くときと Emacs 終了時に削除) に書き出して開く。
+  未解析のメッセージ (`mew-use-text/html` が nil など) は先に `.` で再解析する。
+- **CSP**: ファイル先頭に `<meta charset="utf-8">` (メール側の charset 宣言より先に置き、こちらを勝たせる)
+  と Content-Security-Policy の meta を差し込む。
+
+  | | 既定 (`C-c w`) | 信頼するメール (`C-u C-c w`) |
+  |---|---|---|
+  | スクリプト (インライン含む) | 止める | 止める |
+  | 画像 | `data:` のみ (`mew-html-blocked-images` が nil なら http / https も) | `data:` / https / http |
+  | CSS / フォント | インライン / `data:` のみ | https も読み込む |
+  | フォーム送信・`<base>` | 止める | 止める |
+
+  WebKitGTK が file:// の meta CSP を守ることは、ローカルの HTTP サーバにアクセスが来ないこと
+  (許可したときだけ `GET` が届く) と `document.title` を書き換える `<script>` が動かないことで確認した。
+- **meta refresh**: `<meta http-equiv="refresh">` は操作なしで外部 URL へ移動し、CSP では止められない
+  (既定の `C-c w` でも移動してアクセスが届くことを確認した。属性値を `&#114;efresh` と文字参照で書いても効く)。
+  属性を見て消すと文字参照で漏れるので、メール中の `<meta` はタグ名ごと `<x-mew-meta` に変えて無効化する
+  (`my/mew-html-neutralize-meta`)。
+- **できないこと**: リンクを押すと xwidget の中でそのページへ移動する (CSP は移動を止められない)。
+  `cid:` で参照するインライン画像 (multipart/related) は表示されない。
+- **外部リソースを許すリスク**: 画像 / CSS の取得は送信者に「開封した・いつ・どの IP から・どの
+  ブラウザで」を伝える (ウェブビーコン)。CSS だけでも `background-image` や `@font-face` で同じことが
+  できるので、画像を止めて CSS を許しても防げない。また画像・フォントのデコーダは WebKit の攻撃面に
+  なる。許可は From を見て自動で行わず、メールごとに `C-u` で決める (From は偽装でき、
+  信頼できる相手からの転送や引用にも第三者の HTML が含まれる)。ただし `mew-html-blocked-images` を
+  nil にしている場合は、`C-u` なしの `C-c w` でも外部画像を取得する (shr 表示と同じ方針に合わせている)。
+  この設定ではメールごとの判断は CSS / フォントにしか効かず、画像による開封通知は防げない。
+
 ## MS365 (Exchange Online) を足す場合
 
 上流マニュアル (Sec 9.13) は Gmail と MS365 を通信確認済みとしている。ケース別キーで書ける:

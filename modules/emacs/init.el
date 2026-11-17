@@ -1620,6 +1620,101 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   (let ((mew-cite-fields (if (my/mew-cite-region-p) nil mew-cite-fields)))
     (apply orig args)))
 
+(defconst my/mew-html-csp-base
+  "default-src 'none'; form-action 'none'; base-uri 'none'"
+  "xwidget-webkit で HTML メールを開くときの Content-Security-Policy の固定部分。
+default-src 'none' でスクリプト (インラインも含む) と外部への取得をすべて止め、
+CSP の default-src が覆わないフォーム送信と <base> も止める。")
+
+(defvar my/mew-html-xwidget-file nil
+  "直前に xwidget で開いた一時ファイル。次に開くときと Emacs 終了時に消す。")
+
+(defun my/mew-html-render-and-keep (start end)
+  "`mew-prog-text/html' の置き換え。shr で描画し、元の HTML をテキストプロパティに残す。
+描画は上流の既定と同じ `shr-render-region' (`mew-html-blocked-images' も上流の
+`mew-mime-text/html' が束縛したまま効く)。`my/mew-html-view-xwidget' はこの
+プロパティから HTML を取り出す。Message バッファはメッセージを表示するたびに
+作り直されるので、別のメッセージの HTML を拾うことはない。"
+  (let ((html (buffer-substring-no-properties start end))
+        (end-marker (copy-marker end t)))
+    (shr-render-region start end)
+    (put-text-property start end-marker 'my/mew-html html)
+    (set-marker end-marker nil)))
+
+(defun my/mew-html-at-point ()
+  "Message バッファから、point 位置 (無ければ最初) の HTML パートの元 HTML を返す。
+Summary から呼ばれたときは表示中の Message バッファを見る。"
+  (let ((buf (if (text-property-not-all (point-min) (point-max) 'my/mew-html nil)
+                 (current-buffer)
+               (get-buffer (mew-buffer-message)))))
+    (when buf
+      (with-current-buffer buf
+        (or (get-text-property (point) 'my/mew-html)
+            (let ((pos (text-property-not-all (point-min) (point-max) 'my/mew-html nil)))
+              (and pos (get-text-property pos 'my/mew-html))))))))
+
+(defun my/mew-html-xwidget-cleanup ()
+  "直前に xwidget で開いた一時ファイルを消す。"
+  (when (and my/mew-html-xwidget-file (file-exists-p my/mew-html-xwidget-file))
+    (delete-file my/mew-html-xwidget-file))
+  (setq my/mew-html-xwidget-file nil))
+
+(defun my/mew-html-neutralize-meta (html)
+  "HTML 中の <meta> をすべて未知の要素 <x-mew-meta> に変えて無効にする。
+`<meta http-equiv=\"refresh\">' はユーザー操作なしで別の URL へ移動し、CSP では
+止められない (default-src は取得を縛るだけで遷移は対象外)。属性値は文字参照
+(`&#114;efresh' など) で書けるので属性を見て消すと漏れる。タグ名は文字参照で
+書けないので、タグ名ごと置き換える。タグ名は空白 / `/' / `>' で終わる
+(`<meta/http-equiv=...>' も meta 要素になる) ので、その手前で区切る。メール側の
+charset / CSP の宣言も消えるが、charset は先頭に置く UTF-8 宣言が使われ、CSP は
+こちらで付け直すので困らない。"
+  (let ((case-fold-search t))
+    (replace-regexp-in-string "<meta\\([\t\n\f\r />]\\|\\'\\)" "<x-mew-meta\\1" html t)))
+
+(defun my/mew-html-xwidget-open (html trusted)
+  "HTML を CSP 付きの一時ファイルに書き出し、xwidget-webkit で開く。
+メールの <meta> は `my/mew-html-neutralize-meta' で無効にする (meta refresh 対策)。
+先頭に UTF-8 の宣言を置く (Message バッファの文字列は Mew がデコード済みなので
+UTF-8 で書き出せば合う)。
+TRUSTED なら https の画像 / CSS / フォントを読み込む。そうでなければインラインの
+style と data: だけで、外部画像は `mew-html-blocked-images' が nil のときだけ許す
+(shr 表示の既定と合わせる)。スクリプトはどちらでも動かさない。"
+  (defvar mew-html-blocked-images)
+  (unless (featurep 'xwidget-internal)
+    (user-error "この Emacs は xwidget なしでビルドされている"))
+  (my/mew-html-xwidget-cleanup)
+  (let* ((remote (if trusted " https:" ""))
+         (img (if (or trusted (null mew-html-blocked-images))
+                  " https: http:"
+                ""))
+         (csp (format "%s; style-src 'unsafe-inline'%s; font-src data:%s; img-src data:%s"
+                      my/mew-html-csp-base remote remote img))
+         (head (format "<meta charset=\"utf-8\">\n<meta http-equiv=\"Content-Security-Policy\" content=\"%s\">\n"
+                       csp))
+         ;; make-temp-file はモード 600 で作る。書き込みに失敗しても部分的な本文が
+         ;; 残らないよう、作った直後に登録して失敗時は消す。
+         (file (make-temp-file "mew-html-" nil ".html"))
+         (ok nil))
+    (setq my/mew-html-xwidget-file file)
+    (unwind-protect
+        (let ((coding-system-for-write 'utf-8-unix))
+          (write-region (concat head (my/mew-html-neutralize-meta html)) nil file nil 'silent)
+          (setq ok t))
+      (unless ok (my/mew-html-xwidget-cleanup)))
+    (xwidget-webkit-browse-url (concat "file://" file))))
+
+(defun my/mew-html-view-xwidget (&optional trusted)
+  "表示中のメッセージの HTML パートを xwidget-webkit で開く。
+既定では外部の画像 / CSS / フォントを読み込まない (開封の通知やトラッキングを防ぐ)。
+\\[universal-argument] を付けると、信頼できるメールとして https の画像 / CSS /
+フォントを読み込む。スクリプトはどちらでも止める。リンクを押すと xwidget の中で
+そのページへ移動する (CSP は移動を止められない)。"
+  (interactive "P")
+  (let ((html (my/mew-html-at-point)))
+    (unless html
+      (user-error "表示中のメッセージに HTML パートが無い (未解析なら `.' で再解析)"))
+    (my/mew-html-xwidget-open html trusted)))
+
 (use-package mew
   :ensure (:host github :repo "kazu-yamamoto/Mew")
   :commands (mew mew-send)
@@ -1627,10 +1722,12 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   :bind (:map mew-message-mode-map
          ("M-<down-mouse-1>" . mew-browse-url-at-mouse)
          ("<return>" . mew-browse-url-at-point)
+         ("C-c w" . my/mew-html-view-xwidget)
          :map mew-draft-mode-map
          ("M-<down-mouse-1>" . mew-browse-url-at-mouse)
          :map mew-summary-mode-map
-         ("C-c RET" . my/mew-browse-url-open-gmail))
+         ("C-c RET" . my/mew-browse-url-open-gmail)
+         ("C-c w" . my/mew-html-view-xwidget))
   :custom
   ;; アカウントは Gmail 1 本なので default ケースだけ。秘密情報 (oauth2-client-id /
   ;; oauth2-client-secret) はここには書かず my/mew-setup-oauth2 が入れる。
@@ -1704,6 +1801,12 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   (advice-add 'mew-oauth2-get-auth-code :override #'my/mew-oauth2-get-auth-code)
   ;; C-c C-y: 全文引用はラベル付き、リージョン引用はラベル無し
   (advice-add 'mew-draft-cite :around #'my/mew-draft-cite-region-without-label)
+  ;; HTML パートは shr で描画しつつ元の HTML を残し、C-c w で xwidget-webkit でも
+  ;; 開けるようにする (my/mew-html-view-xwidget)。上流の既定は libxml が使えるときだけ
+  ;; shr なので、同じ条件のときだけ差し替える (使えなければ上流の w3m のまま)。
+  (when (and (fboundp 'shr-render-region) (fboundp 'libxml-parse-html-region))
+    (setq mew-prog-text/html #'my/mew-html-render-and-keep))
+  (add-hook 'kill-emacs-hook #'my/mew-html-xwidget-cleanup)
   ;; macOS (NS) では Finder から draft へファイルをドロップして添付できるようにする
   (when (featurep 'ns)
     (define-key mew-draft-mode-map [ns-drag-file]
