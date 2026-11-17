@@ -1659,10 +1659,23 @@ Summary から呼ばれたときは表示中の Message バッファを見る。
     (delete-file my/mew-html-xwidget-file))
   (setq my/mew-html-xwidget-file nil))
 
+(defun my/mew-html-neutralize-meta (html)
+  "HTML 中の <meta> をすべて未知の要素 <x-mew-meta> に変えて無効にする。
+`<meta http-equiv=\"refresh\">' はユーザー操作なしで別の URL へ移動し、CSP では
+止められない (default-src は取得を縛るだけで遷移は対象外)。属性値は文字参照
+(`&#114;efresh' など) で書けるので属性を見て消すと漏れる。タグ名は文字参照で
+書けないので、タグ名ごと置き換える。タグ名は空白 / `/' / `>' で終わる
+(`<meta/http-equiv=...>' も meta 要素になる) ので、その手前で区切る。メール側の
+charset / CSP の宣言も消えるが、charset は先頭に置く UTF-8 宣言が使われ、CSP は
+こちらで付け直すので困らない。"
+  (let ((case-fold-search t))
+    (replace-regexp-in-string "<meta\\([\t\n\f\r />]\\|\\'\\)" "<x-mew-meta\\1" html t)))
+
 (defun my/mew-html-xwidget-open (html trusted)
   "HTML を CSP 付きの一時ファイルに書き出し、xwidget-webkit で開く。
-メールの charset 宣言より前に UTF-8 の宣言を置く (HTML は最初の宣言が勝つ。
-Message バッファの文字列は Mew がデコード済みなので UTF-8 で書き出せば合う)。
+メールの <meta> は `my/mew-html-neutralize-meta' で無効にする (meta refresh 対策)。
+先頭に UTF-8 の宣言を置く (Message バッファの文字列は Mew がデコード済みなので
+UTF-8 で書き出せば合う)。
 TRUSTED なら https の画像 / CSS / フォントを読み込む。そうでなければインラインの
 style と data: だけで、外部画像は `mew-html-blocked-images' が nil のときだけ許す
 (shr 表示の既定と合わせる)。スクリプトはどちらでも動かさない。"
@@ -1678,11 +1691,16 @@ style と data: だけで、外部画像は `mew-html-blocked-images' が nil �
                       my/mew-html-csp-base remote remote img))
          (head (format "<meta charset=\"utf-8\">\n<meta http-equiv=\"Content-Security-Policy\" content=\"%s\">\n"
                        csp))
-         ;; make-temp-file はモード 600 で作る
-         (file (make-temp-file "mew-html-" nil ".html")))
-    (let ((coding-system-for-write 'utf-8-unix))
-      (write-region (concat head html) nil file nil 'silent))
+         ;; make-temp-file はモード 600 で作る。書き込みに失敗しても部分的な本文が
+         ;; 残らないよう、作った直後に登録して失敗時は消す。
+         (file (make-temp-file "mew-html-" nil ".html"))
+         (ok nil))
     (setq my/mew-html-xwidget-file file)
+    (unwind-protect
+        (let ((coding-system-for-write 'utf-8-unix))
+          (write-region (concat head (my/mew-html-neutralize-meta html)) nil file nil 'silent)
+          (setq ok t))
+      (unless ok (my/mew-html-xwidget-cleanup)))
     (xwidget-webkit-browse-url (concat "file://" file))))
 
 (defun my/mew-html-view-xwidget (&optional trusted)

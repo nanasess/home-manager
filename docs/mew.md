@@ -223,13 +223,19 @@ Summary / Message で `C-c w` (`my/mew-html-view-xwidget`) を押すと xwidget-
 
   WebKitGTK が file:// の meta CSP を守ることは、ローカルの HTTP サーバにアクセスが来ないこと
   (許可したときだけ `GET` が届く) と `document.title` を書き換える `<script>` が動かないことで確認した。
+- **meta refresh**: `<meta http-equiv="refresh">` は操作なしで外部 URL へ移動し、CSP では止められない
+  (既定の `C-c w` でも移動してアクセスが届くことを確認した。属性値を `&#114;efresh` と文字参照で書いても効く)。
+  属性を見て消すと文字参照で漏れるので、メール中の `<meta` はタグ名ごと `<x-mew-meta` に変えて無効化する
+  (`my/mew-html-neutralize-meta`)。
 - **できないこと**: リンクを押すと xwidget の中でそのページへ移動する (CSP は移動を止められない)。
   `cid:` で参照するインライン画像 (multipart/related) は表示されない。
 - **外部リソースを許すリスク**: 画像 / CSS の取得は送信者に「開封した・いつ・どの IP から・どの
   ブラウザで」を伝える (ウェブビーコン)。CSS だけでも `background-image` や `@font-face` で同じことが
   できるので、画像を止めて CSS を許しても防げない。また画像・フォントのデコーダは WebKit の攻撃面に
   なる。許可は From を見て自動で行わず、メールごとに `C-u` で決める (From は偽装でき、
-  信頼できる相手からの転送や引用にも第三者の HTML が含まれる)。
+  信頼できる相手からの転送や引用にも第三者の HTML が含まれる)。ただし `mew-html-blocked-images` を
+  nil にしている場合は、`C-u` なしの `C-c w` でも外部画像を取得する (shr 表示と同じ方針に合わせている)。
+  この設定ではメールごとの判断は CSS / フォントにしか効かず、画像による開封通知は防げない。
 
 ## MS365 (Exchange Online) を足す場合
 
