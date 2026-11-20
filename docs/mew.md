@@ -178,6 +178,21 @@ WSL では `browse-url` が `$BROWSER` (wsl-open) 経由で Windows 側ブラウ
 `.wslconfig` が `networkingMode=mirrored` なので、Windows のブラウザからの
 `localhost:28080` は WSL 側の Emacs に届く。
 
+### 5. 裏での自動 update
+
+`M-x mew` しなくても、Emacs の起動 (daemon を含む) から 10 秒後に Mew を裏で初期化して
+`%inbox` を取得し、以降 5 分ごとに update する (init.el の `my/mew-auto-update`)。
+起動直後に 1Password の承認ダイアログが出るのはこのため (セッション中 1 回)。
+承認を拒否したり 1Password がロック中だったりしたときは `*Messages*` に
+「Mew の自動 update に失敗」と出るだけで、次の周期にまた試す。
+
+- `%inbox` の summary をどこかのウィンドウに表示している間は、読んでいる最中の
+  Message バッファやウィンドウ構成を壊さないよう何もしない。表示中は従来どおり `s` / `i`。
+- 間隔は `my/mew-auto-update-interval` (秒、`nil` で無効)。変えたら
+  `M-x my/mew-auto-update-start` でタイマーを張り直す。
+- リフレッシュ トークンが失効しているとブラウザ認可が始まり、認可コードを受け取るまで
+  Emacs が待つ (手で `i` したときと同じ挙動)。
+
 ## 旧設定からの差分
 
 | 旧 (`.mew.d/.mew.el`) | 今 | 理由 |
