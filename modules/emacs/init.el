@@ -1558,38 +1558,47 @@ Mew は gpg 2.1+ に対して --pinentry-mode loopback を使うので、パス�
 トークンが切れる約 1 時間ごとにブラウザ認可が再発する。実測: 初回認可後の
 :refresh_token が nil)。access_type=offline でリフレッシュ トークンを要求し、
 prompt=consent で再認可時 (保存済みトークンを失った場合) も必ず発行させる。
-この 2 つのパラメータ以外は上流 (mew-oauth2.el) のコピーで、state の生成
-(`mew-oauth2-state') もそのまま行う。上流のリダイレクト ハンドラは state が
-一致しない認可コードを 400 で弾く (RFC 6749 10.12) ので、これを落とすと認可が
-必ず失敗する。Mew を更新したら上流の本体と差分が開いていないか確認すること。"
-  (setq mew-oauth2-state (mew-oauth2-random-string))
-  (setq my/mew-oauth2-authorizing t)
-  (let ((url-params
-         (concat
-          url
-          "?response_type=code"
-          "&client_id=" client-id
-          "&scope=" (url-hexify-string resource-url)
-          "&redirect_uri=" (url-hexify-string redirect-url)
-          "&state=" mew-oauth2-state
-          "&code_challenge=" challenge
-          "&code_challenge_method=S256"
-          "&access_type=offline"
-          "&prompt=consent")))
-    (mew-oauth2-cleanup-redirect-handler port)
-    ;; 認可を途中でやめてもリッスン ソケットは閉じる (閉じないとポートが
-    ;; セッション中ずっと塞がる)。上流と同じ unwind-protect。
-    (unwind-protect
-        (condition-case nil
-            (progn
-              (mew-oauth2-setup-redirect-handler port)
-              (browse-url url-params)
-              (mew-rendezvous (null mew-oauth2-code))
-              mew-oauth2-code)
-          (error "")
-          (quit ""))
-      (setq my/mew-oauth2-authorizing nil)
-      (mew-oauth2-cleanup-redirect-handler port))))
+この 2 つのパラメータと `my/mew-oauth2-authorizing' の出し入れ以外は上流
+(mew-oauth2.el、Mew 7.1rc1) のコピーで、state の生成もそのまま行う。上流の
+リダイレクト ハンドラは state が一致しない認可コードを 400 で弾く (RFC 6749
+10.12) ので、これを落とすと認可が必ず失敗する。7.1rc1 から state と認可コードは
+グローバル変数ではなく待受プロセスの plist (`mew-oauth2-state' /
+`mew-oauth2-code') に置かれ、`mew-oauth2-setup-redirect-handler' は (port state)
+を取ってそのプロセスを返す。旧版のコピーのままだと引数の数のエラーを
+`condition-case' が握りつぶし、認可が黙って失敗する。Mew を更新したら上流の
+本体と差分が開いていないか確認すること。"
+  ;; 認可の中で別の認可が始まった場合 (待機中もタイマーや他接続の filter が
+  ;; 走る) は上流と同じく断る。PORT で待ち受けられるのは 1 つだけ。
+  (if (process-status (mew-oauth2-redirect-handler-name port))
+      (progn
+        (message "OAuth2: another authorization is in progress")
+        "")
+    (let* ((state (mew-oauth2-random-string))
+           (url-params
+            (concat
+             url
+             "?response_type=code"
+             "&client_id=" (url-hexify-string client-id)
+             "&scope=" (url-hexify-string resource-url)
+             "&redirect_uri=" (url-hexify-string redirect-url)
+             "&state=" state
+             "&code_challenge=" challenge
+             "&code_challenge_method=S256"
+             "&access_type=offline"
+             "&prompt=consent")))
+      (setq my/mew-oauth2-authorizing t)
+      ;; 認可を途中でやめてもリッスン ソケットは閉じる (閉じないとポートが
+      ;; セッション中ずっと塞がる)。上流と同じ unwind-protect。
+      (unwind-protect
+          (condition-case err
+              (let ((server (mew-oauth2-setup-redirect-handler port state)))
+                (browse-url url-params)
+                (mew-rendezvous (null (process-get server 'mew-oauth2-code)))
+                (process-get server 'mew-oauth2-code))
+            (error (message "OAuth2: %s" (error-message-string err)) "")
+            (quit (message "OAuth2: the authorization was canceled") ""))
+        (setq my/mew-oauth2-authorizing nil)
+        (mew-oauth2-cleanup-redirect-handler port)))))
 
 (defun my/mew-browse-url-open-gmail ()
   "現在のケースのドメインの Gmail (Google Workspace) をブラウザで開く。"
