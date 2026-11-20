@@ -1545,6 +1545,12 @@ Mew は gpg 2.1+ に対して --pinentry-mode loopback を使うので、パス�
       (my/op-read (concat my/mew-op-item "/password"))
     (funcall orig prompt)))
 
+(defvar my/mew-oauth2-authorizing nil
+  "ブラウザ認可 (`my/mew-oauth2-get-auth-code') の完了待ち中なら non-nil。
+待機は `mew-rendezvous' (`sit-for' のループ) なのでその間もタイマーが走る。
+`my/mew-auto-update' はこれを見て、2 つ目の認可で state と待受ポートを
+奪わないようにする。")
+
 (defun my/mew-oauth2-get-auth-code (url client-id resource-url redirect-url challenge port)
   "`mew-oauth2-get-auth-code' の置き換え。引数と戻り値は上流と同じ。
 上流の認可 URL には access_type=offline が無く、Google の OAuth クライアントが
@@ -1557,6 +1563,7 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
 一致しない認可コードを 400 で弾く (RFC 6749 10.12) ので、これを落とすと認可が
 必ず失敗する。Mew を更新したら上流の本体と差分が開いていないか確認すること。"
   (setq mew-oauth2-state (mew-oauth2-random-string))
+  (setq my/mew-oauth2-authorizing t)
   (let ((url-params
          (concat
           url
@@ -1581,6 +1588,7 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
               mew-oauth2-code)
           (error "")
           (quit ""))
+      (setq my/mew-oauth2-authorizing nil)
       (mew-oauth2-cleanup-redirect-handler port))))
 
 (defun my/mew-browse-url-open-gmail ()
@@ -1619,6 +1627,89 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   (defvar mew-cite-fields)
   (let ((mew-cite-fields (if (my/mew-cite-region-p) nil mew-cite-fields)))
     (apply orig args)))
+
+(defcustom my/mew-auto-update-interval 300
+  "%inbox を裏で update する間隔 (秒)。nil なら自動 update しない。
+Emacs の起動 (daemon を含む) から `my/mew-auto-update-initial-delay' 秒後に
+1 回目を行い、以降この間隔で繰り返す。"
+  :type '(choice (const :tag "無効" nil) integer)
+  :group 'mew)
+
+(defcustom my/mew-auto-update-initial-delay 10
+  "Emacs 起動から 1 回目の自動 update までの秒数。"
+  :type 'integer
+  :group 'mew)
+
+(defvar my/mew-auto-update-timer nil
+  "`my/mew-auto-update' を呼ぶ繰り返しタイマー。")
+
+(defun my/mew-visible-p ()
+  "Mew の Summary / Virtual / Message バッファがどこかのウィンドウに出ていれば non-nil。
+`mew-summary-reset' が消す Message バッファはフォルダー単位ではなくフレームと
+ウィンドウ位置で決まる (`mew-buffer-message') ので、%inbox 以外のフォルダーを
+読んでいる最中でも消える。Mew を使っている間はまとめて見送るために使う。"
+  (catch 'found
+    (walk-windows (lambda (w)
+                    (when (memq (buffer-local-value 'major-mode (window-buffer w))
+                                '(mew-summary-mode mew-virtual-mode mew-message-mode))
+                      (throw 'found t)))
+                  'no-minibuf 'visible)
+    nil))
+
+(defun my/mew-auto-update ()
+  "%inbox を裏で update する (summary の `s' の update と同じ)。
+`my/mew-auto-update-timer' から呼ぶ。Mew が未起動なら初期化してから summary を
+作る。その際の 1Password の承認 (OAuth2 クライアント / master password) は
+`M-x mew' と同じ経路で、セッション中 1 回だけ出る (`my/op-read' のキャッシュ)。
+
+上流の `mew-init' と `mew-summary-reset' はウィンドウ構成を書き換える
+(`switch-to-buffer' / `mew-window-configure') ので `save-window-excursion' で包む。
+`mew-summary-reset' は Message バッファも消すため、Mew の Summary / Message が
+どこかのウィンドウに表示されている間 (= 読んでいる最中) は何もしない
+(`my/mew-visible-p')。そのときは従来どおり手で `s' / `i' する。ミニバッファ使用中、
+ブラウザ認可の待機中 (`my/mew-oauth2-authorizing')、Mew の別プロセスが動いている
+間も見送る。
+`mew-summary-scan-boot' は `mew' が内部で呼ぶ関数なので、Mew を更新したら
+存在と引数 (proto case) を確認すること。"
+  (condition-case err
+      (unless (or (> (minibuffer-depth) 0)
+                  my/mew-oauth2-authorizing
+                  (my/mew-visible-p))
+        (require 'mew)
+        ;; master password は IMAP の filter 内 (XOAUTH2 の認証文字列を作るとき) にも
+        ;; 読まれるが、そこで 1Password を拒否すると error がこの condition-case に
+        ;; 届かず、summary のロックが接続を閉じるまで残る。接続を張る前に同期的に
+        ;; 読んでおき、拒否はここで捕まえて次の周期に回す。
+        (my/op-read (concat my/mew-op-item "/password"))
+        (save-window-excursion
+          (unless mew-init-p (mew-init))
+          (mew-passwd-setup-master)
+          (let* ((case mew-case)
+                 (proto (mew-proto case))
+                 (inbox (mew-case-folder case (mew-proto-inbox-folder proto case)))
+                 (buf (get-buffer inbox)))
+            (if (null buf)
+                ;; summary がまだ無い: `mew' を mew-auto-get t で呼んだときと同じ起動処理
+                (mew-summary-scan-boot proto case)
+              (with-current-buffer buf
+                (when (mew-summary-exclusive-p 'no-msg)
+                  (mew-summary-ls nil nil 'update)))))))
+    (error (message "Mew の自動 update に失敗: %s" (error-message-string err)))))
+
+(defun my/mew-auto-update-start ()
+  "`my/mew-auto-update' の繰り返しタイマーを張る (`elpaca-after-init-hook')。"
+  (interactive)
+  (when (timerp my/mew-auto-update-timer)
+    (cancel-timer my/mew-auto-update-timer))
+  (setq my/mew-auto-update-timer
+        (and my/mew-auto-update-interval
+             (run-with-timer my/mew-auto-update-initial-delay
+                             my/mew-auto-update-interval
+                             #'my/mew-auto-update))))
+
+;; emacs --batch (CI の init.el 読み込みテスト) では張らない
+(unless noninteractive
+  (add-hook 'elpaca-after-init-hook #'my/mew-auto-update-start))
 
 (use-package mew
   :ensure (:host github :repo "kazu-yamamoto/Mew")
@@ -1677,7 +1768,7 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   (mew-draft-mode-auto-save -1)
   ;; マークが付いていないメッセージだけ自動 refile する
   (mew-refile-auto-refile-skip-any-mark t)
-  ;; 起動時に自動取得しない
+  ;; M-x mew 自体は取得しない (取得は my/mew-auto-update が裏で定期的に行う)
   (mew-auto-get nil)
   :init
   ;; メッセージファイルに .mew を付ける。既存の ~/Mail は 1.mew 形式で保存されて
