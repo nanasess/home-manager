@@ -186,8 +186,11 @@ WSL では `browse-url` が `$BROWSER` (wsl-open) 経由で Windows 側ブラウ
 承認を拒否したり 1Password がロック中だったりしたときは `*Messages*` に
 「Mew の自動 update に失敗」と出るだけで、次の周期にまた試す。
 
-- `%inbox` の summary をどこかのウィンドウに表示している間は、読んでいる最中の
-  Message バッファやウィンドウ構成を壊さないよう何もしない。表示中は従来どおり `s` / `i`。
+- Mew の Summary / Message をどこかのウィンドウに表示している間 (フォルダーは問わない) は、
+  読んでいる最中の Message バッファやウィンドウ構成を壊さないよう何もしない。
+  表示中は従来どおり `s` / `i`。ブラウザ認可の待機中も見送る (state と待受ポートの奪い合いを防ぐ)。
+- master password は接続を張る前に 1Password から読む。ここで拒否すれば接続は作られず、
+  次の周期にまた試す。
 - 間隔は `my/mew-auto-update-interval` (秒、`nil` で無効)。変えたら
   `M-x my/mew-auto-update-start` でタイマーを張り直す。
 - リフレッシュ トークンが失効しているとブラウザ認可が始まり、認可コードを受け取るまで
