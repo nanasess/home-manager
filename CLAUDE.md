@@ -273,6 +273,44 @@ nixos-hardware#1934 (2026-11-24 マージ) で、カーネルのバージョン�
 `apple_bce` を直書きしている設定は書き換えが要る (k-2 はモジュール任せなので影響なし)。
 6.18.55 で上記の確認項目がすべて問題ないことを確認済み (2026-10-28)。
 
+#### upstream が壊れたときに fork へ一時的に向ける
+
+upstream の nixos-hardware が k-2 で壊れていて、直す PR は出ているがマージされていない場合は、
+その PR の head に一時的に向ける (PR #229 → issue #230 / PR #251 が先例)。ただし手順 2 の 404 /
+`Hunk FAILED` を nixpkgs や nixos-hardware の据え置きで避けられるなら、そちらを優先する。fork に向けるのは
+据え置きでは困るとき (nixpkgs を上げないと他のパッケージが直らない等) だけにする。
+
+1. **向け先を決める**: 修正 PR の head を
+   `gh pr view <N> -R NixOS/nixos-hardware --json headRepositoryOwner,headRefOid` で調べる。
+   **ブランチ名ではなくコミットで固定する** (`github:<owner>/nixos-hardware/<sha>`)。PR のブランチは
+   force-push されやすく、ブランチ名だと `nix flake update` のたびに中身が変わる。
+2. **fork の差分を見る**: `gh api repos/NixOS/nixos-hardware/compare/master...<sha> --jq '.files[].filename'`
+   (fork 側のコミットも SHA で指定できる) で、`apple/t2/` 以外の変更が混ざっていないか確かめる。
+   混ざっていたら PR の本文と diff を読み、k-2 が使うモジュール (`flake.nix` の
+   `nixos-hardware.nixosModules.apple-t2`) への影響を PR 本文に書く。
+3. **flake.nix を書き換える**: `nixos-hardware.url` を fork のコミットに変える。コメントには、一時的に
+   fork に向けている理由 (upstream の Issue / PR 番号)、戻す条件、戻す作業の Issue 番号を書く。
+   `inputs.nixpkgs.follows = "nixpkgs"` はそのまま残す。
+4. **検証**: この節の手順 2〜6 と同じ (configfile、narinfo、toplevel、他ホスト、closure の差分)。
+   fork のコミットは cache.soopy.moe の Hydra でビルドされていないことがある。narinfo が 404 なら、
+   自前ビルドにかかる時間 (4 コアで数時間) をユーザーに伝えて判断を仰ぐ。モジュール名やオプション名が
+   変わる PR (#1934 の `apple-bce` → `t2bce-vhci` 等) なら、`hosts/k-2/` に直書きした旧名を `rg` で洗い出す。
+5. **戻す作業の Issue を立てる** (#230 が雛形): 着手条件 (PR がマージされ、upstream master に入っていること)、
+   戻す手順、検証項目、実機確認、「マージ版が fork のコミットと異なる場合は closure の差分を確認する」という
+   注意を書く。
+6. **記述を揃える**: README「カーネルのキャッシュ」、`flake-update-pr` Skill、この節の冒頭、メモリ
+   (`project_k2_nixpkgs_pinned_t2_patches.md`) に、今は fork に向けていることを書く。fork のコミットは URL に
+   書くので `nix flake update` では動かない。上げるときは URL を書き換える。
+
+**戻すとき**: PR がマージされたことを `gh pr view <N> -R NixOS/nixos-hardware --json state,mergeCommit` で
+確かめ、`gh api repos/NixOS/nixos-hardware/compare/<fork の sha>...master --jq '.status, .behind_by'` を見る。
+`ahead` かつ `behind_by` が 0 なら fork のコミットは master に含まれている。さらに `apple/t2/` に追加の変更が
+無ければ、カーネルと toplevel の drv は変わらない (PR #251 では `/run/current-system` と同じストアパスになり、
+実機確認は不要だった)。`diverged` (squash / rebase マージ) の場合や `apple/t2/` に追加の変更がある場合は
+closure の差分を確認し、カーネルが変わるなら手順 7 の実機確認をユーザーに頼む。URL を
+`github:NixOS/nixos-hardware` に戻して `nix flake update nixos-hardware` し、手順 6 で書いた記述をすべて戻す
+(`rg -n '<owner>|<PR 番号>'` で残っていないか確かめる)。
+
 ### ssh 接続のトラブル
 
 「ssh で繋がらない」「ssh のエラーが出る」と相談されたら、`docs/ssh-conf-d.md` の
