@@ -4,21 +4,19 @@
   inputs = {
     # k-2 の linux-t2 は T2 パッチを当てたカーネル。upstream の nixos-hardware は nixpkgs の
     # linux_6_18 にパッチを当てるため、nixpkgs を上げると linux-config で落ちることがあった
-    # (nixos-hardware#2027)。現在はカーネルのバージョンを固定する fork に向けている
-    # (下の nixos-hardware)。上げる前に kernel.configfile をビルドし、linux-t2 が
+    # (nixos-hardware#2027)。nixos-hardware#1934 でカーネルのバージョンもパッチと一緒に
+    # 固定されるようになったが、上げる前に kernel.configfile をビルドし、linux-t2 が
     # cache.soopy.moe にあるかも確認する (flake-update-pr Skill の手順 3)。
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # T2 Mac (k-2) 用: linux-t2 カーネル / apple-bce / WiFi・BT ファームウェア。
-    # upstream の apple/t2 は nixpkgs のカーネル更新でパッチが当たらなくなるため
-    # (nixos-hardware#2027)、カーネルのバージョンを固定する PR #1934 の head に一時的に向ける。
-    # force-push が多いのでブランチ名ではなくコミットで固定する。#1934 がマージされたら
-    # github:NixOS/nixos-hardware に戻す (issue #227)。
+    # T2 Mac (k-2) 用: linux-t2 カーネル / t2bce-vhci / WiFi・BT ファームウェア。
+    # apple/t2 は stable.json でカーネルソースと T2 パッチ集をまとめて固定している
+    # (nixos-hardware#1934。それまでは PR #229 で #1934 の fork に向けていた、issue #230)。
     nixos-hardware = {
-      url = "github:soopyc/nixos-hardware/7082b484432124bd8d53790a11b808429b73fb6b";
+      url = "github:NixOS/nixos-hardware";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # WSL2 上の NixOS (wsl-nixos、Issue #183)。

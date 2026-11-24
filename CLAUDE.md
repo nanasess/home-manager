@@ -223,10 +223,10 @@ Nix 側の更新はあくまで Electron 本体 (deb) の追従。in-app updater
 k-2 の linux-t2 は T2 パッチを当てたカーネルで、nixpkgs を上げるときの最大のリスクになる。
 upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当てるため、nixpkgs が先に進むと
 パッチが当たらなくなる (nixos-hardware#2027。PR #202 で落ち、PR #205 で nixpkgs を固定した)。
-現在は、カーネルのバージョンもパッチと一緒に固定する nixos-hardware#1934 の fork
-(`github:soopyc/nixos-hardware/<rev>`) にコミットで固定している (PR #229、issue #227)。
-**#1934 がマージされたら `github:NixOS/nixos-hardware` に戻す。** fork の rev は flake.nix の URL に
-書いているので、`nix flake update` では動かない (上げるときは URL を書き換える)。
+nixos-hardware#1934 (2026-11-24 マージ) で、カーネルのバージョンもパッチと一緒に `stable.json` で
+固定されるようになった (それまでは PR #229 で #1934 の fork に向けていた。issue #227 / #230 で
+`github:NixOS/nixos-hardware` に戻した)。nixos-hardware は `nix flake update` で動くので、
+カーネルを上げたくないときは `nix flake update nixpkgs home-manager nixos-wsl` のように除外する。
 
 1. **入力を更新**: worktree で `nix flake update nixpkgs` (k-2 が目的なら他の input は後回しでよい)。
 2. **カーネルのキャッシュを確認** (自前ビルドは 4 コアで数時間):
@@ -235,10 +235,11 @@ upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当て�
    curl -s -o /dev/null -w '%{http_code}\n' "https://cache.soopy.moe/$(basename $K | cut -d- -f1).narinfo"
    nix build --no-link '.#nixosConfigurations.k-2.config.boot.kernelPackages.kernel.configfile'
    ```
-   fork でもカーネルの drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
+   カーネルのバージョンが固定されていても drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
    404 になる** (PR #229 では `3ec6363` は 200、1 つ前のチャネル tip の `fe13242` は 404 だった)。
    404 なら別のチャネル tip を試すか、数日待つ。`configfile` が `Hunk #N FAILED` で落ちたら、
-   原因になった input (fork の rev か nixpkgs) を直前に成功した rev に戻す。
+   原因になった input (nixos-hardware か nixpkgs) を直前に成功した rev に戻す
+   (`nix flake lock --override-input <input> github:<owner>/<repo>/<rev>`)。
 3. **nixpkgs 側のパッケージが壊れていたら、そのパッケージだけ古い rev から取る**。nixpkgs 全体を
    古い rev に揃えるとカーネルがキャッシュから外れるため。PR #229 の azure-cli
    (fabric が invoke 3 非対応で broken、NixOS/nixpkgs#575989) が先例で、`nixpkgs-azure-cli` input と
@@ -267,7 +268,7 @@ upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当て�
    蓋閉じ suspend からの復帰 (キーボード / トラックパッド / Touch Bar)、xremap (Chrome の
    Ctrl+H / Ctrl+L)。ロールバックは GRUB で前の世代を選ぶか `nixos-rebuild switch --rollback`。
 
-fork (#1934) では内蔵キーボード / トラックパッドのモジュール名が `apple-bce` → `t2bce-vhci` に、
+#1934 以降は内蔵キーボード / トラックパッドのモジュール名が `apple-bce` → `t2bce-vhci` に、
 オーディオが t2-better-audio → `t2bce-alsa-ucm` に変わった。`boot.initrd.kernelModules` に
 `apple_bce` を直書きしている設定は書き換えが要る (k-2 はモジュール任せなので影響なし)。
 6.18.55 で上記の確認項目がすべて問題ないことを確認済み (2026-10-28)。
