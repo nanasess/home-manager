@@ -223,10 +223,10 @@ Nix 側の更新はあくまで Electron 本体 (deb) の追従。in-app updater
 k-2 の linux-t2 は T2 パッチを当てたカーネルで、nixpkgs を上げるときの最大のリスクになる。
 upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当てるため、nixpkgs が先に進むと
 パッチが当たらなくなる (nixos-hardware#2027。PR #202 で落ち、PR #205 で nixpkgs を固定した)。
-現在は、カーネルのバージョンもパッチと一緒に固定する nixos-hardware#1934 の fork
-(`github:soopyc/nixos-hardware/<rev>`) にコミットで固定している (PR #229、issue #227)。
-**#1934 がマージされたら `github:NixOS/nixos-hardware` に戻す。** fork の rev は flake.nix の URL に
-書いているので、`nix flake update` では動かない (上げるときは URL を書き換える)。
+nixos-hardware#1934 (2026-11-24 マージ) で、カーネルのバージョンもパッチと一緒に `stable.json` で
+固定されるようになった (それまでは PR #229 で #1934 の fork に向けていた。issue #227 / #230 で
+`github:NixOS/nixos-hardware` に戻した)。nixos-hardware は `nix flake update` で動くので、
+カーネルを上げたくないときは `nix flake update nixpkgs home-manager nixos-wsl` のように除外する。
 
 1. **入力を更新**: worktree で `nix flake update nixpkgs` (k-2 が目的なら他の input は後回しでよい)。
 2. **カーネルのキャッシュを確認** (自前ビルドは 4 コアで数時間):
@@ -235,10 +235,11 @@ upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当て�
    curl -s -o /dev/null -w '%{http_code}\n' "https://cache.soopy.moe/$(basename $K | cut -d- -f1).narinfo"
    nix build --no-link '.#nixosConfigurations.k-2.config.boot.kernelPackages.kernel.configfile'
    ```
-   fork でもカーネルの drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
+   カーネルのバージョンが固定されていても drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
    404 になる** (PR #229 では `3ec6363` は 200、1 つ前のチャネル tip の `fe13242` は 404 だった)。
    404 なら別のチャネル tip を試すか、数日待つ。`configfile` が `Hunk #N FAILED` で落ちたら、
-   原因になった input (fork の rev か nixpkgs) を直前に成功した rev に戻す。
+   原因になった input (nixos-hardware か nixpkgs) を直前に成功した rev に戻す
+   (`nix flake lock --override-input <input> github:<owner>/<repo>/<rev>`)。
 3. **nixpkgs 側のパッケージが壊れていたら、そのパッケージだけ古い rev から取る**。nixpkgs 全体を
    古い rev に揃えるとカーネルがキャッシュから外れるため。PR #229 の azure-cli
    (fabric が invoke 3 非対応で broken、NixOS/nixpkgs#575989) が先例で、`nixpkgs-azure-cli` input と
@@ -267,10 +268,48 @@ upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当て�
    蓋閉じ suspend からの復帰 (キーボード / トラックパッド / Touch Bar)、xremap (Chrome の
    Ctrl+H / Ctrl+L)。ロールバックは GRUB で前の世代を選ぶか `nixos-rebuild switch --rollback`。
 
-fork (#1934) では内蔵キーボード / トラックパッドのモジュール名が `apple-bce` → `t2bce-vhci` に、
+#1934 以降は内蔵キーボード / トラックパッドのモジュール名が `apple-bce` → `t2bce-vhci` に、
 オーディオが t2-better-audio → `t2bce-alsa-ucm` に変わった。`boot.initrd.kernelModules` に
 `apple_bce` を直書きしている設定は書き換えが要る (k-2 はモジュール任せなので影響なし)。
 6.18.55 で上記の確認項目がすべて問題ないことを確認済み (2026-10-28)。
+
+#### upstream が壊れたときに fork へ一時的に向ける
+
+upstream の nixos-hardware が k-2 で壊れていて、直す PR は出ているがマージされていない場合は、
+その PR の head に一時的に向ける (PR #229 → issue #230 / PR #251 が先例)。ただし手順 2 の 404 /
+`Hunk FAILED` を nixpkgs や nixos-hardware の据え置きで避けられるなら、そちらを優先する。fork に向けるのは
+据え置きでは困るとき (nixpkgs を上げないと他のパッケージが直らない等) だけにする。
+
+1. **向け先を決める**: 修正 PR の head を
+   `gh pr view <N> -R NixOS/nixos-hardware --json headRepositoryOwner,headRefOid` で調べる。
+   **ブランチ名ではなくコミットで固定する** (`github:<owner>/nixos-hardware/<sha>`)。PR のブランチは
+   force-push されやすく、ブランチ名だと `nix flake update` のたびに中身が変わる。
+2. **fork の差分を見る**: `gh api repos/NixOS/nixos-hardware/compare/master...<sha> --jq '.files[].filename'`
+   (fork 側のコミットも SHA で指定できる) で、`apple/t2/` 以外の変更が混ざっていないか確かめる。
+   混ざっていたら PR の本文と diff を読み、k-2 が使うモジュール (`flake.nix` の
+   `nixos-hardware.nixosModules.apple-t2`) への影響を PR 本文に書く。
+3. **flake.nix を書き換える**: `nixos-hardware.url` を fork のコミットに変える。コメントには、一時的に
+   fork に向けている理由 (upstream の Issue / PR 番号)、戻す条件、戻す作業の Issue 番号を書く。
+   `inputs.nixpkgs.follows = "nixpkgs"` はそのまま残す。
+4. **検証**: この節の手順 2〜6 と同じ (configfile、narinfo、toplevel、他ホスト、closure の差分)。
+   fork のコミットは cache.soopy.moe の Hydra でビルドされていないことがある。narinfo が 404 なら、
+   自前ビルドにかかる時間 (4 コアで数時間) をユーザーに伝えて判断を仰ぐ。モジュール名やオプション名が
+   変わる PR (#1934 の `apple-bce` → `t2bce-vhci` 等) なら、`hosts/k-2/` に直書きした旧名を `rg` で洗い出す。
+5. **戻す作業の Issue を立てる** (#230 が雛形): 着手条件 (PR がマージされ、upstream master に入っていること)、
+   戻す手順、検証項目、実機確認、「マージ版が fork のコミットと異なる場合は closure の差分を確認する」という
+   注意を書く。
+6. **記述を揃える**: README「カーネルのキャッシュ」、`flake-update-pr` Skill、この節の冒頭、メモリ
+   (`project_k2_nixpkgs_pinned_t2_patches.md`) に、今は fork に向けていることを書く。fork のコミットは URL に
+   書くので `nix flake update` では動かない。上げるときは URL を書き換える。
+
+**戻すとき**: PR がマージされたことを `gh pr view <N> -R NixOS/nixos-hardware --json state,mergeCommit` で
+確かめ、`gh api repos/NixOS/nixos-hardware/compare/<fork の sha>...master --jq '.status, .behind_by'` を見る。
+`ahead` かつ `behind_by` が 0 なら fork のコミットは master に含まれている。さらに `apple/t2/` に追加の変更が
+無ければ、カーネルと toplevel の drv は変わらない (PR #251 では `/run/current-system` と同じストアパスになり、
+実機確認は不要だった)。`diverged` (squash / rebase マージ) の場合や `apple/t2/` に追加の変更がある場合は
+closure の差分を確認し、カーネルが変わるなら手順 7 の実機確認をユーザーに頼む。URL を
+`github:NixOS/nixos-hardware` に戻して `nix flake update nixos-hardware` し、手順 6 で書いた記述をすべて戻す
+(`rg -n '<owner>|<PR 番号>'` で残っていないか確かめる)。
 
 ### ssh 接続のトラブル
 

@@ -302,14 +302,14 @@ Hydra が nixpkgs の更新に追随するまでは新しい `flake.lock` に対
 `linux_6_18` を使うので、nixpkgs だけが進むとパッチが当たらなくなる
 (`4001-asahi-trackpad.patch` が `hid-magicmouse.c` で `Hunk FAILED`、2026-09 の 6.18.46 → 6.18.51 で発生。
 [nixos-hardware#2027](https://github.com/NixOS/nixos-hardware/issues/2027))。
-このため現在は、カーネルのバージョンもパッチと一緒に固定する
-[nixos-hardware#1934](https://github.com/NixOS/nixos-hardware/pull/1934) の fork
-(`github:soopyc/nixos-hardware/<rev>`) に向けている (issue #227)。#1934 がマージされたら
-`flake.nix` の `nixos-hardware` を `github:NixOS/nixos-hardware` に戻す。
+その後 [nixos-hardware#1934](https://github.com/NixOS/nixos-hardware/pull/1934)
+(2026-11-24 マージ) で、カーネルのバージョンもパッチと一緒に固定されるようになった
+(それまでは #1934 の fork に向けていた。issue #227 / #230)。
 それでもパッチ適用で落ちた場合は `nix log` で `linux-config-*.drv` の patchPhase を見て、
-原因になった input を戻す。fork は `stable.json` でカーネルソースとパッチ集をまとめて固定して
-いるので、**fork の rev を上げて落ちたなら `flake.nix` の `nixos-hardware` の URL を直前に
-成功した rev に戻して `nix flake update nixos-hardware` する** (nixpkgs を据え置いても直らない)。
+原因になった input を戻す。apple/t2 は `stable.json` でカーネルソースとパッチ集をまとめて固定して
+いるので、**nixos-hardware を上げて落ちたなら
+`nix flake lock --override-input nixos-hardware github:NixOS/nixos-hardware/<直前に成功した rev>`
+で戻す** (nixpkgs を据え置いても直らない)。
 nixpkgs だけを上げて落ちたなら nixpkgs を据え置き、`nix flake update home-manager` のように
 他の input だけ更新する (下記)。
 
