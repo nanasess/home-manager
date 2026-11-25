@@ -45,9 +45,12 @@ Apple のファームウェアはコミットしない。**
 
 ### カーネルのバイナリキャッシュ
 
-linux-t2 は nixpkgs のキャッシュに無い。t2linux コミュニティの Hydra
-(`https://cache.soopy.moe`) を substituter に入れないと自前ビルドになる
-(この機種の 4 コアで数時間)。
+linux-t2 は nixpkgs のキャッシュに無い。t2linux のコミュニティメンバーが運営する
+`https://cache.soopy.moe` を substituter に入れないと自前ビルドになる
+(この機種の 4 コアで数時間)。t2linux wiki には「public hydra instance」とあるが、Hydra
+(`hydra.soopy.moe`) は 2026-04 に停止しており、今は運営者が自分のマシンのビルドを niks3 で
+手で push している (2026-11 に [soopyc/gensokyo](https://github.com/soopyc/gensokyo) で確認)。
+nixpkgs を上げたときにカーネルが載っているとは限らない (CLAUDE.md の更新手順を参照)。
 
 - インストール後: `hosts/k-2/configuration.nix` の `nix.settings` で宣言済み。
 - `nixos-install` 時: まだ効かないので `--option extra-substituters ... --option extra-trusted-public-keys ...` を渡す。

@@ -423,7 +423,8 @@ in
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
     trusted-users = [ "root" "nanasess" ];
-    # t2linux コミュニティの Hydra。linux-t2 カーネルを自前ビルドしないために使う
+    # t2linux のコミュニティメンバーが運営するキャッシュ。linux-t2 カーネルを自前ビルドしないために使う
+    # (Hydra は 2026-04 に停止し、今は運営者が手で push している。載っていないこともある)
     # (https://wiki.t2linux.org/distributions/nixos/faq/#substituter-setup)。
     # nixos-install 時はまだ効かないので --option で同じ値を渡すこと (issue #151)。
     # substituters は既定値 (cache.nixos.org) を置き換えるので明示的に併記する。

@@ -292,10 +292,12 @@ GRUB の既定に据えるだけで稼働中システムは変えない。カー
 
 #### カーネルのキャッシュ
 
-linux-t2 は nixpkgs のキャッシュに無く、t2linux コミュニティの Hydra (`https://cache.soopy.moe`)
-から取る (`hosts/k-2/configuration.nix` の `nix.settings.substituters` で宣言済み)。
-Hydra が nixpkgs の更新に追随するまでは新しい `flake.lock` に対応するカーネルが無く、
-その状態で `switch` すると **自前ビルド (4 コアで数時間)** になる。
+linux-t2 は nixpkgs のキャッシュに無く、t2linux のコミュニティメンバーが運営する
+`https://cache.soopy.moe` から取る (`hosts/k-2/configuration.nix` の `nix.settings.substituters` で宣言済み)。
+このキャッシュは以前は Hydra でビルドしていたが、2026-04 に Hydra が止まり、今は運営者が自分の
+マシン (nixos-26.05) をビルドして手で push している。そのため新しい `flake.lock` に対応するカーネルが
+載るとは限らず、無い状態で `switch` すると **自前ビルド (4 コアで数時間)** になる。
+代わりに wsl-nixos でビルドして取り込む手順は issue #252 で検証中。
 
 自前ビルドにすら失敗することもあった。upstream の nixos-hardware の apple-t2 は T2 パッチ集
 を t2linux/linux-t2-patches の特定 commit に固定する一方、カーネル本体は nixpkgs の

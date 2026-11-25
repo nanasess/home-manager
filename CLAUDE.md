@@ -228,6 +228,14 @@ nixos-hardware#1934 (2026-11-24 マージ) で、カーネルのバージョン�
 `github:NixOS/nixos-hardware` に戻した)。nixos-hardware は `nix flake update` で動くので、
 カーネルを上げたくないときは `nix flake update nixpkgs home-manager nixos-wsl` のように除外する。
 
+**cache.soopy.moe は自動ビルドではない** (2026-11-25 に調査)。運営は t2linux の soopyc さん (個人) で、
+インフラ設定は [soopyc/gensokyo](https://github.com/soopyc/gensokyo) にある。以前は `hydra.soopy.moe`
+(Hydra) がビルドしていたが 2026-04-17 に停止し、今は運営者が自分のマシンをビルドして niks3
+(`niks3.soopy.moe`) に手で push している (`justfile` の `cache` レシピ)。運営者の T2 Mac は nixos-26.05 なので、
+**nixos-unstable の tip ごとに k-2 向けのカーネルが載る保証は無く、待っても 404 のままのことがある**。
+t2linux wiki の FAQ は「public hydra instance」のままなので鵜呑みにしない。404 のときの代替として、
+wsl-nixos (Zen 3) で k-2 の toplevel をビルドして k-2 に取り込む手順を issue #252 で検証中。
+
 1. **入力を更新**: worktree で `nix flake update nixpkgs` (k-2 が目的なら他の input は後回しでよい)。
 2. **カーネルのキャッシュを確認** (自前ビルドは 4 コアで数時間):
    ```bash
@@ -237,7 +245,9 @@ nixos-hardware#1934 (2026-11-24 マージ) で、カーネルのバージョン�
    ```
    カーネルのバージョンが固定されていても drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
    404 になる** (PR #229 では `3ec6363` は 200、1 つ前のチャネル tip の `fe13242` は 404 だった)。
-   404 なら別のチャネル tip を試すか、数日待つ。`configfile` が `Hunk #N FAILED` で落ちたら、
+   404 なら別のチャネル tip を試す。待っても載るとは限らない (上記)。どの tip も 404 なら、k-2 での
+   自前ビルド (数時間) か、wsl-nixos でビルドして取り込む (issue #252) かをユーザーに確認する。
+   `configfile` が `Hunk #N FAILED` で落ちたら、
    原因になった input (nixos-hardware か nixpkgs) を直前に成功した rev に戻す
    (`nix flake lock --override-input <input> github:<owner>/<repo>/<rev>`)。
 3. **nixpkgs 側のパッケージが壊れていたら、そのパッケージだけ古い rev から取る**。nixpkgs 全体を
@@ -292,8 +302,8 @@ upstream の nixos-hardware が k-2 で壊れていて、直す PR は出てい�
    fork に向けている理由 (upstream の Issue / PR 番号)、戻す条件、戻す作業の Issue 番号を書く。
    `inputs.nixpkgs.follows = "nixpkgs"` はそのまま残す。
 4. **検証**: この節の手順 2〜6 と同じ (configfile、narinfo、toplevel、他ホスト、closure の差分)。
-   fork のコミットは cache.soopy.moe の Hydra でビルドされていないことがある。narinfo が 404 なら、
-   自前ビルドにかかる時間 (4 コアで数時間) をユーザーに伝えて判断を仰ぐ。モジュール名やオプション名が
+   fork のコミットは cache.soopy.moe に無いことが多い。narinfo が 404 なら、自前ビルドにかかる時間
+   (4 コアで数時間) と wsl-nixos でビルドする選択肢 (issue #252) をユーザーに伝えて判断を仰ぐ。モジュール名やオプション名が
    変わる PR (#1934 の `apple-bce` → `t2bce-vhci` 等) なら、`hosts/k-2/` に直書きした旧名を `rg` で洗い出す。
 5. **戻す作業の Issue を立てる** (#230 が雛形): 着手条件 (PR がマージされ、upstream master に入っていること)、
    戻す手順、検証項目、実機確認、「マージ版が fork のコミットと異なる場合は closure の差分を確認する」という
