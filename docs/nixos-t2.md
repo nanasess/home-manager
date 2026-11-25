@@ -22,9 +22,12 @@ T2 チップが NVMe / キーボード / トラックパッド / Touch Bar / オ
 ### ファームウェア
 
 `hardware.apple-t2.firmware.enable = true` は macOS の復旧イメージ (~700MB) を
-ダウンロードし、`vmTools.runInLinuxVM` の中で HFS+ をマウントして `brcm/` を取り出す。
-QEMU が動けばよく、KVM が使えない環境 (Ubuntu の nix-daemon は nixbld が `kvm` グループに
-いない) でも TCG で完走する (2026-09-14 に確認)。ファームウェアは unfree なので
+ダウンロードし、`dmg2img` で BaseSystem.dmg を変換して `7zz x` で展開し、`get-wifi` で
+`brcm/` を取り出す (`apple/t2/pkgs/brcm-firmware/`)。VM は起動しないので KVM も QEMU も要らず、
+x86_64-linux ならどのホストでもビルドできる (2026-11-25 に wsl-nixos で toplevel ごとビルド)。
+以前は `vmTools.runInLinuxVM` の中で HFS+ をマウントしていたが、nixos-hardware の
+`48c8b5e0` (2026-07-03、apple/t2: improve firmware extraction) で置き換わった
+(この節の旧記述は VM 前提だった。2026-11-26 に `97a30ee` のソースと drv の入力で確認)。ファームウェアは unfree なので
 `allowUnfreePredicate` に `brcm-firmware` と `brcm-firmware-<version>-zstd` の両方を入れる
 (前者が実体、後者は zstd 圧縮した派生で `lib.getName` が名前を分解できない)。
 

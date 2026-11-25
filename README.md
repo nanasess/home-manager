@@ -520,7 +520,7 @@ nix flake check
 nix fmt
 
 # k-2: toplevel の評価と home-manager 部分のビルド
-# (toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージ (KVM 必須) を抱えるので、
+# (toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージ (~700MB の取得) を抱えるので、
 #  k-2 以外のホストではここまでに留める)
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
 nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'

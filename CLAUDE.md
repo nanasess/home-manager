@@ -30,8 +30,9 @@ Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-mana
 nix flake check
 
 # k-2 (NixOS, T2 Mac) のシステム設定を評価 / ビルド
-# toplevel は linux-t2 カーネルと Apple 復旧イメージ (KVM 必須) を抱えるので、
-# 他ホストでは評価 + home-manager 部分のビルドまでに留める (docs/nixos-t2.md)
+# toplevel は linux-t2 カーネル (キャッシュに無ければ数時間) と Apple 復旧イメージ (~700MB の取得) を
+# 抱えるので、普段は評価 + home-manager 部分のビルドまでに留める (docs/nixos-t2.md)。
+# KVM は要らないので、wsl-nixos などの x86_64-linux なら toplevel 全体もビルドできる
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
 nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'
 
@@ -354,7 +355,7 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/ibus-skk.md](docs/ibus-skk.md) | 1.4.3 のバグ、エンジン登録、反映手順 | `pkgs/ibus-skk.nix`, `modules/ibus-skk/` (k-2) |
 | [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、XKB レイヤとの関係、GNOME Wayland でのアプリ判定、root 作業 | `modules/xremap/` (k-2) |
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | Claude Code への画像貼り付け。`Ctrl+V` が正解な理由、WSLg の BMP 問題と `wl-paste` shim、切り分け手順 | `modules/wsl` (WSL ホスト共通) |
-| [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS (nixpkgs の更新手順は上記「k-2 (T2) の nixpkgs / nixos-hardware の更新手順」)。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
+| [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS (nixpkgs の更新手順は上記「k-2 (T2) の nixpkgs / nixos-hardware の更新手順」)。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (dmg2img + 7zz、VM / KVM 不要)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
 | [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |
 | [docs/restic-nas.md](docs/restic-nas.md) | restic → Synology NAS。DSM の SFTP 仮想ルート (`/restic/...`)、backup 専用ユーザーと `authorized_keys` の置き方、`/root/secrets/` の運用、復旧手順 | `hosts/k-2/configuration.nix` (バックアップ) |
 | [docs/ssh-conf-d.md](docs/ssh-conf-d.md) | ホスト別 ssh 設定 (private の ssh_conf.d) の構成、**ssh 接続トラブルの切り分け手順** (`ssh -v` の `Applying options` で conf.d のファイルと行を特定 → 症状別の原因表 → ssh_conf.d に PR)、棚卸し手順 | `home.nix` (`programs.ssh`)、`~/.ssh/conf.d` |
