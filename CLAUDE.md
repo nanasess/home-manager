@@ -151,6 +151,7 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 | Terraform | mise `aqua:hashicorp/terraform` (HashiCorp 公式の zip を SHA256SUMS で検証、`home.nix` の `programs.mise` でバージョン固定) | nixpkgs の terraform は unfree (BSL 1.1) のため Hydra がビルドせず cache.nixos.org に無い。nixpkgs を上げるたびに Go のソースビルドになっていた。OpenTofu (キャッシュあり) は CI の terraform とロックファイル / state の互換を確かめる手間があるので採らない。`home.nix` の `allowUnfreePredicate` は空でも残す (`useGlobalPkgs` を使わない理由のため) |
 | Playwright ブラウザ (k-2) | 公式配布バイナリ (`playwright install`) + `programs.nix-ld.libraries` (`hosts/k-2/configuration.nix`) | nixpkgs の `playwright-driver` (1.61) はプロジェクト側 (`@playwright/test` 1.63) とブラウザリビジョンが合わず、nixpkgs 側で追従すると更新のたびに hash 更新が要る。Chromium の実行時ライブラリだけ nix-ld に載せて公式バイナリを使う (`playwright install-deps` 相当)。nixpkgs に依存ライブラリのみのパッケージは無い (2026-09 時点) |
 | ホスト別 ssh 設定 | private リポジトリ `nanasess/ssh_conf.d` を `~/.ssh/conf.d` に clone、`programs.ssh.includes` で読む。未 clone は activation (`sshConfDCheck`) が警告。WSL ホストは Windows の ssh.exe 用に `%USERPROFILE%\.ssh\` へミラー (`modules/wsl` の `windowsSshConfig`) | 顧客名・接続先の一覧なので public のこのリポジトリには submodule / flake input でも入れない。1Password に登録できない古い鍵 (RSA の exponent 35 等) は Document に置き `ssh-legacy` (`modules/zsh`) で一時 agent に読み込む。WSL からは Windows の ssh.exe を使わない (理由は `docs/ssh-conf-d.md`) |
+| k-2 のリモートビルダー | wsl-nixos の `nix.sshServe` (ssh-ng、nix-ssh) + k-2 の `nix.buildMachines`、接続先は mDNS (`services.avahi.nssmdns4`)、鍵は `/root/secrets/` (正本は 1Password) | cache.soopy.moe に linux-t2 が無いとき k-2 (4 コア) で数時間かかる自前ビルドを 32 スレッドの wsl-nixos に回す。Windows の IP は DHCP で変わるのでコンピューター名で引き、ホスト鍵は `HostKeyAlias` で固定。WSL が止まっていればローカルビルドに戻る (`docs/remote-builder.md`、issue #252) |
 | バックアップ (k-2) | restic (`services.restic.backups.nas`) → Synology DS720+ の SFTP、秘密情報は `/root/secrets/` (正本は 1Password) | flake で再現できない状態 (`~`、VPN 定義、BT ペアリング) だけを毎時送る。NAS 側は DSM 組み込み SFTP のみで追加ソフト不要、Btrfs の変更不可スナップショットで履歴を保護。ディスクイメージは取らず、復旧は再インストール + `restic-nas restore` (`docs/restic-nas.md`) |
 
 **プラットフォーム非依存化の判断基準**: 特定ディストリのパッケージマネージャ (旧 portage / apt など) に依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で当時の wsl-gentoo (portage) と ubuntu を統一した先例 (PR #110)。
@@ -237,7 +238,9 @@ nixos-hardware#1934 (2026-11-24 マージ) で、カーネルのバージョン�
    ```
    カーネルのバージョンが固定されていても drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
    404 になる** (PR #229 では `3ec6363` は 200、1 つ前のチャネル tip の `fe13242` は 404 だった)。
-   404 なら別のチャネル tip を試すか、数日待つ。`configfile` が `Hunk #N FAILED` で落ちたら、
+   404 なら別のチャネル tip を試すか、数日待つか、wsl-nixos をリモートビルダーにして自前ビルドする
+   (k-2 の `nix.buildMachines`。wsl-nixos が起動していれば `nixos-rebuild` が自動で回す。
+   toplevel 全体で 30 分程度。`docs/remote-builder.md`)。`configfile` が `Hunk #N FAILED` で落ちたら、
    原因になった input (nixos-hardware か nixpkgs) を直前に成功した rev に戻す
    (`nix flake lock --override-input <input> github:<owner>/<repo>/<rev>`)。
 3. **nixpkgs 側のパッケージが壊れていたら、そのパッケージだけ古い rev から取る**。nixpkgs 全体を
@@ -345,4 +348,5 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |
 | [docs/restic-nas.md](docs/restic-nas.md) | restic → Synology NAS。DSM の SFTP 仮想ルート (`/restic/...`)、backup 専用ユーザーと `authorized_keys` の置き方、`/root/secrets/` の運用、復旧手順 | `hosts/k-2/configuration.nix` (バックアップ) |
 | [docs/ssh-conf-d.md](docs/ssh-conf-d.md) | ホスト別 ssh 設定 (private の ssh_conf.d) の構成、**ssh 接続トラブルの切り分け手順** (`ssh -v` の `Applying options` で conf.d のファイルと行を特定 → 症状別の原因表 → ssh_conf.d に PR)、棚卸し手順 | `home.nix` (`programs.ssh`)、`~/.ssh/conf.d` |
+| [docs/remote-builder.md](docs/remote-builder.md) | k-2 → wsl-nixos のリモートビルダー (ssh-ng)。mDNS の名前解決 (nss-mdns)、`nix.sshServe` の nix-ssh、root 用の鍵 (`/root/secrets/`)、Hyper-V ファイアウォールのルール、確認と切り分け | `hosts/k-2/configuration.nix`、`hosts/wsl-nixos/configuration.nix` (リモートビルダー) |
 | [docs/1password-wsl.md](docs/1password-wsl.md) | WSL での Windows 版 / Linux 版 1Password の併用。用途別の担当表 (ssh = Linux 版 agent、コミット署名 = Windows 版 `op-ssh-sign.exe`、`op` = シム → `op.exe`、`op run` = Linux 版、Environments = Linux 版)、アプリ側の手作業設定、`op` シム、トラブルシュート、Zenn 記事との差分 | `modules/wsl`、`home.nix`、`hosts/wsl-*/` |
