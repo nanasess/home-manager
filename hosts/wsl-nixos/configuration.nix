@@ -138,7 +138,7 @@
   # .wslconfig が networkingMode=mirrored なので、Windows の LAN IP の 2222 番で受ける。
   # 22 は Windows の OpenSSH Server (今は停止中) と取り合わないよう避ける。
   # LAN の外からの受信は Windows の Hyper-V ファイアウォール (既定で受信 Block) の
-  # ルールで LocalSubnet に絞る (docs/remote-builder.md)。WSL が止まっている間は届かない。
+  # ルールで Private プロファイルの LocalSubnet に絞る (docs/remote-builder.md)。WSL が止まっている間は届かない。
   services.openssh = {
     ports = [ 2222 ];
     openFirewall = true;
