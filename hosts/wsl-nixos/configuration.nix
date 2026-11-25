@@ -113,6 +113,43 @@
     options = "--delete-older-than 30d";
   };
 
+  # ---------------------------------------------------------------------------
+  # k-2 のリモートビルダー (issue #252、docs/remote-builder.md)
+  # ---------------------------------------------------------------------------
+  #
+  # k-2 (4 コア / 8 スレッド) の nix-daemon が ssh-ng でここにビルドを回す。主な目的は
+  # cache.soopy.moe に無いときの linux-t2 カーネル (k-2 では数時間、ここでは toplevel
+  # 全体で 31 分だった)。
+  #
+  # nix.sshServe は nix-ssh ユーザーを作り、sshd の Match で ForceCommand
+  # `nix-daemon --stdio` を掛ける (シェルには入れない)。trusted は k-2 から署名の無い
+  # 入力パスを受け取るために要る (nix-ssh を trusted-users に足す)。
+  # 鍵は k-2 の root 専用 (/root/secrets/nix-builder_ed25519、正本は 1Password)。
+  nix.sshServe = {
+    enable = true;
+    protocol = "ssh-ng";
+    write = true;
+    trusted = true;
+    keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILTGhU7l6WJ3usMA/eft3Fg0K5uuMSoPwOc+mQgCTD/u k-2 nix-daemon"
+    ];
+  };
+
+  # .wslconfig が networkingMode=mirrored なので、Windows の LAN IP の 2222 番で受ける。
+  # 22 は Windows の OpenSSH Server (今は停止中) と取り合わないよう避ける。
+  # LAN の外からの受信は Windows の Hyper-V ファイアウォール (既定で受信 Block) の
+  # ルールで Private プロファイルの LocalSubnet に絞る (docs/remote-builder.md)。WSL が止まっている間は届かない。
+  services.openssh = {
+    ports = [ 2222 ];
+    openFirewall = true;
+    settings = {
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+      PermitRootLogin = "no";
+      AllowUsers = [ "nix-ssh" ];
+    };
+  };
+
   # 最初にインストールした NixOS のリリース。変更しないこと。
   system.stateVersion = "26.11";
 }
