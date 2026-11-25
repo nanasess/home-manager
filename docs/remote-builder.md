@@ -16,7 +16,7 @@ k-2 (nixos-rebuild / nix build)
             HostName <Windows のコンピューター名>.local   ← mDNS (nss-mdns)
             Port 2222、鍵 /root/secrets/nix-builder_ed25519
                  │
-                 ▼  Hyper-V ファイアウォール (LocalSubnet からの TCP 2222 だけ許可)
+                 ▼  Hyper-V ファイアウォール (Private プロファイルの LocalSubnet からの TCP 2222 だけ許可)
           Windows の LAN IP (WSL の mirrored モードなので wsl-nixos と共有)
                  │
                  ▼
@@ -71,7 +71,7 @@ mirrored モードでは WSL への受信は Hyper-V ファイアウォールが
 ```powershell
 New-NetFirewallHyperVRule -Name nix-builder -DisplayName "nix builder (WSL sshd 2222)" `
   -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' `
-  -Protocol TCP -LocalPorts 2222 -RemoteAddresses LocalSubnet
+  -Protocol TCP -LocalPorts 2222 -RemoteAddresses LocalSubnet -Profiles Private
 # 確認 / 削除
 Get-NetFirewallHyperVRule -Name nix-builder
 Remove-NetFirewallHyperVRule -Name nix-builder
@@ -79,6 +79,13 @@ Remove-NetFirewallHyperVRule -Name nix-builder
 
 mDNS の応答には Windows Defender ファイアウォールの「mDNS (UDP 受信)」ルールが要る
 (既定で有効。LAN が Private プロファイルであることも確認する)。
+
+`-Profiles` を省略すると `Any` になり、Public のインターフェース (外出先の Wi-Fi 等) にも
+適用されて、そのネットワーク内から 2222 番に届く。鍵認証の nix-ssh しか入れないが、
+自宅 LAN (Private) に絞っておく。作成済みのルールは
+`Set-NetFirewallHyperVRule -Name nix-builder -Profiles Private` で変えられる
+(`Get-NetFirewallHyperVRule -Name nix-builder` の `Profiles` と、`PortStatuses` に
+Private のポートだけが並ぶことで確認する)。
 
 ## 確認
 
