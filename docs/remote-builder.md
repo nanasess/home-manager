@@ -92,14 +92,17 @@ Private のポートだけが並ぶことで確認する)。
 ```bash
 # k-2 上
 getent ahostsv4 <Windows のコンピューター名>.local        # nss-mdns で引けること
-sudo nix store info --store ssh-ng://wsl-nixos-builder    # 接続と nix-daemon の応答
+# 接続と nix-daemon の応答 (Trusted: 1 なら OK)。/etc/ssh/ssh_config の Host には User / IdentityFile が
+# 無いので、ユーザーと鍵は URL で渡す (省くと root@… で接続して Permission denied になる)。
+# nix-daemon は /etc/nix/machines の sshUser / sshKey を使うので、ビルドにはこの指定は要らない
+sudo nix store info --store 'ssh-ng://nix-ssh@wsl-nixos-builder?ssh-key=/root/secrets/nix-builder_ed25519'
 # 毎回中身が変わる derivation を、ローカルでは作らせずにビルドする → 32 なら wsl-nixos で動いた
 nix build --no-link --print-out-paths --max-jobs 0 --impure --expr \
   "(builtins.getFlake \"nixpkgs\").legacyPackages.x86_64-linux.runCommand \"rb-test-$(date +%s)\" {} \"nproc > \$out\"" \
   | xargs cat
 ```
 
-`nix-ssh` で普通にログインしようとしても (`sudo ssh -i /root/secrets/nix-builder_ed25519 wsl-nixos-builder`)
+`nix-ssh` で普通にログインしようとしても (`sudo ssh -i /root/secrets/nix-builder_ed25519 nix-ssh@wsl-nixos-builder`)
 シェルには入れず、nix-daemon のプロトコル待ちになる。
 
 ## 切り分け
@@ -109,5 +112,5 @@ nix build --no-link --print-out-paths --max-jobs 0 --impure --expr \
 | `Could not resolve hostname …local` | k-2 の nss-mdns が無い / Windows の mDNS ルール / Windows のコンピューター名変更 |
 | `Connection timed out` | WSL が止まっている / Hyper-V ルールが無い / wsl-nixos の sshd が止まっている (`systemctl status sshd`) |
 | `Host key verification failed` | wsl-nixos を作り直してホスト鍵が変わった (`/etc/ssh/ssh_host_ed25519_key.pub` を knownHosts に) |
-| `Permission denied (publickey)` | `/root/secrets/nix-builder_ed25519` が無い・権限が広い / `nix.sshServe.keys` と食い違い |
+| `Permission denied (publickey)` | 手動の確認で URL に `nix-ssh@` / `?ssh-key=` が無い (`root@…` で接続している) / `/root/secrets/nix-builder_ed25519` が無い・権限が広い / `nix.sshServe.keys` と食い違い |
 | 回らずに k-2 でビルドされる | `nix show-config | grep builders` / `supportedFeatures` に要求 feature (`big-parallel` 等) が無い |
