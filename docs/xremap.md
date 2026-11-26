@@ -99,7 +99,23 @@ home-manager のシンボリックリンク差し替えでも検知できる。`
 systemctl --user status xremap.service
 gnome-extensions info xremap@k0kubun.com          # State: ACTIVE か
 busctl --user call org.gnome.Shell /com/k0kubun/Xremap com.k0kubun.Xremap WMClasses
+journalctl --user -u xremap -b | grep application-client   # supported: true か
 ```
+
+## ログイン直後にアプリ別の設定が効かなくなる (0.15.18〜)
+
+`application-client: GNOME (supported: false)` が出て、Chrome の Ctrl+H / Ctrl+L だけが効かなくなる。
+拡張は ACTIVE で、上の `busctl` も正しく応答する。
+
+- xremap は「GNOME からアプリ名を取れるか」を**最初のキー入力で 1 回だけ**判定してキャッシュする
+  (`src/client/mod.rs` の `WMClient::supported`)
+- 0.15.18 (xremap/xremap#1043) から、フォーカス中のウィンドウが無いと拡張の `ActiveWindow` が
+  `wm_class = null` を返し、それが「取れない」と判定されるようになった。ログイン直後にキーを押すと
+  そのセッションの間ずっと `false` のまま
+- `modules/xremap/gnome-supported-null-wm-class.patch` で回避している (PR #255、2026-11-26 に k-2 で確認)。
+  上流には同じ修正を [xremap/xremap#1051](https://github.com/xremap/xremap/pull/1051) で出した
+- パッチが外れた状態で起きたら、ウィンドウにフォーカスがある状態で `systemctl --user restart xremap` すれば
+  そのセッションは直る
 
 ## タイプ中のトラックパッド無効化 (DWT) が効かなくなる
 
