@@ -471,11 +471,12 @@
                          https :inherit t :depth treeless :ref
                          "804dbcb1452e7496ae0c48e20362da6351227246"))
  (mew :source "elpaca-menu-lock-file" :recipe
-      (:package "mew" :fetcher github :repo "kazu-yamamoto/Mew" :files
+      (:package "mew" :fetcher github :repo "nanasess/Mew" :branch
+                "issue-368-hm" :files
                 ("elisp/*.el" "etc" "info/*.info*") :source
                 "elpaca-menu-lock-file" :id mew :host github :type git
                 :protocol https :inherit t :depth treeless :ref
-                "2bcb42550076a5343ecf08b8682f36df160c20e4"))
+                "6cb1ed98916bb5b93d1a0918a83e54d14ed6bf61"))
  (migemo :source "elpaca-menu-lock-file" :recipe
          (:package "migemo" :repo "emacs-jp/migemo" :fetcher github
                    :files

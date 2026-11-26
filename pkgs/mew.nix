@@ -17,18 +17,20 @@
 #
 # elisp と同じコミットに固定する (modules/emacs/elpaca.lock の mew の :ref)。
 # 更新時は両方を揃えて上げること。
+# 上流 PR #376 がマージされるまでは fork (nanasess/Mew の issue-368-hm) に固定している。
+# 7.1rc1 (2bcb425) にその PR のコミットを載せたもので、bin/ は 7.1rc1 と同じ。
 let
   rubyWithSqlite = ruby.withPackages (ps: [ ps.sqlite3 ]);
 in
 stdenv.mkDerivation rec {
   pname = "mew-bin";
-  version = "7.1rc1-unstable-2026-11-20";
+  version = "7.1rc1-unstable-2026-11-26";
 
   src = fetchFromGitHub {
-    owner = "kazu-yamamoto";
+    owner = "nanasess";
     repo = "Mew";
-    rev = "2bcb42550076a5343ecf08b8682f36df160c20e4";
-    hash = "sha256-toBgynh3Gp1+uQWatRsKG6EY1wTyia3meTFrmp76BwE=";
+    rev = "6cb1ed98916bb5b93d1a0918a83e54d14ed6bf61";
+    hash = "sha256-TS7X1ECkDLg+Sp/nPbvmu0AYIueqf4Fs1v/ad47jjZQ=";
   };
 
   # bin/ は独立した configure (autoconf 生成済み) を持つのでそこだけビルドする。
