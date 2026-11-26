@@ -30,8 +30,9 @@ Nix Flake ベースの [Home Manager](https://github.com/nix-community/home-mana
 nix flake check
 
 # k-2 (NixOS, T2 Mac) のシステム設定を評価 / ビルド
-# toplevel は linux-t2 カーネルと Apple 復旧イメージ (KVM 必須) を抱えるので、
-# 他ホストでは評価 + home-manager 部分のビルドまでに留める (docs/nixos-t2.md)
+# toplevel は linux-t2 カーネル (キャッシュに無ければ数時間) と Apple 復旧イメージ (~700MB の取得) を
+# 抱えるので、普段は評価 + home-manager 部分のビルドまでに留める (docs/nixos-t2.md)。
+# KVM は要らないので、wsl-nixos などの x86_64-linux なら toplevel 全体もビルドできる
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
 nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'
 
@@ -151,6 +152,7 @@ home-manager モジュール内で Nix プロファイルのパスが要ると�
 | Terraform | mise `aqua:hashicorp/terraform` (HashiCorp 公式の zip を SHA256SUMS で検証、`home.nix` の `programs.mise` でバージョン固定) | nixpkgs の terraform は unfree (BSL 1.1) のため Hydra がビルドせず cache.nixos.org に無い。nixpkgs を上げるたびに Go のソースビルドになっていた。OpenTofu (キャッシュあり) は CI の terraform とロックファイル / state の互換を確かめる手間があるので採らない。`home.nix` の `allowUnfreePredicate` は空でも残す (`useGlobalPkgs` を使わない理由のため) |
 | Playwright ブラウザ (k-2) | 公式配布バイナリ (`playwright install`) + `programs.nix-ld.libraries` (`hosts/k-2/configuration.nix`) | nixpkgs の `playwright-driver` (1.61) はプロジェクト側 (`@playwright/test` 1.63) とブラウザリビジョンが合わず、nixpkgs 側で追従すると更新のたびに hash 更新が要る。Chromium の実行時ライブラリだけ nix-ld に載せて公式バイナリを使う (`playwright install-deps` 相当)。nixpkgs に依存ライブラリのみのパッケージは無い (2026-09 時点) |
 | ホスト別 ssh 設定 | private リポジトリ `nanasess/ssh_conf.d` を `~/.ssh/conf.d` に clone、`programs.ssh.includes` で読む。未 clone は activation (`sshConfDCheck`) が警告。WSL ホストは Windows の ssh.exe 用に `%USERPROFILE%\.ssh\` へミラー (`modules/wsl` の `windowsSshConfig`) | 顧客名・接続先の一覧なので public のこのリポジトリには submodule / flake input でも入れない。1Password に登録できない古い鍵 (RSA の exponent 35 等) は Document に置き `ssh-legacy` (`modules/zsh`) で一時 agent に読み込む。WSL からは Windows の ssh.exe を使わない (理由は `docs/ssh-conf-d.md`) |
+| k-2 のリモートビルダー | wsl-nixos の `nix.sshServe` (ssh-ng、nix-ssh) + k-2 の `nix.buildMachines`、接続先は mDNS (`services.avahi.nssmdns4`)、鍵は `/root/secrets/` (正本は 1Password) | cache.soopy.moe に linux-t2 が無いとき k-2 (4 コア) で数時間かかる自前ビルドを 32 スレッドの wsl-nixos に回す。Windows の IP は DHCP で変わるのでコンピューター名で引き、ホスト鍵は `HostKeyAlias` で固定。WSL が止まっていればローカルビルドに戻る (`docs/remote-builder.md`、issue #252) |
 | バックアップ (k-2) | restic (`services.restic.backups.nas`) → Synology DS720+ の SFTP、秘密情報は `/root/secrets/` (正本は 1Password) | flake で再現できない状態 (`~`、VPN 定義、BT ペアリング) だけを毎時送る。NAS 側は DSM 組み込み SFTP のみで追加ソフト不要、Btrfs の変更不可スナップショットで履歴を保護。ディスクイメージは取らず、復旧は再インストール + `restic-nas restore` (`docs/restic-nas.md`) |
 
 **プラットフォーム非依存化の判断基準**: 特定ディストリのパッケージマネージャ (旧 portage / apt など) に依存する構成は、入手経路が「バイナリ + 付随ツール」だけの問題であれば **Nix パッケージ化 (必要なら `pkgs/` に自作 derivation) して全ホスト共通化する**ことを優先する。辞書・データ類はシステムパス (`/usr/lib` 等、要 sudo) ではなくユーザーパス (`xdg.dataHome` 配下) に置き、セットアップを sudo レスにする。yaskkserv2 はこの方針で当時の wsl-gentoo (portage) と ubuntu を統一した先例 (PR #110)。
@@ -223,10 +225,18 @@ Nix 側の更新はあくまで Electron 本体 (deb) の追従。in-app updater
 k-2 の linux-t2 は T2 パッチを当てたカーネルで、nixpkgs を上げるときの最大のリスクになる。
 upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当てるため、nixpkgs が先に進むと
 パッチが当たらなくなる (nixos-hardware#2027。PR #202 で落ち、PR #205 で nixpkgs を固定した)。
-現在は、カーネルのバージョンもパッチと一緒に固定する nixos-hardware#1934 の fork
-(`github:soopyc/nixos-hardware/<rev>`) にコミットで固定している (PR #229、issue #227)。
-**#1934 がマージされたら `github:NixOS/nixos-hardware` に戻す。** fork の rev は flake.nix の URL に
-書いているので、`nix flake update` では動かない (上げるときは URL を書き換える)。
+nixos-hardware#1934 (2026-11-24 マージ) で、カーネルのバージョンもパッチと一緒に `stable.json` で
+固定されるようになった (それまでは PR #229 で #1934 の fork に向けていた。issue #227 / #230 で
+`github:NixOS/nixos-hardware` に戻した)。nixos-hardware は `nix flake update` で動くので、
+カーネルを上げたくないときは `nix flake update nixpkgs home-manager nixos-wsl` のように除外する。
+
+**cache.soopy.moe は自動ビルドではない** (2026-11-25 に調査)。運営は t2linux の soopyc さん (個人) で、
+インフラ設定は [soopyc/gensokyo](https://github.com/soopyc/gensokyo) にある。以前は `hydra.soopy.moe`
+(Hydra) がビルドしていたが 2026-04-17 に停止し、今は運営者が自分のマシンをビルドして niks3
+(`niks3.soopy.moe`) に手で push している (`justfile` の `cache` レシピ)。運営者の T2 Mac は nixos-26.05 なので、
+**nixos-unstable の tip ごとに k-2 向けのカーネルが載る保証は無く、待っても 404 のままのことがある**。
+t2linux wiki の FAQ は「public hydra instance」のままなので鵜呑みにしない。404 のときは
+wsl-nixos をリモートビルダーにしてビルドする (issue #252、PR #256、`docs/remote-builder.md`)。
 
 1. **入力を更新**: worktree で `nix flake update nixpkgs` (k-2 が目的なら他の input は後回しでよい)。
 2. **カーネルのキャッシュを確認** (自前ビルドは 4 コアで数時間):
@@ -235,10 +245,14 @@ upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当て�
    curl -s -o /dev/null -w '%{http_code}\n' "https://cache.soopy.moe/$(basename $K | cut -d- -f1).narinfo"
    nix build --no-link '.#nixosConfigurations.k-2.config.boot.kernelPackages.kernel.configfile'
    ```
-   fork でもカーネルの drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
+   カーネルのバージョンが固定されていても drv は nixpkgs のツールチェーンに依存するので、**nixpkgs の rev によっては
    404 になる** (PR #229 では `3ec6363` は 200、1 つ前のチャネル tip の `fe13242` は 404 だった)。
-   404 なら別のチャネル tip を試すか、数日待つ。`configfile` が `Hunk #N FAILED` で落ちたら、
-   原因になった input (fork の rev か nixpkgs) を直前に成功した rev に戻す。
+   404 なら別のチャネル tip を試す。待っても載るとは限らない (上記)。wsl-nixos が起動していれば、k-2 の
+   `nix.buildMachines` で wsl-nixos に自動で回る (toplevel 全体で 30 分程度、カーネル単体で 28 分。
+   `docs/remote-builder.md`)。wsl-nixos が使えないときは k-2 での自前ビルド (数時間) になるので、
+   進めるかユーザーに確認する。`configfile` が `Hunk #N FAILED` で落ちたら、
+   原因になった input (nixos-hardware か nixpkgs) を直前に成功した rev に戻す
+   (`nix flake lock --override-input <input> github:<owner>/<repo>/<rev>`)。
 3. **nixpkgs 側のパッケージが壊れていたら、そのパッケージだけ古い rev から取る**。nixpkgs 全体を
    古い rev に揃えるとカーネルがキャッシュから外れるため。PR #229 の azure-cli
    (fabric が invoke 3 非対応で broken、NixOS/nixpkgs#575989) が先例で、`nixpkgs-azure-cli` input と
@@ -267,10 +281,49 @@ upstream の nixos-hardware は nixpkgs の `linux_6_18` にパッチを当て�
    蓋閉じ suspend からの復帰 (キーボード / トラックパッド / Touch Bar)、xremap (Chrome の
    Ctrl+H / Ctrl+L)。ロールバックは GRUB で前の世代を選ぶか `nixos-rebuild switch --rollback`。
 
-fork (#1934) では内蔵キーボード / トラックパッドのモジュール名が `apple-bce` → `t2bce-vhci` に、
+#1934 以降は内蔵キーボード / トラックパッドのモジュール名が `apple-bce` → `t2bce-vhci` に、
 オーディオが t2-better-audio → `t2bce-alsa-ucm` に変わった。`boot.initrd.kernelModules` に
 `apple_bce` を直書きしている設定は書き換えが要る (k-2 はモジュール任せなので影響なし)。
 6.18.55 で上記の確認項目がすべて問題ないことを確認済み (2026-10-28)。
+
+#### upstream が壊れたときに fork へ一時的に向ける
+
+upstream の nixos-hardware が k-2 で壊れていて、直す PR は出ているがマージされていない場合は、
+その PR の head に一時的に向ける (PR #229 → issue #230 / PR #251 が先例)。ただし手順 2 の 404 /
+`Hunk FAILED` を nixpkgs や nixos-hardware の据え置きで避けられるなら、そちらを優先する。fork に向けるのは
+据え置きでは困るとき (nixpkgs を上げないと他のパッケージが直らない等) だけにする。
+
+1. **向け先を決める**: 修正 PR の head を
+   `gh pr view <N> -R NixOS/nixos-hardware --json headRepositoryOwner,headRefOid` で調べる。
+   **ブランチ名ではなくコミットで固定する** (`github:<owner>/nixos-hardware/<sha>`)。PR のブランチは
+   force-push されやすく、ブランチ名だと `nix flake update` のたびに中身が変わる。
+2. **fork の差分を見る**: `gh api repos/NixOS/nixos-hardware/compare/master...<sha> --jq '.files[].filename'`
+   (fork 側のコミットも SHA で指定できる) で、`apple/t2/` 以外の変更が混ざっていないか確かめる。
+   混ざっていたら PR の本文と diff を読み、k-2 が使うモジュール (`flake.nix` の
+   `nixos-hardware.nixosModules.apple-t2`) への影響を PR 本文に書く。
+3. **flake.nix を書き換える**: `nixos-hardware.url` を fork のコミットに変える。コメントには、一時的に
+   fork に向けている理由 (upstream の Issue / PR 番号)、戻す条件、戻す作業の Issue 番号を書く。
+   `inputs.nixpkgs.follows = "nixpkgs"` はそのまま残す。
+4. **検証**: この節の手順 2〜6 と同じ (configfile、narinfo、toplevel、他ホスト、closure の差分)。
+   fork のコミットは cache.soopy.moe に無いことが多い。narinfo が 404 なら、wsl-nixos が起動しているか
+   (リモートビルダーで 30 分程度) を確かめ、使えなければ k-2 での自前ビルド (4 コアで数時間) になることを
+   ユーザーに伝えて判断を仰ぐ。モジュール名やオプション名が
+   変わる PR (#1934 の `apple-bce` → `t2bce-vhci` 等) なら、`hosts/k-2/` に直書きした旧名を `rg` で洗い出す。
+5. **戻す作業の Issue を立てる** (#230 が雛形): 着手条件 (PR がマージされ、upstream master に入っていること)、
+   戻す手順、検証項目、実機確認、「マージ版が fork のコミットと異なる場合は closure の差分を確認する」という
+   注意を書く。
+6. **記述を揃える**: README「カーネルのキャッシュ」、`flake-update-pr` Skill、この節の冒頭、メモリ
+   (`project_k2_nixpkgs_pinned_t2_patches.md`) に、今は fork に向けていることを書く。fork のコミットは URL に
+   書くので `nix flake update` では動かない。上げるときは URL を書き換える。
+
+**戻すとき**: PR がマージされたことを `gh pr view <N> -R NixOS/nixos-hardware --json state,mergeCommit` で
+確かめ、`gh api repos/NixOS/nixos-hardware/compare/<fork の sha>...master --jq '.status, .behind_by'` を見る。
+`ahead` かつ `behind_by` が 0 なら fork のコミットは master に含まれている。さらに `apple/t2/` に追加の変更が
+無ければ、カーネルと toplevel の drv は変わらない (PR #251 では `/run/current-system` と同じストアパスになり、
+実機確認は不要だった)。`diverged` (squash / rebase マージ) の場合や `apple/t2/` に追加の変更がある場合は
+closure の差分を確認し、カーネルが変わるなら手順 7 の実機確認をユーザーに頼む。URL を
+`github:NixOS/nixos-hardware` に戻して `nix flake update nixos-hardware` し、手順 6 で書いた記述をすべて戻す
+(`rg -n '<owner>|<PR 番号>'` で残っていないか確かめる)。
 
 ### ssh 接続のトラブル
 
@@ -302,8 +355,9 @@ GitHub Actions (`.github/workflows/check.yml`) が push/PR 時に以下を実行
 | [docs/ibus-skk.md](docs/ibus-skk.md) | 1.4.3 のバグ、エンジン登録、反映手順 | `pkgs/ibus-skk.nix`, `modules/ibus-skk/` (k-2) |
 | [docs/xremap.md](docs/xremap.md) | Chrome のタブ移動リマップ、XKB レイヤとの関係、GNOME Wayland でのアプリ判定、root 作業 | `modules/xremap/` (k-2) |
 | [docs/clipboard-image-paste.md](docs/clipboard-image-paste.md) | Claude Code への画像貼り付け。`Ctrl+V` が正解な理由、WSLg の BMP 問題と `wl-paste` shim、切り分け手順 | `modules/wsl` (WSL ホスト共通) |
-| [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS (nixpkgs の更新手順は上記「k-2 (T2) の nixpkgs / nixos-hardware の更新手順」)。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (KVM 必須)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
-| [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、HTML メールを xwidget-webkit で開く (`C-c w`、CSP と外部リソースのリスク)、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |
+| [docs/nixos-t2.md](docs/nixos-t2.md) | T2 Mac での NixOS (nixpkgs の更新手順は上記「k-2 (T2) の nixpkgs / nixos-hardware の更新手順」)。nixos-hardware apple-t2 の仕組み、ファームウェア抽出 (dmg2img + 7zz、VM / KVM 不要)、カーネルのバイナリキャッシュ、ESP 300MB と GRUB、インストール手順 | `hosts/k-2/` (k-2) |
+| [docs/mew.md](docs/mew.md) | Mew の Gmail XOAUTH2 + 1Password 化。master password 方式が必要な理由、1Password アイテムと Google OAuth クライアントの作り方、初回認可、旧設定からの差分、MS365 を足す場合 | `pkgs/mew.nix`, `modules/emacs/init.el` (Email (Mew)) |
 | [docs/restic-nas.md](docs/restic-nas.md) | restic → Synology NAS。DSM の SFTP 仮想ルート (`/restic/...`)、backup 専用ユーザーと `authorized_keys` の置き方、`/root/secrets/` の運用、復旧手順 | `hosts/k-2/configuration.nix` (バックアップ) |
 | [docs/ssh-conf-d.md](docs/ssh-conf-d.md) | ホスト別 ssh 設定 (private の ssh_conf.d) の構成、**ssh 接続トラブルの切り分け手順** (`ssh -v` の `Applying options` で conf.d のファイルと行を特定 → 症状別の原因表 → ssh_conf.d に PR)、棚卸し手順 | `home.nix` (`programs.ssh`)、`~/.ssh/conf.d` |
+| [docs/remote-builder.md](docs/remote-builder.md) | k-2 → wsl-nixos のリモートビルダー (ssh-ng)。mDNS の名前解決 (nss-mdns)、`nix.sshServe` の nix-ssh、root 用の鍵 (`/root/secrets/`)、Hyper-V ファイアウォールのルール、確認と切り分け | `hosts/k-2/configuration.nix`、`hosts/wsl-nixos/configuration.nix` (リモートビルダー) |
 | [docs/1password-wsl.md](docs/1password-wsl.md) | WSL での Windows 版 / Linux 版 1Password の併用。用途別の担当表 (ssh = Linux 版 agent、コミット署名 = Windows 版 `op-ssh-sign.exe`、`op` = シム → `op.exe`、`op run` = Linux 版、Environments = Linux 版)、アプリ側の手作業設定、`op` シム、トラブルシュート、Zenn 記事との差分 | `modules/wsl`、`home.nix`、`hosts/wsl-*/` |

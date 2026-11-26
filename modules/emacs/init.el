@@ -1545,6 +1545,12 @@ Mew は gpg 2.1+ に対して --pinentry-mode loopback を使うので、パス�
       (my/op-read (concat my/mew-op-item "/password"))
     (funcall orig prompt)))
 
+(defvar my/mew-oauth2-authorizing nil
+  "ブラウザ認可 (`my/mew-oauth2-get-auth-code') の完了待ち中なら non-nil。
+待機は `mew-rendezvous' (`sit-for' のループ) なのでその間もタイマーが走る。
+`my/mew-auto-update' はこれを見て、2 つ目の認可で state と待受ポートを
+奪わないようにする。")
+
 (defun my/mew-oauth2-get-auth-code (url client-id resource-url redirect-url challenge port)
   "`mew-oauth2-get-auth-code' の置き換え。引数と戻り値は上流と同じ。
 上流の認可 URL には access_type=offline が無く、Google の OAuth クライアントが
@@ -1552,36 +1558,47 @@ Mew は gpg 2.1+ に対して --pinentry-mode loopback を使うので、パス�
 トークンが切れる約 1 時間ごとにブラウザ認可が再発する。実測: 初回認可後の
 :refresh_token が nil)。access_type=offline でリフレッシュ トークンを要求し、
 prompt=consent で再認可時 (保存済みトークンを失った場合) も必ず発行させる。
-この 2 つのパラメータ以外は上流 (mew-oauth2.el) のコピーで、state の生成
-(`mew-oauth2-state') もそのまま行う。上流のリダイレクト ハンドラは state が
-一致しない認可コードを 400 で弾く (RFC 6749 10.12) ので、これを落とすと認可が
-必ず失敗する。Mew を更新したら上流の本体と差分が開いていないか確認すること。"
-  (setq mew-oauth2-state (mew-oauth2-random-string))
-  (let ((url-params
-         (concat
-          url
-          "?response_type=code"
-          "&client_id=" client-id
-          "&scope=" (url-hexify-string resource-url)
-          "&redirect_uri=" (url-hexify-string redirect-url)
-          "&state=" mew-oauth2-state
-          "&code_challenge=" challenge
-          "&code_challenge_method=S256"
-          "&access_type=offline"
-          "&prompt=consent")))
-    (mew-oauth2-cleanup-redirect-handler port)
-    ;; 認可を途中でやめてもリッスン ソケットは閉じる (閉じないとポートが
-    ;; セッション中ずっと塞がる)。上流と同じ unwind-protect。
-    (unwind-protect
-        (condition-case nil
-            (progn
-              (mew-oauth2-setup-redirect-handler port)
-              (browse-url url-params)
-              (mew-rendezvous (null mew-oauth2-code))
-              mew-oauth2-code)
-          (error "")
-          (quit ""))
-      (mew-oauth2-cleanup-redirect-handler port))))
+この 2 つのパラメータと `my/mew-oauth2-authorizing' の出し入れ以外は上流
+(mew-oauth2.el、Mew 7.1rc1) のコピーで、state の生成もそのまま行う。上流の
+リダイレクト ハンドラは state が一致しない認可コードを 400 で弾く (RFC 6749
+10.12) ので、これを落とすと認可が必ず失敗する。7.1rc1 から state と認可コードは
+グローバル変数ではなく待受プロセスの plist (`mew-oauth2-state' /
+`mew-oauth2-code') に置かれ、`mew-oauth2-setup-redirect-handler' は (port state)
+を取ってそのプロセスを返す。旧版のコピーのままだと引数の数のエラーを
+`condition-case' が握りつぶし、認可が黙って失敗する。Mew を更新したら上流の
+本体と差分が開いていないか確認すること。"
+  ;; 認可の中で別の認可が始まった場合 (待機中もタイマーや他接続の filter が
+  ;; 走る) は上流と同じく断る。PORT で待ち受けられるのは 1 つだけ。
+  (if (process-status (mew-oauth2-redirect-handler-name port))
+      (progn
+        (message "OAuth2: another authorization is in progress")
+        "")
+    (let* ((state (mew-oauth2-random-string))
+           (url-params
+            (concat
+             url
+             "?response_type=code"
+             "&client_id=" (url-hexify-string client-id)
+             "&scope=" (url-hexify-string resource-url)
+             "&redirect_uri=" (url-hexify-string redirect-url)
+             "&state=" state
+             "&code_challenge=" challenge
+             "&code_challenge_method=S256"
+             "&access_type=offline"
+             "&prompt=consent")))
+      (setq my/mew-oauth2-authorizing t)
+      ;; 認可を途中でやめてもリッスン ソケットは閉じる (閉じないとポートが
+      ;; セッション中ずっと塞がる)。上流と同じ unwind-protect。
+      (unwind-protect
+          (condition-case err
+              (let ((server (mew-oauth2-setup-redirect-handler port state)))
+                (browse-url url-params)
+                (mew-rendezvous (null (process-get server 'mew-oauth2-code)))
+                (process-get server 'mew-oauth2-code))
+            (error (message "OAuth2: %s" (error-message-string err)) "")
+            (quit (message "OAuth2: the authorization was canceled") ""))
+        (setq my/mew-oauth2-authorizing nil)
+        (mew-oauth2-cleanup-redirect-handler port)))))
 
 (defun my/mew-browse-url-open-gmail ()
   "現在のケースのドメインの Gmail (Google Workspace) をブラウザで開く。"
@@ -1620,100 +1637,88 @@ prompt=consent で再認可時 (保存済みトークンを失った場合) も�
   (let ((mew-cite-fields (if (my/mew-cite-region-p) nil mew-cite-fields)))
     (apply orig args)))
 
-(defconst my/mew-html-csp-base
-  "default-src 'none'; form-action 'none'; base-uri 'none'"
-  "xwidget-webkit で HTML メールを開くときの Content-Security-Policy の固定部分。
-default-src 'none' でスクリプト (インラインも含む) と外部への取得をすべて止め、
-CSP の default-src が覆わないフォーム送信と <base> も止める。")
+(defcustom my/mew-auto-update-interval 300
+  "%inbox を裏で update する間隔 (秒)。nil なら自動 update しない。
+Emacs の起動 (daemon を含む) から `my/mew-auto-update-initial-delay' 秒後に
+1 回目を行い、以降この間隔で繰り返す。"
+  :type '(choice (const :tag "無効" nil) integer)
+  :group 'mew)
 
-(defvar my/mew-html-xwidget-file nil
-  "直前に xwidget で開いた一時ファイル。次に開くときと Emacs 終了時に消す。")
+(defcustom my/mew-auto-update-initial-delay 10
+  "Emacs 起動から 1 回目の自動 update までの秒数。"
+  :type 'integer
+  :group 'mew)
 
-(defun my/mew-html-render-and-keep (start end)
-  "`mew-prog-text/html' の置き換え。shr で描画し、元の HTML をテキストプロパティに残す。
-描画は上流の既定と同じ `shr-render-region' (`mew-html-blocked-images' も上流の
-`mew-mime-text/html' が束縛したまま効く)。`my/mew-html-view-xwidget' はこの
-プロパティから HTML を取り出す。Message バッファはメッセージを表示するたびに
-作り直されるので、別のメッセージの HTML を拾うことはない。"
-  (let ((html (buffer-substring-no-properties start end))
-        (end-marker (copy-marker end t)))
-    (shr-render-region start end)
-    (put-text-property start end-marker 'my/mew-html html)
-    (set-marker end-marker nil)))
+(defvar my/mew-auto-update-timer nil
+  "`my/mew-auto-update' を呼ぶ繰り返しタイマー。")
 
-(defun my/mew-html-at-point ()
-  "Message バッファから、point 位置 (無ければ最初) の HTML パートの元 HTML を返す。
-Summary から呼ばれたときは表示中の Message バッファを見る。"
-  (let ((buf (if (text-property-not-all (point-min) (point-max) 'my/mew-html nil)
-                 (current-buffer)
-               (get-buffer (mew-buffer-message)))))
-    (when buf
-      (with-current-buffer buf
-        (or (get-text-property (point) 'my/mew-html)
-            (let ((pos (text-property-not-all (point-min) (point-max) 'my/mew-html nil)))
-              (and pos (get-text-property pos 'my/mew-html))))))))
+(defun my/mew-visible-p ()
+  "Mew の Summary / Virtual / Message バッファがどこかのウィンドウに出ていれば non-nil。
+`mew-summary-reset' が消す Message バッファはフォルダー単位ではなくフレームと
+ウィンドウ位置で決まる (`mew-buffer-message') ので、%inbox 以外のフォルダーを
+読んでいる最中でも消える。Mew を使っている間はまとめて見送るために使う。"
+  (catch 'found
+    (walk-windows (lambda (w)
+                    (when (memq (buffer-local-value 'major-mode (window-buffer w))
+                                '(mew-summary-mode mew-virtual-mode mew-message-mode))
+                      (throw 'found t)))
+                  'no-minibuf 'visible)
+    nil))
 
-(defun my/mew-html-xwidget-cleanup ()
-  "直前に xwidget で開いた一時ファイルを消す。"
-  (when (and my/mew-html-xwidget-file (file-exists-p my/mew-html-xwidget-file))
-    (delete-file my/mew-html-xwidget-file))
-  (setq my/mew-html-xwidget-file nil))
+(defun my/mew-auto-update ()
+  "%inbox を裏で update する (summary の `s' の update と同じ)。
+`my/mew-auto-update-timer' から呼ぶ。Mew が未起動なら初期化してから summary を
+作る。その際の 1Password の承認 (OAuth2 クライアント / master password) は
+`M-x mew' と同じ経路で、セッション中 1 回だけ出る (`my/op-read' のキャッシュ)。
 
-(defun my/mew-html-neutralize-meta (html)
-  "HTML 中の <meta> をすべて未知の要素 <x-mew-meta> に変えて無効にする。
-`<meta http-equiv=\"refresh\">' はユーザー操作なしで別の URL へ移動し、CSP では
-止められない (default-src は取得を縛るだけで遷移は対象外)。属性値は文字参照
-(`&#114;efresh' など) で書けるので属性を見て消すと漏れる。タグ名は文字参照で
-書けないので、タグ名ごと置き換える。タグ名は空白 / `/' / `>' で終わる
-(`<meta/http-equiv=...>' も meta 要素になる) ので、その手前で区切る。メール側の
-charset / CSP の宣言も消えるが、charset は先頭に置く UTF-8 宣言が使われ、CSP は
-こちらで付け直すので困らない。"
-  (let ((case-fold-search t))
-    (replace-regexp-in-string "<meta\\([\t\n\f\r />]\\|\\'\\)" "<x-mew-meta\\1" html t)))
+上流の `mew-init' と `mew-summary-reset' はウィンドウ構成を書き換える
+(`switch-to-buffer' / `mew-window-configure') ので `save-window-excursion' で包む。
+`mew-summary-reset' は Message バッファも消すため、Mew の Summary / Message が
+どこかのウィンドウに表示されている間 (= 読んでいる最中) は何もしない
+(`my/mew-visible-p')。そのときは従来どおり手で `s' / `i' する。ミニバッファ使用中、
+ブラウザ認可の待機中 (`my/mew-oauth2-authorizing')、Mew の別プロセスが動いている
+間も見送る。
+`mew-summary-scan-boot' は `mew' が内部で呼ぶ関数なので、Mew を更新したら
+存在と引数 (proto case) を確認すること。"
+  (condition-case err
+      (unless (or (> (minibuffer-depth) 0)
+                  my/mew-oauth2-authorizing
+                  (my/mew-visible-p))
+        (require 'mew)
+        ;; master password は IMAP の filter 内 (XOAUTH2 の認証文字列を作るとき) にも
+        ;; 読まれるが、そこで 1Password を拒否すると error がこの condition-case に
+        ;; 届かず、summary のロックが接続を閉じるまで残る。接続を張る前に同期的に
+        ;; 読んでおき、拒否はここで捕まえて次の周期に回す。
+        (my/op-read (concat my/mew-op-item "/password"))
+        (save-window-excursion
+          (unless mew-init-p (mew-init))
+          (mew-passwd-setup-master)
+          (let* ((case mew-case)
+                 (proto (mew-proto case))
+                 (inbox (mew-case-folder case (mew-proto-inbox-folder proto case)))
+                 (buf (get-buffer inbox)))
+            (if (null buf)
+                ;; summary がまだ無い: `mew' を mew-auto-get t で呼んだときと同じ起動処理
+                (mew-summary-scan-boot proto case)
+              (with-current-buffer buf
+                (when (mew-summary-exclusive-p 'no-msg)
+                  (mew-summary-ls nil nil 'update)))))))
+    (error (message "Mew の自動 update に失敗: %s" (error-message-string err)))))
 
-(defun my/mew-html-xwidget-open (html trusted)
-  "HTML を CSP 付きの一時ファイルに書き出し、xwidget-webkit で開く。
-メールの <meta> は `my/mew-html-neutralize-meta' で無効にする (meta refresh 対策)。
-先頭に UTF-8 の宣言を置く (Message バッファの文字列は Mew がデコード済みなので
-UTF-8 で書き出せば合う)。
-TRUSTED なら https の画像 / CSS / フォントを読み込む。そうでなければインラインの
-style と data: だけで、外部画像は `mew-html-blocked-images' が nil のときだけ許す
-(shr 表示の既定と合わせる)。スクリプトはどちらでも動かさない。"
-  (defvar mew-html-blocked-images)
-  (unless (featurep 'xwidget-internal)
-    (user-error "この Emacs は xwidget なしでビルドされている"))
-  (my/mew-html-xwidget-cleanup)
-  (let* ((remote (if trusted " https:" ""))
-         (img (if (or trusted (null mew-html-blocked-images))
-                  " https: http:"
-                ""))
-         (csp (format "%s; style-src 'unsafe-inline'%s; font-src data:%s; img-src data:%s"
-                      my/mew-html-csp-base remote remote img))
-         (head (format "<meta charset=\"utf-8\">\n<meta http-equiv=\"Content-Security-Policy\" content=\"%s\">\n"
-                       csp))
-         ;; make-temp-file はモード 600 で作る。書き込みに失敗しても部分的な本文が
-         ;; 残らないよう、作った直後に登録して失敗時は消す。
-         (file (make-temp-file "mew-html-" nil ".html"))
-         (ok nil))
-    (setq my/mew-html-xwidget-file file)
-    (unwind-protect
-        (let ((coding-system-for-write 'utf-8-unix))
-          (write-region (concat head (my/mew-html-neutralize-meta html)) nil file nil 'silent)
-          (setq ok t))
-      (unless ok (my/mew-html-xwidget-cleanup)))
-    (xwidget-webkit-browse-url (concat "file://" file))))
+(defun my/mew-auto-update-start ()
+  "`my/mew-auto-update' の繰り返しタイマーを張る (`elpaca-after-init-hook')。"
+  (interactive)
+  (when (timerp my/mew-auto-update-timer)
+    (cancel-timer my/mew-auto-update-timer))
+  (setq my/mew-auto-update-timer
+        (and my/mew-auto-update-interval
+             (run-with-timer my/mew-auto-update-initial-delay
+                             my/mew-auto-update-interval
+                             #'my/mew-auto-update))))
 
-(defun my/mew-html-view-xwidget (&optional trusted)
-  "表示中のメッセージの HTML パートを xwidget-webkit で開く。
-既定では外部の画像 / CSS / フォントを読み込まない (開封の通知やトラッキングを防ぐ)。
-\\[universal-argument] を付けると、信頼できるメールとして https の画像 / CSS /
-フォントを読み込む。スクリプトはどちらでも止める。リンクを押すと xwidget の中で
-そのページへ移動する (CSP は移動を止められない)。"
-  (interactive "P")
-  (let ((html (my/mew-html-at-point)))
-    (unless html
-      (user-error "表示中のメッセージに HTML パートが無い (未解析なら `.' で再解析)"))
-    (my/mew-html-xwidget-open html trusted)))
+;; emacs --batch (CI の init.el 読み込みテスト) では張らない
+(unless noninteractive
+  (add-hook 'elpaca-after-init-hook #'my/mew-auto-update-start))
 
 (use-package mew
   :ensure (:host github :repo "kazu-yamamoto/Mew")
@@ -1774,7 +1779,7 @@ style と data: だけで、外部画像は `mew-html-blocked-images' が nil �
   (mew-draft-mode-auto-save -1)
   ;; マークが付いていないメッセージだけ自動 refile する
   (mew-refile-auto-refile-skip-any-mark t)
-  ;; 起動時に自動取得しない
+  ;; M-x mew 自体は取得しない (取得は my/mew-auto-update が裏で定期的に行う)
   (mew-auto-get nil)
   :init
   ;; メッセージファイルに .mew を付ける。既存の ~/Mail は 1.mew 形式で保存されて

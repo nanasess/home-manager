@@ -56,6 +56,14 @@ init.el では `mew-oauth2-get-auth-code` を `:override` で置き換え、`&ac
 ハンドラの検証に入るため)。同じコミットで `unwind-protect` によるリッスン ソケットの後始末も
 入ったので、こちらも取り込んである。
 
+7.1rc1 (上流 9ae6814 / 68fae34、PR #361 / #354) では、state と認可コードがグローバル変数から
+待受プロセスの plist (`process-get server 'mew-oauth2-code`) に移り、
+`mew-oauth2-setup-redirect-handler` の引数が `(port state)` になった。あわせて、認可中に別の認可が
+始まったら断るようになり、`client_id` が URL エンコードされるようになった。旧版のコピーのままだと、
+引数の数のエラーを `condition-case` が握りつぶして `""` を返すので、**ブラウザ認可がエラーも出さずに
+失敗する** (リフレッシュ トークンが生きている間は認可を通らないので気づきにくい)。オーバーライドは
+7.1rc1 の本体に合わせて書き直してある。
+
 ### トークン取得 / 更新は上流 (curl) に任せる
 
 上流 `mew-oauth2.el` はトークン取得 (認可コード → アクセス トークン) と更新 (リフレッシュ トークン →
@@ -177,6 +185,24 @@ mv ~/Mail/.mew-passwd.gpg ~/Mail/.mew-passwd.gpg.2024-09-04
 WSL では `browse-url` が `$BROWSER` (wsl-open) 経由で Windows 側ブラウザを開く。
 `.wslconfig` が `networkingMode=mirrored` なので、Windows のブラウザからの
 `localhost:28080` は WSL 側の Emacs に届く。
+
+### 5. 裏での自動 update
+
+`M-x mew` しなくても、Emacs の起動 (daemon を含む) から 10 秒後に Mew を裏で初期化して
+`%inbox` を取得し、以降 5 分ごとに update する (init.el の `my/mew-auto-update`)。
+起動直後に 1Password の承認ダイアログが出るのはこのため (セッション中 1 回)。
+承認を拒否したり 1Password がロック中だったりしたときは `*Messages*` に
+「Mew の自動 update に失敗」と出るだけで、次の周期にまた試す。
+
+- Mew の Summary / Message をどこかのウィンドウに表示している間 (フォルダーは問わない) は、
+  読んでいる最中の Message バッファやウィンドウ構成を壊さないよう何もしない。
+  表示中は従来どおり `s` / `i`。ブラウザ認可の待機中も見送る (state と待受ポートの奪い合いを防ぐ)。
+- master password は接続を張る前に 1Password から読む。ここで拒否すれば接続は作られず、
+  次の周期にまた試す。
+- 間隔は `my/mew-auto-update-interval` (秒、`nil` で無効)。変えたら
+  `M-x my/mew-auto-update-start` でタイマーを張り直す。
+- リフレッシュ トークンが失効しているとブラウザ認可が始まり、認可コードを受け取るまで
+  Emacs が待つ (手で `i` したときと同じ挙動)。
 
 ## 旧設定からの差分
 

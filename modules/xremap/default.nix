@@ -6,7 +6,22 @@ let
   # nixpkgs の既定 (pkgs.xremap) は wlroots build。GNOME Wayland ではアプリ判定に
   # gnome feature (GNOME Shell 拡張との D-Bus 連携) が必要なため variant を差し替える。
   # variant 名は nixpkgs の pkgs/by-name/xr/xremap/package.nix の `variants` に定義がある。
-  xremap = pkgs.xremap.override { withVariant = "gnome"; };
+  #
+  # 0.15.18 の c780618d (GNOME 拡張が null を返す場合への対応) 以降、フォーカス中のウィンドウが
+  # 無いときに ActiveWindow の wm_class が null になると `supported: false` と判定される。
+  # この判定は最初のキー入力で 1 回だけ行われてキャッシュされるため、ログイン直後に
+  # ウィンドウが無い状態でキーを押すと、そのセッションの間ずっとアプリ別の設定 (Chrome の
+  # Ctrl+H / Ctrl+L) が効かなくなる。ActiveWindow が応答すれば supported とみなすパッチを当てる。
+  # 0.15.19 でも未修正 (2026-11-26 時点)。同じ修正を上流に出している:
+  # https://github.com/xremap/xremap/pull/1051 (上流は Issue が無効で、報告は Discussions か PR)。
+  # #1051 (または同等の修正) を含む版が nixpkgs に入ったらパッチごと外す。assert で版の変化に気付けるようにする。
+  xremap = (pkgs.xremap.override { withVariant = "gnome"; }).overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [
+      (assert lib.assertMsg (lib.versionOlder old.version "0.15.20")
+        "xremap ${old.version}: gnome-supported-null-wm-class.patch がまだ必要か上流 (xremap/xremap#1051) を確認する";
+        ./gnome-supported-null-wm-class.patch)
+    ];
+  });
 
   # xremap がフォーカス中アプリの WMClass を取得するための GNOME Shell 拡張。
   # https://extensions.gnome.org/extension/5060/xremap/

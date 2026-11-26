@@ -27,8 +27,8 @@ in
   # ---------------------------------------------------------------------------
 
   # WiFi / Bluetooth (BCM4364B3 "Trinidad") のファームウェアを Apple の復旧イメージから
-  # 宣言的に抽出する。vmTools.runInLinuxVM で HFS+ をマウントするため QEMU が動く
-  # (KVM が無くても TCG で完走する。Ubuntu 上での事前ビルドで確認済み)。
+  # 宣言的に抽出する。dmg2img + 7zz で展開するので VM / KVM は要らない
+  # (nixos-hardware 48c8b5e0 以降。docs/nixos-t2.md「ファームウェア」)。
   #
   # version は ventura に固定。既定の sonoma は抽出スクリプト (get-wifi) が BCM4388
   # (Willamette) のエントリで AssertionError を起こして失敗する (2026-09-14、
@@ -423,7 +423,8 @@ in
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
     trusted-users = [ "root" "nanasess" ];
-    # t2linux コミュニティの Hydra。linux-t2 カーネルを自前ビルドしないために使う
+    # t2linux のコミュニティメンバーが運営するキャッシュ。linux-t2 カーネルを自前ビルドしないために使う
+    # (Hydra は 2026-04 に停止し、今は運営者が手で push している。載っていないこともある)
     # (https://wiki.t2linux.org/distributions/nixos/faq/#substituter-setup)。
     # nixos-install 時はまだ効かないので --option で同じ値を渡すこと (issue #151)。
     # substituters は既定値 (cache.nixos.org) を置き換えるので明示的に併記する。
@@ -441,6 +442,54 @@ in
     dates = "weekly";
     options = "--delete-older-than 30d";
   };
+
+  # ---------------------------------------------------------------------------
+  # リモートビルダー (wsl-nixos、issue #252、docs/remote-builder.md)
+  # ---------------------------------------------------------------------------
+  #
+  # cache.soopy.moe に linux-t2 が無いとき、4 コアのここで数時間ビルドする代わりに
+  # wsl-nixos (32 スレッド) に回す。wsl-nixos が止まっている (Windows のスリープ /
+  # wsl --shutdown / 外出先) ときは接続に失敗し、ローカルでビルドする。
+  #
+  # 接続は nix-daemon (root) が行うので 1Password の SSH agent は使えない。鍵は
+  # パスフレーズなしで /root/secrets/nix-builder_ed25519 (0600、Nix 管理外、手動配置)
+  # に置き、正本は 1Password に控える (restic の鍵と同じ例外運用、docs/remote-builder.md)。
+  # 鍵は wsl-nixos の nix-ssh 専用で、ForceCommand により nix-daemon しか動かせない。
+  nix.distributedBuilds = true;
+  nix.buildMachines = [
+    {
+      # 実際の接続先は下の programs.ssh.extraConfig の Host 別名で決める
+      hostName = "wsl-nixos-builder";
+      protocol = "ssh-ng";
+      sshUser = "nix-ssh";
+      sshKey = "/root/secrets/nix-builder_ed25519";
+      systems = [ "x86_64-linux" ];
+      maxJobs = 4;
+      speedFactor = 4;
+      # linux-t2 は big-parallel を要求する。wsl-nixos の system-features と揃える
+      supportedFeatures = [ "big-parallel" "kvm" "nixos-test" "benchmark" ];
+    }
+  ];
+  # cache.nixos.org にある入力は k-2 から送らず、wsl-nixos が自分で取る
+  nix.settings.builders-use-substitutes = true;
+
+  # wsl-nixos は WSL の mirrored モードなので Windows と同じ IP。IP は DHCP で変わるので、
+  # Windows が mDNS で応答するコンピューター名で引く。Windows のコンピューター名を
+  # 変えたらここを更新する。GNOME が avahi-daemon を入れるが、glibc (ssh) から .local を
+  # 引くには nss-mdns が要る (avahi-resolve は引けても getent は失敗していた)。
+  services.avahi.nssmdns4 = true;
+  # HostKeyAlias でホスト鍵を別名に結び付け、コンピューター名や IP が変わっても
+  # knownHosts を書き換えずに済むようにする。ConnectTimeout は wsl-nixos が止まって
+  # いるときにすぐローカルビルドへ戻すため。
+  programs.ssh.extraConfig = ''
+    Host wsl-nixos-builder
+      HostName DESKTOP-HV9026L.local
+      Port 2222
+      HostKeyAlias wsl-nixos-builder
+      ConnectTimeout 5
+      ServerAliveInterval 30
+  '';
+  programs.ssh.knownHosts.wsl-nixos-builder.publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIACAykVYtF5QGJSbFIR/G98SBKAfvAy79BPUtRZIIlOE";
 
   # 最初にインストールした NixOS のリリース。変更しないこと。
   system.stateVersion = "26.05";

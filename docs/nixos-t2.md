@@ -16,15 +16,19 @@ T2 チップが NVMe / キーボード / トラックパッド / Touch Bar / オ
 | カーネル | linux-t2 (t2linux パッチ済み) | モジュールが `boot.kernelPackages` を差し替える |
 | キーボード / トラックパッド | `t2bce-vhci` (旧 `apple-bce`。nixos-hardware#1934 で改名) | initrd に組み込み済み |
 | Touch Bar | tiny-dfr | `hardware.apple.touchBar.enable` (nixpkgs 本体のモジュール) |
-| オーディオ | t2-better-audio の UCM / udev | pipewire / wireplumber を override |
+| オーディオ | `t2bce-alsa-ucm` の ALSA UCM 設定 (旧 t2-better-audio。nixos-hardware#1934 で置き換え) | モジュールが設定する |
 | WiFi / Bluetooth (BCM4364) | Apple 復旧イメージからファームウェア抽出 | `hardware.apple-t2.firmware.enable` |
+| 内蔵カメラ (FaceTime HD、`05ac:8514`) | T2 の USB (VHCI) の先にある UVC デバイス。`t2bce-vhci` + `uvcvideo` で `/dev/video0` / `/dev/video1` になる | 追加設定なし。Zoom / Google Meet で使える (2026-11-26 に確認) |
 
 ### ファームウェア
 
 `hardware.apple-t2.firmware.enable = true` は macOS の復旧イメージ (~700MB) を
-ダウンロードし、`vmTools.runInLinuxVM` の中で HFS+ をマウントして `brcm/` を取り出す。
-QEMU が動けばよく、KVM が使えない環境 (Ubuntu の nix-daemon は nixbld が `kvm` グループに
-いない) でも TCG で完走する (2026-09-14 に確認)。ファームウェアは unfree なので
+ダウンロードし、`dmg2img` で BaseSystem.dmg を変換して `7zz x` で展開し、`get-wifi` で
+`brcm/` を取り出す (`apple/t2/pkgs/brcm-firmware/`)。VM は起動しないので KVM も QEMU も要らず、
+x86_64-linux ならどのホストでもビルドできる (2026-11-25 に wsl-nixos で toplevel ごとビルド)。
+以前は `vmTools.runInLinuxVM` の中で HFS+ をマウントしていたが、nixos-hardware の
+`48c8b5e0` (2026-07-03、apple/t2: improve firmware extraction) で置き換わった
+(この節の旧記述は VM 前提だった。2026-11-26 に `97a30ee` のソースと drv の入力で確認)。ファームウェアは unfree なので
 `allowUnfreePredicate` に `brcm-firmware` と `brcm-firmware-<version>-zstd` の両方を入れる
 (前者が実体、後者は zstd 圧縮した派生で `lib.getName` が名前を分解できない)。
 
@@ -45,9 +49,12 @@ Apple のファームウェアはコミットしない。**
 
 ### カーネルのバイナリキャッシュ
 
-linux-t2 は nixpkgs のキャッシュに無い。t2linux コミュニティの Hydra
-(`https://cache.soopy.moe`) を substituter に入れないと自前ビルドになる
-(この機種の 4 コアで数時間)。
+linux-t2 は nixpkgs のキャッシュに無い。t2linux のコミュニティメンバーが運営する
+`https://cache.soopy.moe` を substituter に入れないと自前ビルドになる
+(この機種の 4 コアで数時間)。t2linux wiki には「public hydra instance」とあるが、Hydra
+(`hydra.soopy.moe`) は 2026-04 に停止しており、今は運営者が自分のマシンのビルドを niks3 で
+手で push している (2026-11 に [soopyc/gensokyo](https://github.com/soopyc/gensokyo) で確認)。
+nixpkgs を上げたときにカーネルが載っているとは限らない (CLAUDE.md の更新手順を参照)。
 
 - インストール後: `hosts/k-2/configuration.nix` の `nix.settings` で宣言済み。
 - `nixos-install` 時: まだ効かないので `--option extra-substituters ... --option extra-trusted-public-keys ...` を渡す。
@@ -60,7 +67,11 @@ linux-t2 は nixpkgs のキャッシュに無い。t2linux コミュニティの
 
 ### 動かないもの
 
-Ubuntu と同じ。内蔵カメラ、Touch ID。
+Touch ID (T2 の Secure Enclave 経由のため。Linux 側からの利用方法は調べていない)。
+
+以前はここに内蔵カメラも書いていたが、実機で確かめた記録の無い前提 (issue #151) を写したもので、
+誤りだった。T2 より前の MacBook の FaceTime HD (PCIe の Broadcom 1570、ツリー外の `facetimehd`
+ドライバが要る) と取り違えたと思われる。T2 Mac では普通の UVC カメラとして動く (上の表)。
 
 ### サスペンド
 
