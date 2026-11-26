@@ -292,10 +292,13 @@ GRUB の既定に据えるだけで稼働中システムは変えない。カー
 
 #### カーネルのキャッシュ
 
-linux-t2 は nixpkgs のキャッシュに無く、t2linux コミュニティの Hydra (`https://cache.soopy.moe`)
-から取る (`hosts/k-2/configuration.nix` の `nix.settings.substituters` で宣言済み)。
-Hydra が nixpkgs の更新に追随するまでは新しい `flake.lock` に対応するカーネルが無く、
-その状態で `switch` すると **自前ビルド (4 コアで数時間)** になる。
+linux-t2 は nixpkgs のキャッシュに無く、t2linux のコミュニティメンバーが運営する
+`https://cache.soopy.moe` から取る (`hosts/k-2/configuration.nix` の `nix.settings.substituters` で宣言済み)。
+このキャッシュは以前は Hydra でビルドしていたが、2026-04 に Hydra が止まり、今は運営者が自分の
+マシン (nixos-26.05) をビルドして手で push している。そのため新しい `flake.lock` に対応するカーネルが
+載るとは限らず、無い状態で `switch` すると **自前ビルド (4 コアで数時間)** になる。
+wsl-nixos が起動していれば、k-2 の `nix.buildMachines` で wsl-nixos (32 スレッド) に自動で回り、
+30 分程度で済む (`docs/remote-builder.md`)。
 
 自前ビルドにすら失敗することもあった。upstream の nixos-hardware の apple-t2 は T2 パッチ集
 を t2linux/linux-t2-patches の特定 commit に固定する一方、カーネル本体は nixpkgs の
@@ -517,7 +520,7 @@ nix flake check
 nix fmt
 
 # k-2: toplevel の評価と home-manager 部分のビルド
-# (toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージ (KVM 必須) を抱えるので、
+# (toplevel を丸ごとビルドすると linux-t2 カーネルと Apple 復旧イメージ (~700MB の取得) を抱えるので、
 #  k-2 以外のホストではここまでに留める)
 nix eval --raw '.#nixosConfigurations.k-2.config.system.build.toplevel.drvPath'
 nix build '.#nixosConfigurations.k-2.config.home-manager.users.nanasess.home.activationPackage'

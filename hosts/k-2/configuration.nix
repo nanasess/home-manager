@@ -27,8 +27,8 @@ in
   # ---------------------------------------------------------------------------
 
   # WiFi / Bluetooth (BCM4364B3 "Trinidad") のファームウェアを Apple の復旧イメージから
-  # 宣言的に抽出する。vmTools.runInLinuxVM で HFS+ をマウントするため QEMU が動く
-  # (KVM が無くても TCG で完走する。Ubuntu 上での事前ビルドで確認済み)。
+  # 宣言的に抽出する。dmg2img + 7zz で展開するので VM / KVM は要らない
+  # (nixos-hardware 48c8b5e0 以降。docs/nixos-t2.md「ファームウェア」)。
   #
   # version は ventura に固定。既定の sonoma は抽出スクリプト (get-wifi) が BCM4388
   # (Willamette) のエントリで AssertionError を起こして失敗する (2026-09-14、
@@ -423,7 +423,8 @@ in
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
     trusted-users = [ "root" "nanasess" ];
-    # t2linux コミュニティの Hydra。linux-t2 カーネルを自前ビルドしないために使う
+    # t2linux のコミュニティメンバーが運営するキャッシュ。linux-t2 カーネルを自前ビルドしないために使う
+    # (Hydra は 2026-04 に停止し、今は運営者が手で push している。載っていないこともある)
     # (https://wiki.t2linux.org/distributions/nixos/faq/#substituter-setup)。
     # nixos-install 時はまだ効かないので --option で同じ値を渡すこと (issue #151)。
     # substituters は既定値 (cache.nixos.org) を置き換えるので明示的に併記する。
