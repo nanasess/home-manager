@@ -16,8 +16,9 @@ T2 チップが NVMe / キーボード / トラックパッド / Touch Bar / オ
 | カーネル | linux-t2 (t2linux パッチ済み) | モジュールが `boot.kernelPackages` を差し替える |
 | キーボード / トラックパッド | `t2bce-vhci` (旧 `apple-bce`。nixos-hardware#1934 で改名) | initrd に組み込み済み |
 | Touch Bar | tiny-dfr | `hardware.apple.touchBar.enable` (nixpkgs 本体のモジュール) |
-| オーディオ | t2-better-audio の UCM / udev | pipewire / wireplumber を override |
+| オーディオ | `t2bce-alsa-ucm` の ALSA UCM 設定 (旧 t2-better-audio。nixos-hardware#1934 で置き換え) | モジュールが設定する |
 | WiFi / Bluetooth (BCM4364) | Apple 復旧イメージからファームウェア抽出 | `hardware.apple-t2.firmware.enable` |
+| 内蔵カメラ (FaceTime HD、`05ac:8514`) | T2 の USB (VHCI) の先にある UVC デバイス。`t2bce-vhci` + `uvcvideo` で `/dev/video0` / `/dev/video1` になる | 追加設定なし。Zoom / Google Meet で使える (2026-11-26 に確認) |
 
 ### ファームウェア
 
@@ -66,7 +67,11 @@ nixpkgs を上げたときにカーネルが載っているとは限らない (C
 
 ### 動かないもの
 
-Ubuntu と同じ。内蔵カメラ、Touch ID。
+Touch ID (T2 の Secure Enclave 経由のため。Linux 側からの利用方法は調べていない)。
+
+以前はここに内蔵カメラも書いていたが、実機で確かめた記録の無い前提 (issue #151) を写したもので、
+誤りだった。T2 より前の MacBook の FaceTime HD (PCIe の Broadcom 1570、ツリー外の `facetimehd`
+ドライバが要る) と取り違えたと思われる。T2 Mac では普通の UVC カメラとして動く (上の表)。
 
 ### サスペンド
 
