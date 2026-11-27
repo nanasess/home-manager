@@ -27,7 +27,7 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 ### ワークフロー preference
 
-- **機能ライフサイクル完結を期待**: 調査 → 実装 → テスト → PR 作成 → レビュー対応 → 本番検証 → Issue クローズまでを 1 セッションで連鎖実行する。「ローカルで動く」で止めない。ただし CI / デプロイの完了待ちだけは例外で、後述「Commits & PRs」の規約どおり前景では待たずにバックグラウンドで監視し、成功通知を受けた場合だけレビュー対応・本番検証・Issue クローズを続行する。失敗通知の場合は結果と原因の見立てを報告し、指示を受けるまで後続工程を停止する。
+- **機能ライフサイクル完結を期待**: 調査 → 実装 → テスト → PR 作成 → レビュー対応 → 本番検証 → Issue クローズまでを 1 セッションで連鎖実行する。「ローカルで動く」で止めない。ただし CI / デプロイの完了待ちだけは例外で、後述「Commits & PRs」の規約どおり前景では待たずにバックグラウンドで監視し、成功通知を受けた場合だけレビュー対応・本番検証・Issue クローズを続行する。失敗通知の場合は結果と原因の見立てを報告し、原因が明らかでローカルで検証できる修正なら直して push し、続行する。見立てが立たない・深掘りが要るときは指示を待つ。
 - **簡潔な指示を好む**: 「PR 化して」「CLAUDE.md に記録」のような短い指示でも、完成形まで自走することを期待する。
 - **並列作業時は git worktree**: PR ごとや実験ごとに worktree で分離する。**worktree の作成・削除は必ず git-worktree-manager の `worktree` コマンドで行う。** `git worktree add` / `git worktree remove`、`EnterWorktree` ツール、Agent ツールの `isolation: "worktree"` は使わない。これらで作ると `worktree list` / `switch` / `cleanup` の管理外になり、`~/git-repos/aka-bane/aka-bane.com.worktrees/239-setenv` のような野良 worktree が溜まる (実際に大量発生した)。
   - **作成**: プロジェクトルートで `worktree create <task-name>` (ブランチに接頭辞が要るなら `--branch-prefix feat/`)。Issue / PR から切るなら `worktree checkout <issue または PR の URL>`。作る前に `worktree list` で同じタスクの worktree が既に無いか確認し、あれば再利用する。
@@ -159,7 +159,9 @@ op read --account skirnir 'op://skirnir-common/claude-1password-conventions/note
 - **CI / デプロイの完了を前景で待たないこと。** `gh pr checks --watch` や `gh run watch` の前景実行、`until … sleep` ループで待機すると、その間は私が指示を出せずセッションが止まる。
 - **代わりに PR 作成・push・dispatch の直後にバックグラウンド監視を張る。** Bash の `run_in_background: true` で `gh pr checks <PR> --watch --fail-fast --interval 30` (dispatch なら `gh run watch <run-id> --exit-status`) を起動し、状態 (CI 起動済み・レビュー待ち等) を報告して他の作業に戻る。push 直後はチェック未登録で即終了することがあるので、登録を待つ短い `until` を前置する。同じ CI に監視を重複して張らない。
 - **完了通知で呼び戻されたら結果を報告し、`PushNotification` で知らせる** (例: `CI failed: check (nix flake check)` / `CI passed: #123`)。
-- **失敗時の調査は簡易に留め、クイックレスポンスを優先する。** `gh run view <run-id> --log-failed` の該当箇所から原因の見立てを数行で報告するところまでとし、深掘りは私の指示を待つ。**修正の push は私の承認を得てから行う。** 細かい修正を何度も push すると private リポジトリでは Actions の課金が嵩むため、修正はローカルで検証 (`nix flake check` 等) してからまとめて 1 回で push する。
+- **失敗時の調査は簡易に留め、クイックレスポンスを優先する。** `gh run view <run-id> --log-failed` の該当箇所から原因の見立てを数行で報告する。深掘りが要るときは私の指示を待つ。
+- **PR への追加 push (CI 失敗の修正・レビュー対応とも) に私の承認は要らない。ただし細かい修正を何度も push しない。** プロジェクトによっては 1 回の push で CI が 30 分近く回り、private リポジトリでは Actions の課金も嵩む。修正はローカルで検証 (`nix flake check` 等) してから、まとめて 1 回で push する。
+- **push 前のローカル検証は CI のマトリクスに合わせる。** CI が最小対応バージョンで動くもの (例: PHPStan を PHP 8.1 で解析) は、ローカルの最新版だけで済ませず同じバージョンで確かめる。合わせられないときは、その旨を「未検証」として報告に書く。
 - チェックごとの経過を逐次追う必要があるときだけ `Monitor` を使う (最長 30 分で張り直し)。数十分以上のデプロイは `/loop` で間隔を空けて確認する。
 
 ### GitHub 操作は `gh` CLI を使う
