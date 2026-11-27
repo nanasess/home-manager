@@ -1491,6 +1491,9 @@ JSON からはグループを特定できないため。"
 ;; elisp は elpaca (上流 kazu-yamamoto/Mew)、外部コマンド (mewl / mewencode / incm /
 ;; cmew / smew) は Nix の pkgs/mew.nix (modules/emacs/default.nix で home.packages に
 ;; 入る)。両者は同じコミットに固定してある (elpaca.lock の :ref と pkgs/mew.nix の rev)。
+;; 上流 PR #376 (C-c C-e の HTML の無害化と xwidget-webkit 表示) がマージされるまでは、
+;; 7.1rc1 にその PR のコミットを載せた fork のブランチ (nanasess/Mew の issue-368-hm) に
+;; 固定している。戻し方は docs/mew.md「HTML メールを開く (C-c C-e)」。
 ;;
 ;; 秘密情報 (OAuth2 クライアント ID / secret、master password) は 1Password に置き、
 ;; `op read' で実行時に解決する。このファイルに残るのは op:// 参照だけなので
@@ -1721,7 +1724,7 @@ Emacs の起動 (daemon を含む) から `my/mew-auto-update-initial-delay' 秒
   (add-hook 'elpaca-after-init-hook #'my/mew-auto-update-start))
 
 (use-package mew
-  :ensure (:host github :repo "kazu-yamamoto/Mew")
+  :ensure (:host github :repo "nanasess/Mew" :branch "issue-368-hm")
   :commands (mew mew-send)
   :hook (mew-init . my/mew-setup-oauth2)
   :bind (:map mew-message-mode-map
@@ -1730,7 +1733,9 @@ Emacs の起動 (daemon を含む) から `my/mew-auto-update-initial-delay' 秒
          :map mew-draft-mode-map
          ("M-<down-mouse-1>" . mew-browse-url-at-mouse)
          :map mew-summary-mode-map
-         ("C-c RET" . my/mew-browse-url-open-gmail))
+         ("C-c RET" . my/mew-browse-url-open-gmail)
+         ;; C-c C-e は外部リソースを読まない。信頼するメールだけこちらで読み込む
+         ("C-c w" . mew-summary-execute-external-remote))
   :custom
   ;; アカウントは Gmail 1 本なので default ケースだけ。秘密情報 (oauth2-client-id /
   ;; oauth2-client-secret) はここには書かず my/mew-setup-oauth2 が入れる。
