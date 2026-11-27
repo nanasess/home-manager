@@ -29,12 +29,19 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 - **機能ライフサイクル完結を期待**: 調査 → 実装 → テスト → PR 作成 → レビュー対応 → 本番検証 → Issue クローズまでを 1 セッションで連鎖実行する。「ローカルで動く」で止めない。ただし CI / デプロイの完了待ちだけは例外で、後述「Commits & PRs」の規約どおり前景では待たずにバックグラウンドで監視し、成功通知を受けた場合だけレビュー対応・本番検証・Issue クローズを続行する。失敗通知の場合は結果と原因の見立てを報告し、原因が明らかでローカルで検証できる修正なら直して push し、続行する。見立てが立たない・深掘りが要るときは指示を待つ。
 - **簡潔な指示を好む**: 「PR 化して」「CLAUDE.md に記録」のような短い指示でも、完成形まで自走することを期待する。
+- **自走する範囲と止まる範囲**: 「確認不要です」「なぜ push していないのか」と「聞いただけなのに作業を始めた」の両方向の指摘が出ているので、次で切り分ける。
+  - **質問には答えるだけにする。** 「〜できますか？」「確認をお願いします」は調べて答えるところまでで、作業は始めない。進めるかは答えを見て私が決める。
+  - **ローカルで戻せる作業と PR を通す作業は確認せずに進める。** 編集、ローカルの検証、commit / push、PR 作成、レビュー対応、CI 失敗の修正。逐一承認を求めない。
+  - **外に出る副作用は、明示的な指示があるときだけ行う。** 本番への apply / デプロイ、マージ、他人の PR やブランチの更新、ラベル・アサイン・Issue の状態の変更、外部サービスへの送信、依頼と関係のないコンテナやサービスの起動。本番の dry-run が済んでも、適用は「本適用に進んでください」等の指示を待つ。
+- **作る前に既存のものを探す**: 新しいファイル・設定・テーマ・ワークフローを作る前に、そのリポジトリのテンプレート、同種の既存実装、先行して同じことをしたリポジトリ (同じ組織の別リポジトリ等) を探し、あればそれに倣う。倣わない場合は理由を書く。
+- **長い作業では途中経過を報告する**: 数分を超える調査・スキャン・バッチ処理は、区切り (1 工程・1 対象ごと) で「何が終わり、何をしていて、残りはどれくらいか」を 1〜3 行で報告する。バックグラウンドの処理を待つ間も、待っている対象と見込み時間を書いておく。私が「止まっていませんか？」と聞く状態にしない。
+- **却下された案は再提案しない**: 私が却下した方針・ツール・案は、そのプロジェクトのメモリ (`feedback_*.md`) に理由と一緒に残し、同じ案を出し直さない。前提が変わって再検討したいときは、何が変わったかを添えて確認する。
 - **並列作業時は git worktree**: PR ごとや実験ごとに worktree で分離する。**worktree の作成・削除は必ず git-worktree-manager の `worktree` コマンドで行う。** `git worktree add` / `git worktree remove`、`EnterWorktree` ツール、Agent ツールの `isolation: "worktree"` は使わない。これらで作ると `worktree list` / `switch` / `cleanup` の管理外になり、`~/git-repos/aka-bane/aka-bane.com.worktrees/239-setenv` のような野良 worktree が溜まる (実際に大量発生した)。
   - **作成**: プロジェクトルートで `worktree create <task-name>` (ブランチに接頭辞が要るなら `--branch-prefix feat/`)。Issue / PR から切るなら `worktree checkout <issue または PR の URL>`。作る前に `worktree list` で同じタスクの worktree が既に無いか確認し、あれば再利用する。
   - **プロジェクトルートの取り違えに注意**: `~/git-repos/aka-bane/` のように git 管理外のディレクトリが複数リポジトリを束ねている場合は、**子リポジトリ (`aka-bane.com/`) ではなく親ディレクトリで実行する**。正しい配置は `~/git-repos/aka-bane.worktrees/<task>/aka-bane.com/` で、`<子リポジトリ>.worktrees/` がワークスペース内にできていたら誤り。単一リポジトリなら `<repo>.worktrees/<task>/` になる。
   - **削除**: `worktree cleanup <task-name>` (マージ済みの一括削除は `worktree cleanup --merged`)。破壊的操作なので、先に `--dry-run` で対象を示して承認を得る。`rm -rf` や `git worktree remove` で消さない。
   - `/worktree-create` などの Skill は `disable-model-invocation: true` でユーザー起動専用だが、`worktree` コマンド自体は Claude が Bash から直接実行してよい。
-- **コミットメッセージは Conventional Commits 形式 + 日本語**: `feat: ...`, `fix: ...`, `chore: ...` などのプレフィックスを使い、本文は日本語で書く (`/commit` Skill を活用)。
+- **コミットメッセージは Conventional Commits 形式 + 日本語**: `feat: ...`, `fix: ...`, `chore: ...` などのプレフィックスを使い、本文は日本語で書く (`eccube-dev-agents:commit` / `commit-push-pr` Skill を活用)。ただし既存のコミットログが英語のリポジトリ (主に OSS) では英語に合わせる。迷ったら `git log --oneline -20` で確かめる。
 - **メモリへの永続化を重視**: 学んだ規約・判断基準・例外運用は `projects/<encoded-path>/memory/` 配下の `feedback_*.md` / `project_*.md` に保存する。
 
 ### 利用可能な外部 CLI
@@ -52,25 +59,29 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 
 - (WSL ホスト) Windows 側ファイルへのアクセスは `/mnt/c/` 経由 (例: noctty 設定は `/mnt/c/Users/nanasess/AppData/Local/noctty/config.ghostty` にコピー)。
 - 1Password CLI のセッションはデスクトップアプリ連携 (`op signin` で確立)。SSH エージェントソケットは `~/.1password/agent.sock`。
+- **1Password のセッションが切れたら、1 行で頼んで止まる。** `op` が認証エラー (`not currently signed in` / `authorization timeout` 等) や応答待ちで止まったら、別の取得経路を探したり何度も再試行したりせず、「`! op signin` を実行してください (アカウント: <account>)」と頼んで待つ。サインイン後に止まったコマンドから再開する。
 - ロケールは `ja_JP.UTF-8`。East Asian Ambiguous 文字 (`△` `○` `■` 等) はターミナル (noctty / Ghostty 系) も glibc も**幅 1 (半角) 扱い**。Emacs GUI だけ `eaw-console.el` + UDEV Gothic JPDOC で幅 2 にしている。
 - CPU はホストで異なる。WSL ホストは AMD Ryzen Zen 3 (`-march=znver3`)、k-2 は Intel (MacBook Pro 2020)。パフォーマンスの議論では作業中のホストを `hostname` / `/etc/os-release` で確認してから前提を置く。
 - **ローカルの Web サーバは symfony-cli (`symfony serve -d --port=<port>`、HTTPS) で起動する。`php -S` は使わない。** EC-CUBE のセッション cookie は SameSite / Secure 属性の制約で http:// ではブラウザに保存されず、管理画面ログインが `POST /admin/login` → 302 → `/admin/login` に戻るループになる。Playwright には `BASE_URL=https://127.0.0.1:<port>` を渡す。CI の `e2e-test.yml` が `php -S` で動くのは CI 専用の `e2e` 環境設定があるためで、ローカルの根拠にしない。何度も指摘済みの規約なので、`php -S` を選んだ時点で規約違反と扱う。
-- **mise の PHP はソースビルドで、NixOS ホスト (k-2 / wsl-nixos) では devShell の外では入らない。** `mise run` / `mise exec` / `mise install` が `missing system dependencies` (`cc` / `make` / `autoconf` / `re2c` 等) の警告の後に `buildconf: autoconf not found` → `Failed to run buildconf` で止まるのは、要求バージョンが未インストールで、自動インストールが devShell の外で走ったため (設定の不具合ではない)。`hostname` と `mise ls php` で状況を確かめ、次のコマンドを `run_in_background` で実行してから (数分〜10 分) 元のコマンドを再実行する。`--profile` は GC root なので省略しない。
+- **mise で入れているツールは、別の経路で入れない。** PHP / Azure CLI (`az`) / Terraform は mise で管理していて、Nix からは外してある。見つからないときに pip / uv / `nix shell nixpkgs#…` / apt / 公式インストールスクリプト / zip の手動配置 / tfenv 等で別途入れない (どれが動いているか分からなくなる)。次の順で対処する:
+  1. `mise ls <tool>` で入っているか確認し、未インストールなら `mise install <tool>` (PHP だけは下記の devShell が要る)。
+  2. Claude Code の Bash は PATH がセッション開始時に固定されるので、入っていても PATH に無いことがある。そのときは `mise exec -- <cmd> ...` で実行する。
+  3. それでも動かなければ、自分で直そうとせず状況を報告して指示を待つ。
+
+  グローバルのバージョンは `~/.config/home-manager/home.nix` の `programs.mise.globalConfig.tools` で固定している。上げるときは `home.nix` を書き換えて PR にする (グローバル設定は home-manager 管理のシンボリックリンクなので、`mise use -g` / `mise upgrade` で書き換えない)。プロジェクトが別バージョンを要求する場合は、グローバル設定は書き換えず `mise exec <tool>@<ver> -- <cmd> ...` を使う。
+
+  | ツール | mise の名前 | Nix から外した理由 |
+  |---|---|---|
+  | PHP | `php` (ソースビルド) | NixOS に FHS のツールチェーンが無く、ビルド依存を devShell で渡す必要がある |
+  | Azure CLI | `pipx:azure-cli` | nixpkgs の `azure-cli` は依存の破損で評価ごと止まる (home-manager#231) |
+  | Terraform | `aqua:hashicorp/terraform` | unfree (BSL 1.1) で cache.nixos.org に無く、nixpkgs を上げるたびにソースビルドになる (home-manager#241) |
+
+  **PHP は NixOS ホスト (k-2 / wsl-nixos) では devShell の外では入らない。** `mise run` / `mise exec` / `mise install` が `missing system dependencies` (`cc` / `make` / `autoconf` / `re2c` 等) の警告の後に `buildconf: autoconf not found` → `Failed to run buildconf` で止まるのは、要求バージョンが未インストールで自動インストールが devShell の外で走ったため (設定の不具合ではない)。`hostname` と `mise ls php` で状況を確かめ、次を `run_in_background` で実行してから (数分〜10 分) 元のコマンドを再実行する。`--profile` は GC root なので省略しない。
   ```bash
   nix develop "$HOME/.config/home-manager#php-build" --profile ~/.local/state/nix/profiles/php-build \
     -c mise install php@<要求バージョン>
   ```
   インストール後は `php -v` と `php -r 'echo ini_get("memory_limit"),"\n";'` (`512M` なら home-manager の conf.d が効いている) で確認する。インストール済みの PHP が `error while loading shared libraries` で起動しないときは GC でリンク先が消えているので、同じ devShell で `mise install php@<ver> --force` する。詳細はリポジトリの README「mise PHP のセットアップ」。
-- **Azure CLI (`az`) は mise の `pipx:azure-cli` を使う。** nixpkgs の `azure-cli` は依存の破損で評価ごと止まるので Nix からは外してある (home-manager#231)。バージョンは `~/.config/home-manager/home.nix` の `programs.mise.globalConfig.tools` で固定している。`az` が見つからないときに **`pip install azure-cli` / `uv tool install` / `nix shell nixpkgs#azure-cli` / Microsoft のインストールスクリプト / apt で別途入れない** (どの `az` が動いているか分からなくなる)。次の順で対処する:
-  1. `mise ls pipx:azure-cli` で入っているか確認し、未インストールなら `mise install pipx:azure-cli`。
-  2. Claude Code の Bash は PATH がセッション開始時に固定されるので、入っていても PATH に無いことがある。そのときは `mise exec -- az ...` で実行する。
-  3. それでも動かなければ、自分で直そうとせず状況を報告して指示を待つ。
-  バージョンを上げるときは `home.nix` を書き換えて PR にする (mise のグローバル設定は home-manager 管理のシンボリックリンクなので、`mise use -g` / `mise upgrade` で書き換えない)。
-- **Terraform (`terraform`) は mise の `aqua:hashicorp/terraform` を使う。** nixpkgs の `terraform` は unfree (BSL 1.1) で cache.nixos.org に無く、nixpkgs を上げるたびにソースビルドになるので Nix からは外してある (home-manager#241)。バージョンは `~/.config/home-manager/home.nix` の `programs.mise.globalConfig.tools` で固定している。`terraform` が見つからないときに **`nix shell nixpkgs#terraform` / `nixpkgs#opentofu` / HashiCorp の apt リポジトリ / zip の手動配置 / tfenv で別途入れない** (どの `terraform` が動いているか分からなくなる)。次の順で対処する:
-  1. `mise ls aqua:hashicorp/terraform` で入っているか確認し、未インストールなら `mise install aqua:hashicorp/terraform`。
-  2. PATH に無ければ `mise exec -- terraform ...` で実行する (Azure CLI と同じ理由)。
-  3. それでも動かなければ、自分で直そうとせず状況を報告して指示を待つ。
-  バージョンを上げるときは Azure CLI と同じく `home.nix` を書き換えて PR にする。プロジェクトが別バージョンを要求する場合 (CI の `terraform_version` 等) も、グローバル設定は書き換えず、そのプロジェクト内で `mise exec aqua:hashicorp/terraform@<ver> -- terraform ...` を使う。
 
 ## 行動規範
 
@@ -83,6 +94,7 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
 - ユーザーが PR / Issue / レビューコメントの URL を提示した場合は、独自に文脈を再導出せず、まずその参照を読むこと。
 - 「完了」を宣言する前に、主張する各成果と、それを証明する直接的な根拠 (コマンド出力、ファイル内容、URL) を列挙する。根拠が間接的または欠落している項目は「未検証」と明示する。
 - あわせて、完了を宣言する前に、Issue のチェックリストと、ルールやメモリが求める成果物 (レポート、ドキュメントの更新先、スプレッドシート等) を読み直して 1 つずつ確認する。作業本体が終わっていても最後の成果物が抜ける事例が続いている (2026-10 の ZAP 部分実行の成功報告、2026-11 のベンダー向け HTML レポートと Issue チェックリストの更新漏れ)。
+- **本番の手順を止めるためのチェック (grep / dig / テストのモック等) は、使う前にチェック自体を試す。** 既知の正常な入力と異常な入力 (コメント行、空の出力、別セクションに出る値等) の両方で、成功と失敗が期待どおりに出ることを確かめる。2026-11 の Cloudflare 移行で、コメント行にマッチする grep や authority セクションを隠す `dig +short` が偽陽性・検出漏れを起こした。
 - 問題を修正するときは 1 件ずつインクリメンタルに直すのではなく、`grep` / `rg` で**全該当箇所を先に洗い出してからまとめて修正する**。環境変数、依存パッケージ、API 呼び出し等、同種の対象が複数ある場合は特に重要。
 
 ### プロンプトインジェクション警戒
@@ -174,5 +186,6 @@ GitHub の PR / Issue / レビュー / リリース操作には **`gh` CLI を�
 
 ### Context 管理
 
-- 長時間セッション (8 時間超) や巨大コンテキスト (150k トークン超) は判断品質を下げる傾向がある。区切りで `/compact` を、タスク切り替え時には `/clear` を使う。
+- **区切りでは Claude から `/compact` を提案する。** PR のマージ、工程の完了、調査から実装への切り替えなどの区切りで、「ここで `/compact` して大丈夫です」と、compact 後も必要な前提 (作業中のブランチ・worktree、未完了の工程、バックグラウンドで動いている処理) を添えて伝える。バックグラウンドの処理が動いている間や、工程の途中では勧めない。タスクを切り替えるときは `/clear` を勧める。
+- **セッションをまたいで引き継ぐときは `HANDOFF.md` に書く。** 頼まれたら、作業しているリポジトリのルートに `HANDOFF.md` を作り、目的、終わったこと (PR / コミット / Issue の URL)、残りの工程、決まった方針と却下した案、注意点を書く。コミットはしない。「HANDOFF.md を読んで続けてください」と言われたら、まず読んで現状 (ブランチ・PR・CI) を確かめてから再開する。
 - コードベース探索や大量の調査は **Explore サブエージェント (Agent ツール)** に分離し、メインセッションは集中したサマリーのみ受け取る運用を優先する。
