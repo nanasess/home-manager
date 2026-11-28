@@ -223,6 +223,17 @@
     fi
   '';
 
+  # マルチリポ構成の親ディレクトリ (~/git-repos/<ws>/) の CLAUDE.md は案件名を含むので、
+  # private の skirnir-dev/claude-workspaces で管理し、各親ディレクトリへ symlink している。
+  # ワークスペース名をこの public リポジトリに書かないよう、clone 漏れの警告だけに留める。
+  home.activation.claudeWorkspacesCheck = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    if [ ! -d "$HOME/git-repos/claude-workspaces/.git" ]; then
+      warnEcho "~/git-repos/claude-workspaces がありません。マルチリポの CLAUDE.md を使うには clone してください:"
+      warnEcho "  git clone git@github.com:skirnir-dev/claude-workspaces.git ~/git-repos/claude-workspaces"
+      warnEcho "  ~/git-repos/claude-workspaces/clone.sh && ~/git-repos/claude-workspaces/link.sh"
+    fi
+  '';
+
   # 区切りは RFC 3676 の "-- " (末尾空白あり)。'' 文字列だと末尾空白が
   # フォーマッタやエディタで消されやすいので通常の文字列で書く。
   home.file.".signature".text = "-- \n大河内健太郎\n";

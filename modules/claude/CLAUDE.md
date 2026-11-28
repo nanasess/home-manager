@@ -41,6 +41,7 @@ EC-CUBE 関連の作業では以下の長期的な方向性を踏まえる。直
   - **プロジェクトルートの取り違えに注意**: `~/git-repos/aka-bane/` のように git 管理外のディレクトリが複数リポジトリを束ねている場合は、**子リポジトリ (`aka-bane.com/`) ではなく親ディレクトリで実行する**。正しい配置は `~/git-repos/aka-bane.worktrees/<task>/aka-bane.com/` で、`<子リポジトリ>.worktrees/` がワークスペース内にできていたら誤り。単一リポジトリなら `<repo>.worktrees/<task>/` になる。
   - **削除**: `worktree cleanup <task-name>` (マージ済みの一括削除は `worktree cleanup --merged`)。破壊的操作なので、先に `--dry-run` で対象を示して承認を得る。`rm -rf` や `git worktree remove` で消さない。
   - `/worktree-create` などの Skill は `disable-model-invocation: true` でユーザー起動専用だが、`worktree` コマンド自体は Claude が Bash から直接実行してよい。
+- **マルチリポの親ディレクトリの CLAUDE.md は private リポジトリ `skirnir-dev/claude-workspaces` で管理している。** `~/git-repos/<ws>/CLAUDE.md` (と一部の `.claude/commands` / `skills`) は `~/git-repos/claude-workspaces/workspaces/<ws>/` への symlink。編集はリンク先で行い、そのリポジトリで commit / push する (Edit ツールは symlink への書き込みを拒否してリンク先を示す)。親ディレクトリで `git init` しない (git-worktree-manager が単一リポ扱いになる)。新しいワークスペースの CLAUDE.md を作ったら、同リポジトリの README「ワークスペースを追加する」に従って取り込む。
 - **コミットメッセージは Conventional Commits 形式 + 日本語**: `feat: ...`, `fix: ...`, `chore: ...` などのプレフィックスを使い、本文は日本語で書く (`eccube-dev-agents:commit` / `commit-push-pr` Skill を活用)。ただし既存のコミットログが英語のリポジトリ (主に OSS) では英語に合わせる。迷ったら `git log --oneline -20` で確かめる。
 - **メモリへの永続化を重視**: 学んだ規約・判断基準・例外運用は `projects/<encoded-path>/memory/` 配下の `feedback_*.md` / `project_*.md` に保存する。
 
